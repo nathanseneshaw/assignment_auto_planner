@@ -11,7 +11,7 @@ import { parseBlackboardGradesHtml } from './lms-grades-parse.js'
 import {
   parseBlackboardCourseDisplayFields,
   looksLikeBlackboardCourseListEntry,
-} from '../src/utils/blackboardCourseName.js'
+} from '../utils/blackboardCourseName.js'
 
 const PORTAL_TAB_GROUP = '_1_1'
 const PORTAL_MODULE = '_4_1'
