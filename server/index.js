@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import './load-env.js'
 import express from 'express'
 import cors from 'cors'
 import { BlackboardScraper } from './blackboard-scraper.js'
@@ -16,21 +16,39 @@ import {
   closeAllPlaywrightSessions
 } from './playwright-scraper.js'
 import {
-  isCanvasOAuthConfigured,
-  createOAuthStart,
-  consumeOAuthState,
-  exchangeAuthorizationCode,
-  createServerSession,
-  getServerSession,
-  revokeServerSession,
   syncCanvasData,
   normalizeCanvasBaseUrl
 } from './canvas-lms.js'
 
 const app = express()
-const PORT = process.env.PORT || 3001
+const PORT = Number(process.env.PORT) || 3001
+const HOST = process.env.HOST || '0.0.0.0'
 
-app.use(cors())
+function parseAllowedOrigins() {
+  const fromAllowList = String(process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const front = String(process.env.FRONTEND_URL || '').trim()
+  const set = new Set(fromAllowList)
+  if (front) set.add(front)
+  return [...set]
+}
+
+const allowedOrigins = parseAllowedOrigins()
+
+app.set('trust proxy', 1)
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true)
+      if (allowedOrigins.length === 0) return callback(null, true)
+      if (allowedOrigins.includes(origin)) return callback(null, true)
+      callback(null, false)
+    },
+  })
+)
 app.use(express.json())
 
 // ============================================
@@ -419,84 +437,9 @@ app.post('/api/blackboard/sync', async (req, res) => {
 })
 
 // ============================================
-// CANVAS LMS (OAuth2 + API proxy)
+// CANVAS LMS (API sync — browser session + optional token)
 // ============================================
 
-app.get('/api/canvas/config', (req, res) => {
-  res.json({
-    success: true,
-    oauthConfigured: isCanvasOAuthConfigured()
-  })
-})
-
-app.post('/api/canvas/oauth/start', (req, res) => {
-  const { canvasBaseUrl } = req.body || {}
-  if (!canvasBaseUrl) {
-    return res.status(400).json({ success: false, error: 'canvasBaseUrl is required' })
-  }
-  try {
-    const { authUrl, state } = createOAuthStart(canvasBaseUrl)
-    res.json({ success: true, authUrl, state })
-  } catch (e) {
-    console.error('[Canvas] oauth/start:', e)
-    res.status(500).json({ success: false, error: e.message || 'Failed to start Canvas OAuth' })
-  }
-})
-
-app.get('/api/canvas/oauth/callback', async (req, res) => {
-  const { code, state, error, error_description: errorDescription } = req.query
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-  const redirect = (path) => {
-    res.redirect(302, `${frontendUrl}${path}`)
-  }
-
-  if (error) {
-    const msg = encodeURIComponent(String(errorDescription || error))
-    return redirect(`/profile?canvas_oauth=error&message=${msg}`)
-  }
-
-  if (!code || !state) {
-    return redirect('/profile?canvas_oauth=error&message=missing_code_or_state')
-  }
-
-  const pending = consumeOAuthState(String(state))
-  if (!pending) {
-    return redirect('/profile?canvas_oauth=error&message=invalid_or_expired_state')
-  }
-
-  try {
-    const { accessToken } = await exchangeAuthorizationCode(pending.baseUrl, String(code))
-    const sessionId = createServerSession(pending.baseUrl, accessToken)
-    return redirect(`/profile?canvas_oauth=success&canvas_sid=${encodeURIComponent(sessionId)}`)
-  } catch (e) {
-    console.error('[Canvas] oauth/callback:', e)
-    const msg = encodeURIComponent(e.message || 'token_exchange_failed')
-    return redirect(`/profile?canvas_oauth=error&message=${msg}`)
-  }
-})
-
-app.post('/api/canvas/sync', async (req, res) => {
-  const { sessionId } = req.body || {}
-  if (!sessionId) {
-    return res.status(400).json({ success: false, error: 'sessionId is required' })
-  }
-  const session = getServerSession(String(sessionId))
-  if (!session) {
-    return res.status(401).json({
-      success: false,
-      error: 'Invalid or expired Canvas session. Connect Canvas again.'
-    })
-  }
-  try {
-    const data = await syncCanvasData(session.baseUrl, session.accessToken)
-    res.json({ success: true, data })
-  } catch (e) {
-    console.error('[Canvas] sync:', e)
-    res.status(500).json({ success: false, error: e.message || 'Canvas sync failed' })
-  }
-})
-
-/** Sync using a personal access token (no OAuth). Keeps token off browser→Canvas CORS issues. */
 app.post('/api/canvas/sync-token', async (req, res) => {
   const { canvasBaseUrl, accessToken } = req.body || {}
   if (!canvasBaseUrl || !accessToken) {
@@ -515,15 +458,16 @@ app.post('/api/canvas/sync-token', async (req, res) => {
   }
 })
 
-app.post('/api/canvas/session/revoke', (req, res) => {
-  const { sessionId } = req.body || {}
-  if (sessionId) revokeServerSession(String(sessionId))
-  res.json({ success: true })
-})
-
-// Health check
+// Health check (Render / load balancers)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+app.get('/', (_req, res) => {
+  res.json({
+    service: 'assignment-planner-api',
+    health: '/api/health',
+  })
 })
 
 function gracefulShutdown(signal) {
@@ -541,21 +485,17 @@ process.on('SIGTERM', () => {
   gracefulShutdown('SIGTERM')
 })
 
-app.listen(PORT, () => {
-  console.log(`Blackboard scraper server running on http://localhost:${PORT}`)
+app.listen(PORT, HOST, () => {
+  console.log(`API server listening on http://${HOST}:${PORT}`)
   console.log('Endpoints:')
   console.log('  POST /api/blackboard/start-session - Start SSO login session')
   console.log('  GET  /api/blackboard/check-login/:sessionId - Check if logged in')
   console.log('  POST /api/blackboard/sync-session/:sessionId - Sync after login')
   console.log('  POST /api/blackboard/close-session/:sessionId - Close session')
-  console.log('Canvas LMS:')
+  console.log('Canvas LMS (browser + token):')
   console.log('  POST /api/canvas/start-session — Playwright login (browser)')
   console.log('  GET  /api/canvas/check-login/:sessionId')
   console.log('  POST /api/canvas/sync-session/:sessionId')
   console.log('  POST /api/canvas/close-session/:sessionId')
-  console.log('  GET  /api/canvas/config (OAuth/API optional)')
-  console.log('  POST /api/canvas/oauth/start')
-  console.log('  GET  /api/canvas/oauth/callback')
-  console.log('  POST /api/canvas/sync')
   console.log('  POST /api/canvas/sync-token')
 })

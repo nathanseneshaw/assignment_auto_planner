@@ -5,6 +5,7 @@
 
 import { randomUUID } from 'crypto'
 import { chromium } from 'playwright'
+import { buildChromiumLaunchOptions } from './playwright-launch.js'
 import { BlackboardHttpSession } from './blackboard-http-session.js'
 import { registerBlackboardHttpSession } from './blackboard-http-manager.js'
 
@@ -154,7 +155,7 @@ export async function startBlackboardSsoSession(opts) {
 
     if (!page) {
       const ch = resolvePlaywrightChannel(browserChannelFromBody)
-      const launchOpts = { headless: false, channel: ch }
+      const launchOpts = buildChromiumLaunchOptions(ch)
       if (ch) launchChannelUsed = ch
       browser = await chromium.launch(launchOpts)
       context = await browser.newContext()

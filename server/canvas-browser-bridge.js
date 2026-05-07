@@ -4,6 +4,7 @@
 
 import { randomUUID } from 'crypto'
 import { chromium } from 'playwright'
+import { buildChromiumLaunchOptions } from './playwright-launch.js'
 import {
   normalizeCanvasBaseUrl,
   verifyCanvasCookieSession,
@@ -150,7 +151,7 @@ export async function startCanvasBrowserSession(opts = {}) {
 
     if (!page) {
       const ch = resolvePlaywrightChannel(browserChannelFromBody)
-      const launchOpts = { headless: false, channel: ch }
+      const launchOpts = buildChromiumLaunchOptions(ch)
       if (ch) launchChannelUsed = ch
       browser = await chromium.launch(launchOpts)
       context = await browser.newContext()

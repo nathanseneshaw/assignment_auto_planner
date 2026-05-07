@@ -56,19 +56,6 @@ export const useProfileStore = defineStore('profile', () => {
     return true
   }
 
-  function connectCanvasOAuth(apiUrl, serverSessionId) {
-    lmsConnections.value.canvas = {
-      connected: true,
-      authMode: 'oauth',
-      apiUrl: apiUrl.trim(),
-      apiToken: '',
-      serverSessionId: String(serverSessionId || ''),
-      lastSynced: null
-    }
-    saveToLocalStorage()
-    return true
-  }
-
   /** Canvas via embedded browser sync (no API token); user signs in in a real browser window. */
   function connectCanvasBrowser(apiUrl) {
     lmsConnections.value.canvas = {
@@ -181,9 +168,14 @@ export const useProfileStore = defineStore('profile', () => {
       const parsed = JSON.parse(savedLms)
       lmsConnections.value = parsed
       const c = lmsConnections.value.canvas
+      if (c?.authMode === 'oauth') {
+        c.connected = false
+        c.serverSessionId = ''
+        c.authMode = 'token'
+      }
       if (c && c.authMode == null) {
         if (c.apiToken) c.authMode = 'token'
-        else if (c.serverSessionId) c.authMode = 'oauth'
+        else if (c.serverSessionId) c.authMode = 'browser'
         else c.authMode = 'browser'
       }
       if (c && c.serverSessionId == null) c.serverSessionId = ''
@@ -204,7 +196,6 @@ export const useProfileStore = defineStore('profile', () => {
     hasAnyLmsConnected,
     updateProfile,
     connectCanvas,
-    connectCanvasOAuth,
     connectCanvasBrowser,
     disconnectCanvas,
     connectBlackboard,

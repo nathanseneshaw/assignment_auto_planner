@@ -1,30 +1,8 @@
 /**
- * Canvas LMS API + OAuth2 helpers (Instructure-hosted Canvas).
- * @see https://canvas.instructure.com/doc/api/file.oauth.html
+ * Canvas LMS API helpers (course sync via token or browser cookie session).
  */
 
-import crypto from 'crypto'
 import * as cheerio from 'cheerio'
-
-const pendingOAuthStates = new Map()
-const serverSessions = new Map()
-
-const PENDING_TTL_MS = 15 * 60 * 1000
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000
-
-function now() {
-  return Date.now()
-}
-
-function cleanupMaps() {
-  const t = now()
-  for (const [k, v] of pendingOAuthStates) {
-    if (t - v.createdAt > PENDING_TTL_MS) pendingOAuthStates.delete(k)
-  }
-  for (const [k, v] of serverSessions) {
-    if (t - v.createdAt > SESSION_TTL_MS) serverSessions.delete(k)
-  }
-}
 
 export function normalizeCanvasBaseUrl(input) {
   if (!input || typeof input !== 'string') throw new Error('Canvas URL is required')
@@ -33,90 +11,6 @@ export function normalizeCanvasBaseUrl(input) {
   const parsed = new URL(u)
   if (!parsed.hostname) throw new Error('Invalid Canvas URL')
   return `${parsed.origin}`
-}
-
-export function isCanvasOAuthConfigured() {
-  return Boolean(process.env.CANVAS_CLIENT_ID && process.env.CANVAS_CLIENT_SECRET)
-}
-
-export function getCanvasConfig() {
-  const clientId = process.env.CANVAS_CLIENT_ID || ''
-  const clientSecret = process.env.CANVAS_CLIENT_SECRET || ''
-  const redirectUri =
-    process.env.CANVAS_REDIRECT_URI || 'http://localhost:3001/api/canvas/oauth/callback'
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      'Canvas OAuth is not configured. Set CANVAS_CLIENT_ID and CANVAS_CLIENT_SECRET in server/.env'
-    )
-  }
-  return { clientId, clientSecret, redirectUri, frontendUrl }
-}
-
-/**
- * Returns URL to send the user to for authorization.
- */
-export function createOAuthStart(canvasBaseUrl) {
-  cleanupMaps()
-  const baseUrl = normalizeCanvasBaseUrl(canvasBaseUrl)
-  const { clientId, redirectUri } = getCanvasConfig()
-  const state = crypto.randomBytes(24).toString('hex')
-  pendingOAuthStates.set(state, { baseUrl, createdAt: now() })
-
-  const authUrl = new URL('/login/oauth2/auth', baseUrl)
-  authUrl.searchParams.set('client_id', clientId)
-  authUrl.searchParams.set('response_type', 'code')
-  authUrl.searchParams.set('redirect_uri', redirectUri)
-  authUrl.searchParams.set('state', state)
-
-  return { authUrl: authUrl.toString(), state }
-}
-
-export function consumeOAuthState(state) {
-  cleanupMaps()
-  const row = pendingOAuthStates.get(state)
-  if (!row) return null
-  pendingOAuthStates.delete(state)
-  if (now() - row.createdAt > PENDING_TTL_MS) return null
-  return row
-}
-
-export async function exchangeAuthorizationCode(canvasBaseUrl, code) {
-  const baseUrl = normalizeCanvasBaseUrl(canvasBaseUrl)
-  const { clientId, clientSecret, redirectUri } = getCanvasConfig()
-  const tokenUrl = new URL('/login/oauth2/token', baseUrl)
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: redirectUri,
-    code
-  })
-
-  const res = await fetch(tokenUrl.toString(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body
-  })
-
-  const text = await res.text()
-  let data
-  try {
-    data = JSON.parse(text)
-  } catch {
-    throw new Error(`Canvas token exchange failed: ${res.status} ${text.slice(0, 200)}`)
-  }
-
-  if (!res.ok) {
-    throw new Error(data.error_description || data.error || `Token exchange failed (${res.status})`)
-  }
-
-  return {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token || null,
-    expiresIn: data.expires_in || null,
-    user: data.user || null
-  }
 }
 
 function appendCanvasSearchParams(u, searchParams) {
@@ -279,37 +173,7 @@ export async function syncCanvasDataWithFetcher(root, jsonFetcher) {
 }
 
 /**
- * Create server-side session after OAuth; returns opaque session id for the SPA.
- */
-export function createServerSession(baseUrl, accessToken, meta = {}) {
-  cleanupMaps()
-  const sessionId = crypto.randomBytes(16).toString('hex')
-  serverSessions.set(sessionId, {
-    baseUrl: normalizeCanvasBaseUrl(baseUrl),
-    accessToken,
-    createdAt: now(),
-    ...meta
-  })
-  return sessionId
-}
-
-export function getServerSession(sessionId) {
-  cleanupMaps()
-  const row = serverSessions.get(sessionId)
-  if (!row) return null
-  if (now() - row.createdAt > SESSION_TTL_MS) {
-    serverSessions.delete(sessionId)
-    return null
-  }
-  return row
-}
-
-export function revokeServerSession(sessionId) {
-  serverSessions.delete(sessionId)
-}
-
-/**
- * Full sync: active courses + assignments. Works with OAuth token or personal access token.
+ * Full sync: active courses + assignments (personal access token from sync-token route).
  */
 export async function syncCanvasData(baseUrl, accessToken) {
   const root = normalizeCanvasBaseUrl(baseUrl)
