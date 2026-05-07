@@ -1,11 +1,11 @@
-# Blueprint: Web Service for /server (Node + Playwright Chromium).
+# Blueprint: Web Service for src/server (Node + Playwright Chromium).
 # In Render Dashboard: New → Blueprint → connect repo, or paste this file at repo root.
 services:
   - type: web
     name: assignment-planner-api
     runtime: node
     plan: free
-    rootDir: server
+    rootDir: src/server
     buildCommand: npm install && npx playwright install chromium
     startCommand: npm start
     healthCheckPath: /api/health

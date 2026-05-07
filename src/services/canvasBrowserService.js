@@ -11,7 +11,7 @@ async function fetchJsonAlways(url, init) {
   const head = text.trimStart().slice(0, 64).toLowerCase()
   if (head.startsWith('<!doctype') || head.startsWith('<html') || head.startsWith('<!')) {
     throw new Error(
-      'The app got a web page instead of API data. Start the backend: cd server && npm start'
+      'The app got a web page instead of API data. Start the backend: cd src/server && npm start'
     )
   }
   let data

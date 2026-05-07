@@ -1,5 +1,5 @@
 /**
- * Local development: load server/.env and server/.env.local without the dotenv package.
+ * Local development: load src/server/.env and src/server/.env.local without the dotenv package.
  * Never overwrites existing process.env (Render / Vercel / CI inject vars first).
  */
 import fs from 'node:fs'

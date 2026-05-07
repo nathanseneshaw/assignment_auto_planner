@@ -663,7 +663,7 @@ async function signOutAccount() {
                 <span class="text-sm font-medium">Backend server not running</span>
               </div>
               <p class="text-sm text-amber-700 mt-1">
-                Run <code class="bg-amber-100 px-1 rounded">cd server && npm install && npm start</code> to start the server.
+                Run <code class="bg-amber-100 px-1 rounded">cd src/server && npm install && npm start</code> to start the server.
               </p>
             </div>
 
