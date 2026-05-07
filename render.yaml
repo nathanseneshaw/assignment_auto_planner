@@ -6,6 +6,6 @@ services:
     runtime: node
     plan: free
     rootDir: src/server
-    buildCommand: npm install && npx playwright install chromium
+    buildCommand: cd ../.. && npm install && npx playwright install chromium
     startCommand: npm start
     healthCheckPath: /api/health
