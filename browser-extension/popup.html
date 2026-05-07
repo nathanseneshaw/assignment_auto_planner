@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assignment Auto-Planner</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      width: 340px;
+      padding: 16px;
+      background: #f8fafc;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+    
+    .subtitle {
+      font-size: 12px;
+      color: #64748b;
+    }
+    
+    .last-synced {
+      background: #f1f5f9;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .last-synced-label {
+      font-size: 12px;
+      color: #64748b;
+    }
+    
+    .last-synced-time {
+      font-size: 12px;
+      font-weight: 500;
+      color: #1e293b;
+    }
+    
+    .last-synced-time.recent {
+      color: #16a34a;
+    }
+    
+    .last-synced-time.old {
+      color: #d97706;
+    }
+    
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .status.success { background: #dcfce7; color: #166534; }
+    .status.warning { background: #fef3c7; color: #92400e; }
+    .status.error { background: #fee2e2; color: #991b1b; }
+    .status.info { background: #e0e7ff; color: #3730a3; }
+    .status.syncing { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); color: #3730a3; }
+    
+    .data-summary {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .data-summary h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    
+    .data-item {
+      text-align: center;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 8px;
+    }
+    
+    .data-number {
+      font-size: 28px;
+      font-weight: 700;
+      color: #6366f1;
+    }
+    
+    .data-label {
+      font-size: 11px;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    .btn-secondary {
+      background: white;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+      margin-top: 8px;
+    }
+    
+    .btn-secondary:hover:not(:disabled) {
+      background: #f9fafb;
+    }
+    
+    .btn-small {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    
+    .progress-container {
+      margin: 16px 0;
+    }
+    
+    .progress-bar {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    
+    .progress-text {
+      font-size: 12px;
+      color: #64748b;
+      text-align: center;
+      margin-top: 8px;
+    }
+    
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #c7d2fe;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .settings {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+    }
+    
+    .settings summary {
+      font-size: 12px;
+      color: #64748b;
+      cursor: pointer;
+    }
+    
+    .settings-content {
+      margin-top: 12px;
+    }
+    
+    .settings label {
+      font-size: 12px;
+      color: #64748b;
+      display: block;
+      margin-bottom: 4px;
+    }
+    
+    .settings input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    
+    .auto-sync-note {
+      font-size: 11px;
+      color: #64748b;
+      text-align: center;
+      margin-top: 12px;
+      padding: 8px;
+      background: #f8fafc;
+      border-radius: 6px;
+    }
+    
+    .no-data {
+      text-align: center;
+      padding: 24px 16px;
+      color: #64748b;
+    }
+    
+    .no-data-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+    
+    .no-data h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 6px;
+    }
+    
+    .no-data p {
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">AP</div>
+    <div>
+      <div class="title">Assignment Auto-Planner</div>
+      <div class="subtitle">Blackboard Sync</div>
+    </div>
+  </div>
+  
+  <div id="lastSynced" class="last-synced" style="display: none;">
+    <span class="last-synced-label">Last synced</span>
+    <span id="lastSyncedTime" class="last-synced-time">Never</span>
+  </div>
+  
+  <div id="statusContainer" style="display: none;">
+    <div id="status" class="status info">
+      <span id="statusText">Ready</span>
+    </div>
+  </div>
+  
+  <div id="progressContainer" class="progress-container" style="display: none;">
+    <div class="progress-bar">
+      <div id="progressFill" class="progress-fill"></div>
+    </div>
+    <div id="progressText" class="progress-text">Syncing...</div>
+  </div>
+  
+  <div id="dataSummary" class="data-summary" style="display: none;">
+    <h3>Synced Data</h3>
+    <div class="data-grid">
+      <div class="data-item">
+        <div id="courseCount" class="data-number">0</div>
+        <div class="data-label">Courses</div>
+      </div>
+      <div class="data-item">
+        <div id="assignmentCount" class="data-number">0</div>
+        <div class="data-label">Assignments</div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="noData" class="no-data" style="display: none;">
+    <div class="no-data-icon">📚</div>
+    <h3>No Data Yet</h3>
+    <p>Open Blackboard to auto-sync, or click Sync Now</p>
+  </div>
+  
+  <button id="sendToAppBtn" class="btn btn-primary" style="display: none;">
+    Send to Assignment Planner
+  </button>
+  
+  <button id="syncNowBtn" class="btn btn-secondary">
+    <span id="syncBtnText">Sync Now</span>
+  </button>
+  
+  <div class="auto-sync-note">
+    ✓ Auto-syncs when you open Blackboard
+  </div>
+  
+  <details class="settings">
+    <summary>Settings</summary>
+    <div class="settings-content">
+      <label for="appUrl">App URL</label>
+      <input type="text" id="appUrl" value="http://localhost:5173">
+    </div>
+  </details>
+  
+  <details class="settings" style="margin-top: 8px;">
+    <summary>Debug Log</summary>
+    <div class="settings-content">
+      <pre id="debugLog" style="font-size: 10px; max-height: 150px; overflow-y: auto; background: #f1f5f9; padding: 8px; border-radius: 4px; white-space: pre-wrap; word-break: break-all;"></pre>
+    </div>
+  </details>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
