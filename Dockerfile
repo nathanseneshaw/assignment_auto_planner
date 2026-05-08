@@ -11,8 +11,9 @@ COPY package.json package-lock.json ./
 # Install production dependencies only
 RUN npm ci --omit=dev
 
-# Copy server source
+# Copy server source and shared utilities it imports
 COPY src/server/ ./src/server/
+COPY src/utils/ ./src/utils/
 
 # Force headless + production mode in container
 ENV NODE_ENV=production
