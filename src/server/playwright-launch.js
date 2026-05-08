@@ -25,9 +25,12 @@ export function resolvePlaywrightHeadless() {
  */
 export function buildChromiumLaunchOptions(channel) {
   const headless = resolvePlaywrightHeadless()
+  const executablePath = process.env.CHROMIUM_PATH || undefined
+
   const launchOpts = {
     headless,
     ...(channel ? { channel } : {}),
+    ...(executablePath ? { executablePath } : {}),
   }
   const needsSandboxWorkaround =
     headless || process.env.RENDER === 'true' || process.platform === 'linux'

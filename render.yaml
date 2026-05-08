@@ -1,4 +1,4 @@
-# Blueprint: Web Service for src/server (Node + Playwright Chromium).
+# Blueprint: Web Service for src/server (Node + system Chromium via apt).
 # In Render Dashboard: New → Blueprint → connect repo, or paste this file at repo root.
 services:
   - type: web
@@ -6,6 +6,11 @@ services:
     runtime: node
     plan: free
     rootDir: src/server
-    buildCommand: cd ../.. && npm install && npx playwright install chromium
+    buildCommand: cd ../.. && npm install --omit=dev && apt-get install -y --no-install-recommends chromium-browser
     startCommand: npm start
     healthCheckPath: /api/health
+    envVars:
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: "1"
+      - key: CHROMIUM_PATH
+        value: /usr/bin/chromium-browser
