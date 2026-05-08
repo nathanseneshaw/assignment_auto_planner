@@ -20,8 +20,6 @@ export function importSourceLabel(importSource) {
       return 'Blackboard'
     case 'canvas':
       return 'Canvas'
-    case 'extension':
-      return 'Extension'
     default:
       return ''
   }

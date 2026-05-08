@@ -6,10 +6,15 @@ export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref([])
   const loading = ref(false)
 
+  function localDateKey(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
   const tasksByDate = computed(() => {
     const grouped = {}
     tasks.value.forEach(task => {
       const date = task.scheduledDate
+      if (!date) return
       if (!grouped[date]) {
         grouped[date] = []
       }
@@ -19,7 +24,7 @@ export const useTasksStore = defineStore('tasks', () => {
   })
 
   const todaysTasks = computed(() => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = localDateKey()
     return tasks.value
       .filter(t => t.scheduledDate === today)
       .sort((a, b) => a.priority - b.priority)
@@ -30,7 +35,7 @@ export const useTasksStore = defineStore('tasks', () => {
   })
 
   const overdueTasks = computed(() => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = localDateKey()
     return tasks.value.filter(t => t.scheduledDate < today && !t.completed)
   })
 

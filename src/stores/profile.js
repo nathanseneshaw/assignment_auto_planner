@@ -28,12 +28,6 @@ export const useProfileStore = defineStore('profile', () => {
     }
   })
 
-  const extensionSync = ref({
-    lastSynced: null,
-    coursesImported: 0,
-    assignmentsImported: 0
-  })
-
   const isCanvasConnected = computed(() => lmsConnections.value.canvas.connected)
   const isBlackboardConnected = computed(() => lmsConnections.value.blackboard.connected)
   const hasAnyLmsConnected = computed(() => isCanvasConnected.value || isBlackboardConnected.value)
@@ -141,47 +135,37 @@ export const useProfileStore = defineStore('profile', () => {
     saveToLocalStorage()
   }
 
-  function updateExtensionSync(coursesCount, assignmentsCount) {
-    extensionSync.value = {
-      lastSynced: new Date().toISOString(),
-      coursesImported: coursesCount,
-      assignmentsImported: assignmentsCount
-    }
-    saveToLocalStorage()
-  }
-
   function saveToLocalStorage() {
     localStorage.setItem('profile', JSON.stringify(profile.value))
     localStorage.setItem('lmsConnections', JSON.stringify(lmsConnections.value))
-    localStorage.setItem('extensionSync', JSON.stringify(extensionSync.value))
   }
 
   function loadFromLocalStorage() {
-    const savedProfile = localStorage.getItem('profile')
-    const savedLms = localStorage.getItem('lmsConnections')
-    const savedExtensionSync = localStorage.getItem('extensionSync')
-    
-    if (savedProfile) {
-      profile.value = JSON.parse(savedProfile)
-    }
-    if (savedLms) {
-      const parsed = JSON.parse(savedLms)
-      lmsConnections.value = parsed
-      const c = lmsConnections.value.canvas
-      if (c?.authMode === 'oauth') {
-        c.connected = false
-        c.serverSessionId = ''
-        c.authMode = 'token'
+    try {
+      const savedProfile = localStorage.getItem('profile')
+      const savedLms = localStorage.getItem('lmsConnections')
+
+      if (savedProfile) {
+        profile.value = JSON.parse(savedProfile)
       }
-      if (c && c.authMode == null) {
-        if (c.apiToken) c.authMode = 'token'
-        else if (c.serverSessionId) c.authMode = 'browser'
-        else c.authMode = 'browser'
+      if (savedLms) {
+        const parsed = JSON.parse(savedLms)
+        lmsConnections.value = parsed
+        const c = lmsConnections.value.canvas
+        if (c?.authMode === 'oauth') {
+          c.connected = false
+          c.serverSessionId = ''
+          c.authMode = 'token'
+        }
+        if (c && c.authMode == null) {
+          if (c.apiToken) c.authMode = 'token'
+          else if (c.serverSessionId) c.authMode = 'browser'
+          else c.authMode = 'browser'
+        }
+        if (c && c.serverSessionId == null) c.serverSessionId = ''
       }
-      if (c && c.serverSessionId == null) c.serverSessionId = ''
-    }
-    if (savedExtensionSync) {
-      extensionSync.value = JSON.parse(savedExtensionSync)
+    } catch (e) {
+      console.warn('[profile] Failed to load from localStorage, using defaults:', e)
     }
   }
 
@@ -190,7 +174,6 @@ export const useProfileStore = defineStore('profile', () => {
   return {
     profile,
     lmsConnections,
-    extensionSync,
     isCanvasConnected,
     isBlackboardConnected,
     hasAnyLmsConnected,
@@ -202,7 +185,6 @@ export const useProfileStore = defineStore('profile', () => {
     connectBlackboardBrowser,
     updateBlackboardCourses,
     disconnectBlackboard,
-    syncLms,
-    updateExtensionSync
+    syncLms
   }
 })

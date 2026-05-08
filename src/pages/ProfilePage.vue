@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useProfileStore } from '../stores/profile'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
@@ -15,13 +15,8 @@ import {
   getBlackboardCourses, 
   checkServerHealth 
 } from '../services/blackboardService'
-import { ensureCourseForBlackboardItem } from '../utils/blackboardImport.js'
-import {
-  sanitizeBlackboardCourseDisplayName,
-  blackboardCourseTitlesLooselyEqual,
-} from '../utils/blackboardCourseName.js'
+import { sanitizeBlackboardCourseDisplayName } from '../utils/blackboardCourseName.js'
 
-const route = useRoute()
 const router = useRouter()
 const { showToast } = useToast()
 
@@ -30,8 +25,6 @@ const authStore = useAuthStore()
 const coursesStore = useCoursesStore()
 const assignmentsStore = useAssignmentsStore()
 
-const showImportModal = ref(false)
-const importData = ref(null)
 const showBlackboardModal = ref(false)
 const showBlackboardSyncModal = ref(false)
 const showCanvasSyncModal = ref(false)
@@ -96,126 +89,7 @@ function bbCourseListLabel(course) {
 
 onMounted(async () => {
   serverOnline.value = await checkServerHealth()
-
-  // Check for import data from browser extension
-  const importParam = route.query.import
-  if (importParam) {
-    try {
-      const data = JSON.parse(importParam)
-      if (data && (data.courses?.length > 0 || data.assignments?.length > 0)) {
-        importData.value = data
-        
-        // Auto-import if flag is set (from automated extension sync)
-        if (data.autoImport) {
-          // Small delay to let page render
-          setTimeout(() => {
-            const result = importFromExtension()
-            if (result) {
-              profileStore.updateExtensionSync(result.courses, result.assignments)
-              showToast(`Imported ${result.courses} courses and ${result.assignments} assignments from Blackboard`, 'success')
-            }
-          }, 300)
-        } else {
-          showImportModal.value = true
-        }
-      }
-      // Clear the URL parameter
-      router.replace({ query: {} })
-    } catch (e) {
-      console.error('Failed to parse import data:', e)
-    }
-  }
 })
-
-function importFromExtension() {
-  if (!importData.value) return
-  
-  let coursesAdded = 0
-  let assignmentsAdded = 0
-  
-  // Import courses
-  if (importData.value.courses) {
-    for (const course of importData.value.courses) {
-      const displayName =
-        sanitizeBlackboardCourseDisplayName(course.name || course.fullName || '') ||
-        course.name ||
-        course.fullName
-      const existingCourse = coursesStore.courses.find(
-        c =>
-          c.blackboardId === course.id ||
-          c.name === course.name ||
-          (course.fullName && c.name === course.fullName) ||
-          (displayName && blackboardCourseTitlesLooselyEqual(c.name, displayName))
-      )
-      if (!existingCourse) {
-        coursesStore.addCourse({
-          name: displayName || 'Untitled course',
-          code: course.code || '',
-          instructor: course.instructor || '',
-          term: course.term || '',
-          blackboardId: course.id,
-          lmsSource: 'extension'
-        })
-        coursesAdded++
-      } else if (course.instructor && !existingCourse.instructor) {
-        // Update instructor if we now have it but didn't before
-        coursesStore.updateCourse(existingCourse.id, { instructor: course.instructor })
-      }
-    }
-  }
-  
-  const coursesList = importData.value.courses || []
-
-  // Import assignments
-  if (importData.value.assignments) {
-    for (const assignment of importData.value.assignments) {
-      const { course, created } = ensureCourseForBlackboardItem(
-        coursesStore,
-        coursesList,
-        assignment,
-        'extension'
-      )
-      if (!course) continue
-      if (created) coursesAdded++
-
-      const existingAssignment = assignmentsStore.assignments.find(
-        a => a.title === assignment.title && a.courseId === course.id
-      )
-      if (!existingAssignment) {
-        assignmentsStore.addAssignment({
-          title: assignment.title,
-          description: assignment.description ?? '',
-          dueDate: assignment.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          courseId: course.id,
-          courseName: course.name,
-          type: assignment.type || 'assignment',
-          blackboardId: assignment.id,
-          images: assignment.images || [],
-          importSource: 'extension'
-        })
-        assignmentsAdded++
-      }
-    }
-  }
-  
-  showImportModal.value = false
-  importData.value = null
-  
-  return { courses: coursesAdded, assignments: assignmentsAdded }
-}
-
-function handleManualImport() {
-  const result = importFromExtension()
-  if (result) {
-    profileStore.updateExtensionSync(result.courses, result.assignments)
-    showToast(`Imported ${result.courses} courses and ${result.assignments} assignments from Blackboard`, 'success')
-  }
-}
-
-function cancelImport() {
-  showImportModal.value = false
-  importData.value = null
-}
 
 function openBlackboardModal() {
   blackboardForm.value.apiUrl = profileStore.lmsConnections.blackboard.apiUrl || ''
@@ -591,28 +465,6 @@ async function signOutAccount() {
         </Card>
       </div>
       
-      <!-- Extension sync status card (green) -->
-      <Card v-if="profileStore.extensionSync.lastSynced" class="mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
-              <svg class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h3 class="font-semibold text-gray-900">Sync Status</h3>
-              <p class="text-sm text-gray-600">
-                Last synced: <span class="font-medium">{{ formatLastSynced(profileStore.extensionSync.lastSynced) }}</span>
-              </p>
-              <p class="text-xs text-gray-500 mt-1">
-                {{ profileStore.extensionSync.coursesImported }} courses, {{ profileStore.extensionSync.assignmentsImported }} assignments imported
-              </p>
-            </div>
-          </div>
-          <Badge variant="success" class="shrink-0">Auto-synced</Badge>
-        </div>
-      </Card>
     </div>
 
     <!-- Blackboard Connection Modal -->
@@ -787,69 +639,6 @@ async function signOutAccount() {
       </Transition>
     </Teleport>
 
-    <!-- Import from Extension Modal -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-black/50" @click="cancelImport"></div>
-          <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <div class="flex items-center gap-3 mb-6">
-              <div class="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                <svg class="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">Import from Blackboard</h3>
-                <p class="text-sm text-gray-500">Data received from browser extension</p>
-              </div>
-            </div>
-
-            <div class="space-y-4">
-              <div class="p-4 bg-gray-50 rounded-lg">
-                <div class="flex justify-between items-center mb-2">
-                  <span class="text-sm text-gray-600">Courses found</span>
-                  <span class="font-semibold text-gray-900">{{ importData?.courses?.length || 0 }}</span>
-                </div>
-                <div class="flex justify-between items-center mb-2">
-                  <span class="text-sm text-gray-600">Assignments found</span>
-                  <span class="font-semibold text-gray-900">{{ importData?.assignments?.length || 0 }}</span>
-                </div>
-                <div v-if="importData?.assignments?.some(a => a.images?.length > 0)" class="flex justify-between items-center">
-                  <span class="text-sm text-gray-600">With images</span>
-                  <span class="font-semibold text-gray-900">{{ importData?.assignments?.filter(a => a.images?.length > 0).length || 0 }}</span>
-                </div>
-              </div>
-
-              <div v-if="importData?.courses?.length > 0" class="max-h-48 overflow-y-auto">
-                <p class="text-xs font-medium text-gray-500 uppercase mb-2">Courses</p>
-                <div class="space-y-2">
-                  <div v-for="course in importData.courses" :key="course.id" class="text-sm border-b border-gray-100 pb-2">
-                    <div class="font-medium text-gray-900 truncate">{{ bbCourseListLabel(course) }}</div>
-                    <div v-if="course.instructor" class="text-xs text-gray-500">
-                      Instructor: {{ course.instructor }}
-                    </div>
-                    <div v-if="course.code || course.term" class="text-xs text-gray-400">
-                      {{ [course.code, course.term].filter(Boolean).join(' • ') }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
-              <button @click="cancelImport" class="btn-ghost px-4 py-2">
-                Cancel
-              </button>
-              <button @click="handleManualImport" class="btn-primary px-4 py-2">
-                Import All
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-    
     <!-- Blackboard Sync Modal (server-side HTTP scraper) -->
     <Teleport to="body">
       <Transition name="modal">

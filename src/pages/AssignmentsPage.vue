@@ -62,8 +62,18 @@ const assignmentStats = computed(() => ({
 
 const modalTitle = computed(() => isEditing.value ? 'Edit Assignment' : 'Add New Assignment')
 
+function parseDateString(s) {
+  if (!s) return new Date()
+  // Date-only strings (YYYY-MM-DD) must be parsed as local time, not UTC
+  if (s.length === 10) {
+    const [y, m, d] = s.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  return new Date(s)
+}
+
 function formatDate(dateString) {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  return parseDateString(dateString).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric'
@@ -76,10 +86,9 @@ function formatCompletedLine(assignment) {
 }
 
 function getDaysUntil(dateString) {
-  const date = new Date(dateString)
+  const date = parseDateString(dateString)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  date.setHours(0, 0, 0, 0)
   return Math.ceil((date - today) / (1000 * 60 * 60 * 24))
 }
 

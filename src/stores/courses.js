@@ -10,7 +10,7 @@ export const useCoursesStore = defineStore('courses', () => {
   const coursePersistPromises = new Map()
 
   const coursesSorted = computed(() => {
-    return [...courses.value].sort((a, b) => a.name.localeCompare(b.name))
+    return [...courses.value].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   })
 
   const courseColors = [

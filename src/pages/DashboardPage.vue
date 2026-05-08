@@ -54,23 +54,28 @@ const stats = computed(() => [
 const todaysTasks = computed(() => tasksStore.todaysTasks.slice(0, 5))
 const upcomingDeadlines = computed(() => assignmentsStore.upcomingAssignments.slice(0, 5))
 
+function parseDateLocal(dateString) {
+  const [y, m, d] = dateString.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 function formatDate(dateString) {
-  const date = new Date(dateString)
+  const date = parseDateLocal(dateString)
   const today = new Date()
+  today.setHours(0, 0, 0, 0)
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
   if (date.toDateString() === today.toDateString()) return 'Today'
   if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
-  
+
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function getDaysUntil(dateString) {
-  const date = new Date(dateString)
+  const date = parseDateLocal(dateString)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  date.setHours(0, 0, 0, 0)
   return Math.ceil((date - today) / (1000 * 60 * 60 * 24))
 }
 

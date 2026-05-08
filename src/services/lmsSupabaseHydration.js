@@ -41,8 +41,6 @@ function mapCourseRow(row, index) {
     course.canvasCourseId = external
   } else if (source === 'blackboard' && external) {
     course.blackboardId = external
-  } else if (source === 'extension' && external) {
-    course.blackboardId = external
   }
 
   return course
@@ -70,7 +68,7 @@ function mapAssignmentRow(row, course) {
   if (src === 'canvas' && ext) {
     return { ...base, canvasAssignmentId: ext, importSource: 'canvas' }
   }
-  if ((src === 'blackboard' || src === 'extension') && ext) {
+  if (src === 'blackboard' && ext) {
     return { ...base, blackboardId: ext, importSource: src }
   }
   return base

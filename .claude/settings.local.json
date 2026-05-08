@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\natha\\\\Assignment Auto-Planner\" -File | Where-Object { $_.Name -match '\\(Dockerfile|docker-compose|\\\\.yml|\\\\.yaml|vercel|netlify|heroku|Procfile\\)' } | Select-Object Name)",
+      "Bash(grep -E '\\\\.\\(js|mjs\\)$')",
+      "PowerShell(ConvertTo-String)"
+    ]
+  }
+}

@@ -12,14 +12,19 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     return [...assignments.value].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
   })
 
+  function localDateKey() {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
   const upcomingAssignments = computed(() => {
-    const now = new Date()
-    return assignmentsByDueDate.value.filter(a => new Date(a.dueDate) >= now && a.status !== 'completed')
+    const today = localDateKey()
+    return assignmentsByDueDate.value.filter(a => a.dueDate >= today && a.status !== 'completed')
   })
 
   const overdueAssignments = computed(() => {
-    const now = new Date()
-    return assignments.value.filter(a => new Date(a.dueDate) < now && a.status !== 'completed')
+    const today = localDateKey()
+    return assignments.value.filter(a => a.dueDate < today && a.status !== 'completed')
   })
 
   const assignmentsByCourse = computed(() => {

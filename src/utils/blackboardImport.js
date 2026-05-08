@@ -13,7 +13,7 @@ function courseNameMatchesHint(hint, courseName, courseFullName) {
  * @param {object} coursesStore Pinia courses store ({ courses, addCourse })
  * @param {Array<{ id: string, name?: string, fullName?: string, code?: string, instructor?: string, term?: string }>} syncCourses Courses from the same sync payload
  * @param {{ courseId: string, courseName?: string }} assignment
- * @param {'blackboard'|'extension'} [lmsSource='blackboard'] Source for Supabase when creating a new course
+ * @param {'blackboard'} [lmsSource='blackboard'] Source for Supabase when creating a new course
  * @returns {{ course: object | null, created: boolean }}
  */
 export function ensureCourseForBlackboardItem(

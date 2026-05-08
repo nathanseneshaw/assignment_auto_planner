@@ -146,13 +146,11 @@ const weekRange = computed(() => {
 
 const weekStats = computed(() => {
   const allItems = weekDays.value.flatMap(d => d.items)
+  const completed = allItems.filter(t => t.completed).length
   return {
     total: allItems.length,
-    completed: allItems.filter(t => t.completed).length,
-    percentage:
-      allItems.length > 0
-        ? Math.round((allItems.filter(t => t.completed).length / allItems.length) * 100)
-        : 0
+    completed,
+    percentage: allItems.length > 0 ? Math.round((completed / allItems.length) * 100) : 0
   }
 })
 
@@ -213,13 +211,11 @@ const monthStats = computed(() => {
     ...assignInRange.map((a) => ({ completed: a.status === 'completed' })),
   ]
 
+  const completed = allItems.filter((x) => x.completed).length
   return {
     total: allItems.length,
-    completed: allItems.filter((x) => x.completed).length,
-    percentage:
-      allItems.length > 0
-        ? Math.round((allItems.filter((x) => x.completed).length / allItems.length) * 100)
-        : 0
+    completed,
+    percentage: allItems.length > 0 ? Math.round((completed / allItems.length) * 100) : 0
   }
 })
 

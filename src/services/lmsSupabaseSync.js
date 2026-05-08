@@ -4,7 +4,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
  * Map local Pinia course → LMS source for public.courses.source
  */
 export function resolveCourseLmsSource(course) {
-  if (course.lmsSource && ['canvas', 'blackboard', 'extension', 'manual'].includes(course.lmsSource)) {
+  if (course.lmsSource && ['canvas', 'blackboard', 'manual'].includes(course.lmsSource)) {
     return course.lmsSource
   }
   if (course.canvasCourseId) return 'canvas'
@@ -35,7 +35,7 @@ export function resolveExternalAssignmentId(assignment) {
 
 export function resolveImportSource(assignment) {
   const s = assignment.importSource
-  if (s === 'canvas' || s === 'blackboard' || s === 'extension') return s
+  if (s === 'canvas' || s === 'blackboard') return s
   if (assignment.canvasAssignmentId) return 'canvas'
   if (assignment.blackboardId) return 'blackboard'
   return null
@@ -116,10 +116,7 @@ export async function persistCourseToSupabase(course) {
 
     const { data, error } = await supabase
       .from('courses')
-      .insert({
-        ...row,
-        updated_at: row.updated_at,
-      })
+      .insert(row)
       .select('id')
       .single()
 
