@@ -6,6 +6,8 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /ms-playwright
       - key: FRONTEND_URL
         sync: false
       - key: ALLOWED_ORIGINS

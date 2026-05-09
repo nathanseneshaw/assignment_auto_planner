@@ -1,25 +1,19 @@
-FROM node:20-alpine
-
-# Alpine's Chromium package is compiled for musl/Alpine and is maintained
-# by the Alpine security team — far fewer CVEs than Debian-based images.
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont
-
-# Skip Playwright's CDN browser download; we use the system Chromium above.
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-
-# playwright-launch.js reads CHROMIUM_PATH and passes it as executablePath.
-ENV CHROMIUM_PATH=/usr/bin/chromium-browser
+FROM node:20-slim
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
+
+# Install BOTH chromium and chromium-headless-shell. The default headless mode
+# in Playwright 1.49+ uses chrome-headless-shell — a separate binary from the
+# full Chromium browser. Without it, launching with headless: true fails even
+# if chromium is installed.
+#
+# PLAYWRIGHT_BROWSERS_PATH is an absolute path (not HOME-relative), so Render's
+# runtime HOME=/opt/render override can't change where Playwright looks.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN npx playwright install --with-deps chromium chromium-headless-shell
 
 ENV NODE_ENV=production
 ENV PLAYWRIGHT_HEADLESS=true
