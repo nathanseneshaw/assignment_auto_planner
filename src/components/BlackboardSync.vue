@@ -11,6 +11,7 @@ import {
   syncSession,
   closeSession,
 } from '../services/blackboardBrowserService'
+import BrowserViewer from './BrowserViewer.vue'
 import { ensureCourseForBlackboardItem } from '../utils/blackboardImport.js'
 import {
   sanitizeBlackboardCourseDisplayName,
@@ -28,6 +29,7 @@ const { success } = useToast()
 
 const blackboardUrl = ref(profileStore.lmsConnections.blackboard.apiUrl || '')
 const sessionId = ref(null)
+const viewport = ref({ width: 1280, height: 720 })
 const stopLoginPoll = ref(null)
 const isSyncing = ref(false)
 const isCheckingLogin = ref(false)
@@ -61,6 +63,7 @@ async function startLogin() {
   try {
     const result = await startSsoSession(blackboardUrl.value.trim(), {})
     sessionId.value = result.sessionId
+    viewport.value = result.viewport ?? { width: 1280, height: 720 }
     if (result.blackboardUrl) {
       blackboardUrl.value = result.blackboardUrl
       profileStore.lmsConnections.blackboard.apiUrl = result.blackboardUrl
@@ -217,26 +220,26 @@ async function cancelSync() {
 
       <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">{{ error }}</div>
 
-      <p v-if="isCheckingLogin" class="text-sm text-gray-600">
-        Waiting for you to finish signing in the browser…
-      </p>
-
       <button
+        v-if="!isCheckingLogin"
         type="button"
         @click="startLogin"
-        :disabled="!blackboardUrl?.trim() || isCheckingLogin"
+        :disabled="!blackboardUrl?.trim()"
         class="w-full px-4 py-3 rounded-xl bg-primary-900 text-white text-sm font-semibold hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-primary-900/15 transition-colors"
       >
-        {{ isCheckingLogin ? 'Signing in…' : 'Sign in' }}
+        Sign in
       </button>
-      <button
-        v-if="isCheckingLogin"
-        type="button"
-        class="w-full text-sm text-gray-500 hover:text-gray-800"
-        @click="cancelSync"
-      >
-        Cancel
-      </button>
+
+      <template v-if="isCheckingLogin">
+        <BrowserViewer :session-id="sessionId" :viewport="viewport" />
+        <button
+          type="button"
+          class="w-full text-sm text-gray-500 hover:text-gray-800"
+          @click="cancelSync"
+        >
+          Cancel
+        </button>
+      </template>
     </div>
     
     <!-- Step: Signed in — full in-modal prompt (replaces easy-to-miss toast) -->

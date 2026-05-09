@@ -6,7 +6,10 @@ WORKDIR /app
 # Copy dependency files and install
 COPY package.json package-lock.json ./
 # Clean install for production (ignores devDependencies)
-RUN npm ci --omit=dev 
+RUN npm ci --omit=dev
+
+# Verify browser binaries are present — fails the build early if the image is wrong
+RUN ls /ms-playwright/
 
 ENV NODE_ENV=production
 ENV PLAYWRIGHT_HEADLESS=true

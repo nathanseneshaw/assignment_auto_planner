@@ -160,6 +160,7 @@ export async function startBlackboardSsoSession(opts) {
       browser = await chromium.launch(launchOpts)
       context = await browser.newContext()
       page = await context.newPage()
+      await page.setViewportSize({ width: 1280, height: 720 })
     }
 
     console.log(`[Blackboard SSO] Session ${sessionId} → ${startUrl}`)
@@ -183,11 +184,14 @@ export async function startBlackboardSsoSession(opts) {
       }
     }
 
+    const viewport = { width: 1280, height: 720 }
+
     ssoSessions.set(sessionId, {
       status: 'pending',
       browser,
       context,
       page,
+      viewport,
       blackboardUrl: startUrl,
       learnBaseUrl: learnBaseUrl ? String(learnBaseUrl).trim() : '',
       createdAt: Date.now(),
@@ -202,6 +206,7 @@ export async function startBlackboardSsoSession(opts) {
       message:
         'Complete Blackboard / SSO sign-in in the browser window. Return here and we will detect when you are signed in.',
       blackboardUrl: startUrl,
+      viewport,
       attachedToExistingBrowser,
       launchChannel: launchChannelUsed ?? null,
       alsoOpenedInDefaultBrowser: alsoOpenInDefaultBrowser === true,
@@ -336,4 +341,19 @@ export function closeSsoIfAny(sessionId) {
   if (ssoSessions.has(sessionId)) {
     void closeBlackboardSsoSession(sessionId)
   }
+}
+
+export async function getSessionScreenshot(sessionId) {
+  const entry = ssoSessions.get(sessionId)
+  if (!entry?.page) return null
+  return entry.page.screenshot({ type: 'jpeg', quality: 70 })
+}
+
+export async function sendSessionInput(sessionId, { type, x, y, key, text }) {
+  const entry = ssoSessions.get(sessionId)
+  if (!entry?.page) return false
+  if (type === 'click') await entry.page.mouse.click(x, y)
+  else if (type === 'type') await entry.page.keyboard.type(text)
+  else if (type === 'key') await entry.page.keyboard.press(key)
+  return true
 }

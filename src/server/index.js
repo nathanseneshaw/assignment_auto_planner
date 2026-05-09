@@ -16,6 +16,10 @@ import {
   closeAllPlaywrightSessions
 } from './playwright-scraper.js'
 import {
+  getSessionScreenshot,
+  sendSessionInput,
+} from './blackboard-sso-bridge.js'
+import {
   syncCanvasData,
   normalizeCanvasBaseUrl
 } from './canvas-lms.js'
@@ -109,7 +113,8 @@ app.post('/api/blackboard/start-session', async (req, res) => {
       blackboardUrl: result.blackboardUrl,
       attachedToExistingBrowser: result.attachedToExistingBrowser,
       launchChannel: result.launchChannel ?? null,
-      alsoOpenedInDefaultBrowser: result.alsoOpenedInDefaultBrowser
+      alsoOpenedInDefaultBrowser: result.alsoOpenedInDefaultBrowser,
+      viewport: result.viewport ?? null,
     })
   } catch (error) {
     console.error('Start session error:', error)
@@ -193,6 +198,30 @@ app.get('/api/blackboard/session-status/:sessionId', async (req, res) => {
   const { sessionId } = req.params
   const status = getPlaywrightBlackboardSessionStatus(sessionId)
   res.json({ success: true, ...status })
+})
+
+// Stream a JPEG screenshot of the live browser session
+app.get('/api/blackboard/session-screenshot/:sessionId', async (req, res) => {
+  try {
+    const buf = await getSessionScreenshot(req.params.sessionId)
+    if (!buf) return res.status(404).json({ success: false, error: 'Session not found' })
+    res.set('Content-Type', 'image/jpeg')
+    res.set('Cache-Control', 'no-store')
+    res.send(buf)
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message })
+  }
+})
+
+// Relay mouse/keyboard input to the live browser session
+app.post('/api/blackboard/session-input/:sessionId', async (req, res) => {
+  const { type, x, y, key, text } = req.body
+  try {
+    const ok = await sendSessionInput(req.params.sessionId, { type, x, y, key, text })
+    res.json({ success: ok })
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message })
+  }
 })
 
 // Canvas — embedded browser (SSO / 2FA), Playwright

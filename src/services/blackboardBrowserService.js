@@ -80,7 +80,16 @@ export async function startSsoSession(blackboardUrl, options = {}) {
   if (!data.success) {
     throw new Error(data.error || 'Failed to start SSO session')
   }
-  return data
+  return { ...data, viewport: data.viewport ?? { width: 1280, height: 720 } }
+}
+
+export async function sendBrowserInput(sessionId, input) {
+  const res = await fetch(apiUrl(`${API_BASE}/session-input/${sessionId}`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  return res.json()
 }
 
 export async function checkLoginStatus(sessionId) {
