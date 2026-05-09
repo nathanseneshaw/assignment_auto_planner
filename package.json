@@ -14,9 +14,8 @@
     "server": "cd src/server && npm start",
     "server:dev": "cd src/server && npm run dev",
     "server:test": "cd src/server && npm test",
-    "server:install": "npm install && npx playwright install chromium chromium-headless-shell",
-    "playwright:install": "cd src/server && npx playwright install chromium chromium-headless-shell",
-    "render:build": "npm install && npx playwright install chromium chromium-headless-shell"
+    "server:install": "npm install",
+    "render:build": "npm install"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
@@ -28,7 +27,6 @@
     "fetch-cookie": "^3.0.1",
     "node-fetch": "^3.3.2",
     "pinia": "^3.0.4",
-    "playwright": "1.59.1",
     "tough-cookie": "^4.1.3",
     "vue": "^3.5.12",
     "vue-router": "^4.6.4"

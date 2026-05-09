@@ -1,18 +1,11 @@
 <script setup>
-import { ref, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useProfileStore } from '../stores/profile'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
-import { Badge, Input } from './ui'
+import { Badge } from './ui'
 import { useToast } from '../composables/useToast'
-import {
-  startSsoSession,
-  pollLoginStatus,
-  syncSession,
-  closeSession,
-  testCdpConnection,
-} from '../services/blackboardBrowserService'
-import BrowserViewer from './BrowserViewer.vue'
+import { syncSession, closeSession } from '../services/blackboardBrowserService'
 import { ensureCourseForBlackboardItem } from '../utils/blackboardImport.js'
 import {
   sanitizeBlackboardCourseDisplayName,
@@ -20,7 +13,8 @@ import {
 } from '../utils/blackboardCourseName.js'
 
 const props = defineProps({
-  onComplete: Function
+  initialSessionId: { type: String, default: null },
+  onComplete: Function,
 })
 
 const profileStore = useProfileStore()
@@ -28,134 +22,57 @@ const coursesStore = useCoursesStore()
 const assignmentsStore = useAssignmentsStore()
 const { success } = useToast()
 
-const blackboardUrl = ref(profileStore.lmsConnections.blackboard.apiUrl || '')
-const sessionId = ref(null)
-const viewport = ref({ width: 1280, height: 720 })
-const stopLoginPoll = ref(null)
+const sessionId = ref(props.initialSessionId || null)
 const isSyncing = ref(false)
-const isCheckingLogin = ref(false)
 const syncResults = ref(null)
-const currentStep = ref('cdp') // cdp, url, ready, syncing, results
+const currentStep = ref(props.initialSessionId ? 'syncing' : 'extension')
 const error = ref('')
-const loginStatus = ref(null)
-const cdpUrl = ref(localStorage.getItem('cdpUrl') || '')
-const cdpStatus = ref(null)
-const isTestingCdp = ref(false)
-
-async function testCdp() {
-  if (!cdpUrl.value?.trim()) {
-    cdpStatus.value = { ok: false, message: 'Enter your tunnel URL' }
-    return
-  }
-  isTestingCdp.value = true
-  cdpStatus.value = null
-  try {
-    const result = await testCdpConnection(cdpUrl.value.trim())
-    if (result.success) {
-      cdpStatus.value = { ok: true, message: `Connected to ${result.version || 'browser'}` }
-      localStorage.setItem('cdpUrl', cdpUrl.value.trim())
-      currentStep.value = 'url'
-    } else {
-      cdpStatus.value = { ok: false, message: result.error || 'Connection failed' }
-    }
-  } catch (e) {
-    cdpStatus.value = { ok: false, message: e.message }
-  } finally {
-    isTestingCdp.value = false
-  }
-}
-
-function clearLoginPoll() {
-  stopLoginPoll.value?.()
-  stopLoginPoll.value = null
-}
 
 onUnmounted(() => {
-  clearLoginPoll()
   if (sessionId.value) {
     closeSession(sessionId.value).catch(() => {})
   }
 })
 
-async function startLogin() {
-  if (!blackboardUrl.value?.trim()) {
-    error.value = 'Enter your Blackboard URL'
+async function startSync() {
+  if (!sessionId.value) {
+    error.value = 'No session — sync from the extension first.'
     return
   }
-
-  error.value = ''
-  isCheckingLogin.value = true
-  clearLoginPoll()
-
-  try {
-    const result = await startSsoSession(blackboardUrl.value.trim(), {
-      cdpUrl: cdpUrl.value.trim() || undefined,
-    })
-    sessionId.value = result.sessionId
-    viewport.value = result.viewport ?? { width: 1280, height: 720 }
-    if (result.blackboardUrl) {
-      blackboardUrl.value = result.blackboardUrl
-      profileStore.lmsConnections.blackboard.apiUrl = result.blackboardUrl
-    } else {
-      profileStore.lmsConnections.blackboard.apiUrl = blackboardUrl.value
-    }
-    loginStatus.value = { loggedIn: false }
-
-    success(
-      'Complete sign-in in the browser window that opened (including MFA if prompted). This dialog will continue when you are logged in.',
-      8000
-    )
-
-    stopLoginPoll.value = pollLoginStatus(result.sessionId, status => {
-      loginStatus.value = status
-      if (status.loggedIn) {
-        clearLoginPoll()
-        isCheckingLogin.value = false
-        currentStep.value = 'ready'
-        profileStore.connectBlackboardBrowser(blackboardUrl.value)
-        success('Signed in to Blackboard. You can import courses when ready.', 6000)
-      }
-    })
-  } catch (e) {
-    error.value = e.message
-    isCheckingLogin.value = false
-  }
-}
-
-async function startSync() {
-  if (!sessionId.value) return
   if (isSyncing.value) return
-  
+
   isSyncing.value = true
   currentStep.value = 'syncing'
   error.value = ''
-  
+
   try {
     const result = await syncSession(sessionId.value)
     syncResults.value = result.data
     currentStep.value = 'results'
-    
+
     if (result.data.courses.length === 0 && result.data.assignments.length === 0) {
       error.value = result.data.errors?.[0]?.error || 'No data found'
     }
   } catch (e) {
     error.value = e.message
-    if (loginStatus.value?.loggedIn) {
-      currentStep.value = 'ready'
-    } else {
-      currentStep.value = 'url'
-    }
+    currentStep.value = 'extension'
   } finally {
     isSyncing.value = false
   }
 }
 
+onMounted(() => {
+  if (props.initialSessionId) {
+    void startSync()
+  }
+})
+
 function importResults() {
   if (!syncResults.value) return
-  
+
   let coursesAdded = 0
   let assignmentsAdded = 0
-  
+
   const syncCourses = syncResults.value.courses || []
 
   for (const course of syncCourses) {
@@ -164,7 +81,7 @@ function importResults() {
       course.name ||
       course.fullName
     const existing = coursesStore.courses.find(
-      c =>
+      (c) =>
         c.blackboardId === course.id ||
         c.name === course.name ||
         c.name === course.fullName ||
@@ -177,12 +94,12 @@ function importResults() {
         instructor: course.instructor || '',
         term: course.term || '',
         blackboardId: course.id,
-        lmsSource: 'blackboard'
+        lmsSource: 'blackboard',
       })
       coursesAdded++
     }
   }
-  
+
   for (const assignment of syncResults.value.assignments || []) {
     const { course, created } = ensureCourseForBlackboardItem(
       coursesStore,
@@ -194,175 +111,84 @@ function importResults() {
     if (created) coursesAdded++
 
     const existing = assignmentsStore.assignments.find(
-      a => a.title === assignment.title && a.courseId === course.id
+      (a) => a.title === assignment.title && a.courseId === course.id
     )
     if (!existing) {
       assignmentsStore.addAssignment({
         title: assignment.title,
         description: assignment.description || '',
-        dueDate: assignment.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        dueDate:
+          assignment.dueDate ||
+          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         courseId: course.id,
         courseName: course.name,
         type: assignment.type || 'assignment',
         blackboardId: assignment.id,
         images: assignment.images || [],
-        importSource: 'blackboard'
+        importSource: 'blackboard',
       })
       assignmentsAdded++
     }
   }
-  
-  // Update sync tracking
+
   profileStore.updateExtensionSync(coursesAdded, assignmentsAdded)
-  
+
   success(`Imported ${coursesAdded} courses and ${assignmentsAdded} assignments`)
-  
-  // Close session and reset
+
   if (sessionId.value) {
     closeSession(sessionId.value).catch(() => {})
+    sessionId.value = null
   }
   props.onComplete?.()
 }
 
-async function cancelSync() {
-  clearLoginPoll()
-  isCheckingLogin.value = false
+async function closeAndReset() {
   if (sessionId.value) {
     await closeSession(sessionId.value).catch(() => {})
+    sessionId.value = null
   }
-  sessionId.value = null
-  currentStep.value = cdpUrl.value?.trim() ? 'url' : 'cdp'
-  loginStatus.value = null
+  syncResults.value = null
+  currentStep.value = 'extension'
+  error.value = ''
 }
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Step 0: Connect your browser via CDP -->
-    <div v-if="currentStep === 'cdp'" class="space-y-5">
-      <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
-        <h4 class="font-semibold text-gray-900">Connect your browser</h4>
+    <!-- Step 1: Extension instructions -->
+    <div v-if="currentStep === 'extension'" class="space-y-5">
+      <div class="rounded-xl border border-gray-200 bg-gray-50 p-5 space-y-3">
+        <h4 class="font-semibold text-gray-900">Sync via the Assignment Planner extension</h4>
         <p class="text-sm text-gray-700">
-          Sign-in runs in your own Chrome on your computer. Set up a tunnel so the server can drive that browser:
+          Your browser does the login. The Assignment Planner extension reads your Blackboard
+          session cookies and sends them to the server, which does the rest.
         </p>
         <ol class="text-sm text-gray-700 list-decimal pl-5 space-y-2">
           <li>
-            Launch Chrome with debugging enabled:
-            <pre class="mt-1 px-3 py-2 bg-gray-900 text-gray-100 rounded text-xs overflow-x-auto"><code>chrome.exe --remote-debugging-port=9222 --user-data-dir=%TEMP%\bb-cdp</code></pre>
+            <strong>Install the extension</strong> (one-time):
+            open <code class="px-1 bg-gray-200 rounded text-xs">chrome://extensions</code>,
+            turn on <em>Developer mode</em>, click <em>Load unpacked</em>, and select the
+            <code class="px-1 bg-gray-200 rounded text-xs">extension/</code> folder of this project.
           </li>
-          <li>
-            In a separate terminal, expose port 9222 with ngrok:
-            <pre class="mt-1 px-3 py-2 bg-gray-900 text-gray-100 rounded text-xs overflow-x-auto"><code>ngrok http 9222</code></pre>
-          </li>
-          <li>Copy the <code class="px-1 bg-gray-200 rounded text-xs">https://...ngrok-free.app</code> URL ngrok prints, and paste it below.</li>
+          <li>Open Blackboard in a tab and log in normally.</li>
+          <li>Click the Assignment Planner Sync icon in your toolbar.</li>
+          <li>Click <strong>Sync this site</strong>. This window will open automatically.</li>
         </ol>
       </div>
 
-      <Input
-        v-model="cdpUrl"
-        label="Browser tunnel URL"
-        placeholder="https://abcd-1-2-3-4.ngrok-free.app"
-        hint="The HTTPS URL from ngrok output. Saved to this browser for next time."
-      />
-
       <div
-        v-if="cdpStatus"
-        :class="[
-          'text-sm p-3 rounded-xl border',
-          cdpStatus.ok
-            ? 'text-green-700 bg-green-50 border-green-200'
-            : 'text-red-600 bg-red-50 border-red-100',
-        ]"
+        v-if="error"
+        class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100"
       >
-        {{ cdpStatus.message }}
+        {{ error }}
       </div>
 
-      <button
-        type="button"
-        @click="testCdp"
-        :disabled="!cdpUrl?.trim() || isTestingCdp"
-        class="w-full px-4 py-3 rounded-xl bg-primary-900 text-white text-sm font-semibold hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-primary-900/15 transition-colors"
-      >
-        {{ isTestingCdp ? 'Testing…' : 'Test connection' }}
-      </button>
+      <p class="text-xs text-gray-500">
+        Nothing else to configure here — close this when you're ready to head to Blackboard.
+      </p>
     </div>
 
-    <!-- Step 1: Enter URL -->
-    <div v-else-if="currentStep === 'url'" class="space-y-5">
-      <Input
-        v-model="blackboardUrl"
-        label="Blackboard URL"
-        placeholder="e.g. blackboard.yourschool.edu"
-        hint="With or without https://. Sign-in opens in a browser so you can use SSO and MFA."
-      />
-
-      <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">{{ error }}</div>
-
-      <button
-        v-if="!isCheckingLogin"
-        type="button"
-        @click="startLogin"
-        :disabled="!blackboardUrl?.trim()"
-        class="w-full px-4 py-3 rounded-xl bg-primary-900 text-white text-sm font-semibold hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-primary-900/15 transition-colors"
-      >
-        Sign in
-      </button>
-
-      <template v-if="isCheckingLogin">
-        <BrowserViewer :session-id="sessionId" :viewport="viewport" />
-        <button
-          type="button"
-          class="w-full text-sm text-gray-500 hover:text-gray-800"
-          @click="cancelSync"
-        >
-          Cancel
-        </button>
-      </template>
-    </div>
-    
-    <!-- Step: Signed in — full in-modal prompt (replaces easy-to-miss toast) -->
-    <div v-else-if="currentStep === 'ready'" class="space-y-4">
-      <div
-        class="rounded-xl border-2 border-green-400 bg-green-50 p-5 shadow-sm ring-1 ring-green-200/80"
-        role="status"
-        aria-live="polite"
-      >
-        <div class="flex items-start gap-3">
-          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-500 text-white">
-            <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <div class="min-w-0">
-            <h4 class="text-lg font-semibold text-green-900">You are signed in to Blackboard</h4>
-            <p class="mt-1 text-sm text-green-800">
-              The server is using your browser session. Click import to load courses and assignments.
-            </p>
-            <p v-if="loginStatus?.currentUrl" class="mt-2 text-xs text-green-700/90 break-all">
-              Last page: {{ loginStatus.currentUrl }}
-            </p>
-          </div>
-        </div>
-      </div>
-      
-      <div v-if="error" class="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{{ error }}</div>
-      
-      <div class="flex flex-wrap gap-3">
-        <button
-          type="button"
-          @click="startSync"
-          :disabled="isSyncing"
-          class="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 disabled:opacity-50"
-        >
-          Import my courses
-        </button>
-        <button type="button" @click="cancelSync" class="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-800">
-          Cancel
-        </button>
-      </div>
-    </div>
-    
-    <!-- Step 3: Syncing -->
+    <!-- Step 2: Syncing -->
     <div v-else-if="currentStep === 'syncing'" class="space-y-4">
       <div class="bg-primary-50 border border-primary-200 rounded-lg p-4">
         <div class="flex items-center gap-3">
@@ -381,13 +207,13 @@ async function cancelSync() {
         </div>
       </div>
     </div>
-    
-    <!-- Step 4: Results -->
+
+    <!-- Step 3: Results -->
     <div v-else-if="currentStep === 'results'" class="space-y-4">
       <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
         <p class="text-red-700">{{ error }}</p>
       </div>
-      
+
       <div v-else class="bg-green-50 border border-green-200 rounded-lg p-4">
         <div class="flex items-center gap-3 mb-4">
           <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -402,8 +228,7 @@ async function cancelSync() {
             </p>
           </div>
         </div>
-        
-        <!-- Preview -->
+
         <div v-if="syncResults?.courses?.length" class="mt-4 space-y-2">
           <h5 class="text-sm font-medium text-gray-700">Courses found:</h5>
           <div class="flex flex-col gap-2 items-start">
@@ -415,28 +240,28 @@ async function cancelSync() {
             </Badge>
           </div>
         </div>
-        
+
         <div v-if="syncResults?.errors?.length" class="mt-4 text-sm text-amber-600">
           {{ syncResults.errors.length }} error(s) occurred during sync
         </div>
       </div>
-      
+
       <div class="flex gap-3 flex-wrap">
-        <button 
-          v-if="!error && syncResults?.courses?.length" 
-          @click="importResults" 
+        <button
+          v-if="!error && syncResults?.courses?.length"
+          @click="importResults"
           class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
         >
           Import to App
         </button>
-        <button 
-          @click="startSync" 
+        <button
+          @click="startSync"
           class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
         >
           Sync Again
         </button>
-        <button 
-          @click="cancelSync" 
+        <button
+          @click="closeAndReset"
           class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
         >
           Close

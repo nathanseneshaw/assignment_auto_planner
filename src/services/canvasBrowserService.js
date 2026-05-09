@@ -1,34 +1,12 @@
-// Canvas browser sync — Playwright SSO handoff (see /api/canvas/* routes).
+// Canvas sync — extension-imported cookie sessions (see /api/canvas routes).
 
 import { apiUrl } from './apiBase.js'
 import { fetchApiJson } from './fetchApiJson.js'
 
 const API_BASE = '/api/canvas'
 
-async function fetchJsonAlways(url, init) {
-  const res = await fetch(apiUrl(url), init)
-  const text = await res.text()
-  const head = text.trimStart().slice(0, 64).toLowerCase()
-  if (head.startsWith('<!doctype') || head.startsWith('<html') || head.startsWith('<!')) {
-    throw new Error(
-      'The app got a web page instead of API data. Start the backend: cd src/server && npm start'
-    )
-  }
-  let data
-  try {
-    data = JSON.parse(text)
-  } catch {
-    throw new Error(
-      res.ok
-        ? `Server returned non-JSON: ${text.slice(0, 160)}`
-        : `HTTP ${res.status}: ${text.slice(0, 160)}`
-    )
-  }
-  return { ok: res.ok, status: res.status, data }
-}
-
 /**
- * Validate user-supplied Canvas URL for browser flow.
+ * Validate a user-supplied Canvas URL.
  * @param {string} input
  * @returns {string} normalized origin (https://host)
  */
@@ -55,43 +33,6 @@ export function validateCanvasBrowserUrl(input) {
   return parsed.origin
 }
 
-/**
- * @param {string} canvasUrl
- * @param {object} [options]
- * @param {boolean} [options.useSameBrowser]
- * @param {string} [options.cdpUrl]
- * @param {string} [options.browserChannel]
- * @param {boolean} [options.alsoOpenInDefaultBrowser]
- */
-export async function startCanvasBrowserSession(canvasUrl, options = {}) {
-  const {
-    cdpUrl,
-    browserChannel,
-    alsoOpenInDefaultBrowser = false,
-  } = options
-  const useSameBrowser = options.useSameBrowser ?? !!cdpUrl
-  const normalized = validateCanvasBrowserUrl(canvasUrl)
-  const { ok, status, data } = await fetchJsonAlways(`${API_BASE}/start-session`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      canvasUrl: normalized,
-      useSameBrowser,
-      cdpUrl,
-      browserChannel,
-      alsoOpenInDefaultBrowser,
-    }),
-  })
-  if (!ok || !data.success) {
-    throw new Error(data?.error || `Failed to start Canvas session (${status})`)
-  }
-  return data
-}
-
-export async function checkCanvasBrowserLogin(sessionId) {
-  return fetchApiJson(`${API_BASE}/check-login/${sessionId}`)
-}
-
 export async function syncCanvasBrowserSession(sessionId) {
   return fetchApiJson(`${API_BASE}/sync-session/${sessionId}`, {
     method: 'POST',
@@ -100,7 +41,7 @@ export async function syncCanvasBrowserSession(sessionId) {
 }
 
 /**
- * After browser sign-in, download modules / files / pages as a ZIP (long-running).
+ * After cookie sync, download modules / files / pages as a ZIP (long-running).
  * @param {string} sessionId
  * @param {string} [courses] — comma-separated Canvas course ids, or 'all'
  */
@@ -161,39 +102,4 @@ export async function closeCanvasSession(sessionId) {
   return fetchApiJson(`${API_BASE}/close-session/${sessionId}`, {
     method: 'POST',
   })
-}
-
-export async function testCdpConnection(cdpUrl) {
-  const res = await fetch(apiUrl(`/api/cdp/test`), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cdpUrl }),
-  })
-  return res.json()
-}
-
-export function pollCanvasBrowserLogin(sessionId, onStatus, intervalMs = 1500) {
-  let stopped = false
-
-  const poll = async () => {
-    if (stopped) return
-    try {
-      const status = await checkCanvasBrowserLogin(sessionId)
-      onStatus(status)
-      if (!status.loggedIn && !stopped) {
-        setTimeout(poll, intervalMs)
-      }
-    } catch (error) {
-      onStatus({ loggedIn: false, error: error.message })
-      if (!stopped) {
-        setTimeout(poll, intervalMs)
-      }
-    }
-  }
-
-  poll()
-
-  return () => {
-    stopped = true
-  }
 }

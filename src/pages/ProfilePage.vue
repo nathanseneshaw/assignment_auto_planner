@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useProfileStore } from '../stores/profile'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
@@ -18,6 +18,7 @@ import {
 import { sanitizeBlackboardCourseDisplayName } from '../utils/blackboardCourseName.js'
 
 const router = useRouter()
+const route = useRoute()
 const { showToast } = useToast()
 
 const profileStore = useProfileStore()
@@ -28,6 +29,7 @@ const assignmentsStore = useAssignmentsStore()
 const showBlackboardModal = ref(false)
 const showBlackboardSyncModal = ref(false)
 const showCanvasSyncModal = ref(false)
+const pendingSyncSessionId = ref(null)
 const syncing = ref({ canvas: false, blackboard: false })
 const serverOnline = ref(false)
 
@@ -89,6 +91,17 @@ function bbCourseListLabel(course) {
 
 onMounted(async () => {
   serverOnline.value = await checkServerHealth()
+  const m = String(route.query.sync || '').match(/^(blackboard|canvas):(.+)$/)
+  if (m) {
+    const [, lms, sessionId] = m
+    pendingSyncSessionId.value = sessionId
+    if (lms === 'blackboard') {
+      showBlackboardSyncModal.value = true
+    } else {
+      showCanvasSyncModal.value = true
+    }
+    router.replace({ query: {} })
+  }
 })
 
 function openBlackboardModal() {
@@ -662,7 +675,10 @@ async function signOutAccount() {
               </button>
             </div>
             
-            <BlackboardSync :on-complete="() => showBlackboardSyncModal = false" />
+            <BlackboardSync
+              :initial-session-id="pendingSyncSessionId"
+              :on-complete="() => { showBlackboardSyncModal = false; pendingSyncSessionId = null }"
+            />
           </div>
         </div>
       </Transition>
@@ -689,7 +705,11 @@ async function signOutAccount() {
                 </svg>
               </button>
             </div>
-            <CanvasSync :merge-import="mergeCanvasImport" :on-complete="() => (showCanvasSyncModal = false)" />
+            <CanvasSync
+              :merge-import="mergeCanvasImport"
+              :initial-session-id="pendingSyncSessionId"
+              :on-complete="() => { showCanvasSyncModal = false; pendingSyncSessionId = null }"
+            />
           </div>
         </div>
       </Transition>
