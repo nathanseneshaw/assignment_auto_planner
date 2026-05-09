@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim
+FROM node:20-bookworm
 
 WORKDIR /app
 
@@ -15,10 +15,12 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 # Install production dependencies only (skips Vite, Tailwind, PostCSS, etc.)
 RUN npm ci --omit=dev
 
-# Install the exact Chromium revision required by the installed playwright version,
-# plus all required OS libraries. Docker caches this as a layer — it only
-# re-runs when package.json changes (i.e. when the playwright version bumps).
-RUN npx playwright install chromium --with-deps
+# apt-get update must run in the same layer as --with-deps so the package lists
+# are fresh when Playwright calls apt-get install internally.
+# The full bookworm image (not slim) is required so dpkg is fully initialised.
+RUN apt-get update && \
+    npx playwright install chromium --with-deps && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV PLAYWRIGHT_HEADLESS=true
