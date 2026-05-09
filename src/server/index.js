@@ -1,6 +1,7 @@
 import './load-env.js'
 import express from 'express'
 import cors from 'cors'
+import { chromium } from 'playwright'
 import { BlackboardScraper } from './blackboard-scraper.js'
 import {
   createPlaywrightLoginSession,
@@ -484,6 +485,24 @@ app.post('/api/canvas/sync-token', async (req, res) => {
   } catch (e) {
     console.error('[Canvas] sync-token:', e)
     res.status(500).json({ success: false, error: e.message || 'Canvas sync failed' })
+  }
+})
+
+// Test a CDP connection to a user-supplied browser tunnel
+app.post('/api/cdp/test', async (req, res) => {
+  const { cdpUrl } = req.body || {}
+  if (!cdpUrl || typeof cdpUrl !== 'string') {
+    return res.status(400).json({ success: false, error: 'cdpUrl required' })
+  }
+  let browser
+  try {
+    browser = await chromium.connectOverCDP(cdpUrl)
+    const version = browser.version()
+    await browser.close().catch(() => {})
+    res.json({ success: true, version })
+  } catch (e) {
+    if (browser) await browser.close().catch(() => {})
+    res.status(502).json({ success: false, error: e.message })
   }
 })
 

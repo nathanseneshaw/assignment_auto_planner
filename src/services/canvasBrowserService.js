@@ -65,11 +65,11 @@ export function validateCanvasBrowserUrl(input) {
  */
 export async function startCanvasBrowserSession(canvasUrl, options = {}) {
   const {
-    useSameBrowser = false,
     cdpUrl,
     browserChannel,
     alsoOpenInDefaultBrowser = false,
   } = options
+  const useSameBrowser = options.useSameBrowser ?? !!cdpUrl
   const normalized = validateCanvasBrowserUrl(canvasUrl)
   const { ok, status, data } = await fetchJsonAlways(`${API_BASE}/start-session`, {
     method: 'POST',
@@ -161,6 +161,15 @@ export async function closeCanvasSession(sessionId) {
   return fetchApiJson(`${API_BASE}/close-session/${sessionId}`, {
     method: 'POST',
   })
+}
+
+export async function testCdpConnection(cdpUrl) {
+  const res = await fetch(apiUrl(`/api/cdp/test`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cdpUrl }),
+  })
+  return res.json()
 }
 
 export function pollCanvasBrowserLogin(sessionId, onStatus, intervalMs = 1500) {

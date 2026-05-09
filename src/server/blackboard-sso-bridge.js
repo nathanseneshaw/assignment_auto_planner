@@ -149,7 +149,11 @@ export async function startBlackboardSsoSession(opts) {
         page = await context.newPage()
         console.log(`[Blackboard SSO] Session ${sessionId} connected via CDP ${cdpUrl}`)
       } catch (e) {
-        console.warn(`[Blackboard SSO] CDP failed (${e.message}); launching Chromium.`)
+        throw new Error(
+          `Could not connect to your browser at ${cdpUrl}. ` +
+          `Make sure Chrome is running with --remote-debugging-port=9222 and your tunnel is active. ` +
+          `Underlying error: ${e.message}`
+        )
       }
     }
 

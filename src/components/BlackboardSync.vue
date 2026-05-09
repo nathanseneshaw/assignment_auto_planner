@@ -10,6 +10,7 @@ import {
   pollLoginStatus,
   syncSession,
   closeSession,
+  testCdpConnection,
 } from '../services/blackboardBrowserService'
 import BrowserViewer from './BrowserViewer.vue'
 import { ensureCourseForBlackboardItem } from '../utils/blackboardImport.js'
@@ -34,9 +35,35 @@ const stopLoginPoll = ref(null)
 const isSyncing = ref(false)
 const isCheckingLogin = ref(false)
 const syncResults = ref(null)
-const currentStep = ref('url') // url, ready, syncing, results
+const currentStep = ref('cdp') // cdp, url, ready, syncing, results
 const error = ref('')
 const loginStatus = ref(null)
+const cdpUrl = ref(localStorage.getItem('cdpUrl') || '')
+const cdpStatus = ref(null)
+const isTestingCdp = ref(false)
+
+async function testCdp() {
+  if (!cdpUrl.value?.trim()) {
+    cdpStatus.value = { ok: false, message: 'Enter your tunnel URL' }
+    return
+  }
+  isTestingCdp.value = true
+  cdpStatus.value = null
+  try {
+    const result = await testCdpConnection(cdpUrl.value.trim())
+    if (result.success) {
+      cdpStatus.value = { ok: true, message: `Connected to ${result.version || 'browser'}` }
+      localStorage.setItem('cdpUrl', cdpUrl.value.trim())
+      currentStep.value = 'url'
+    } else {
+      cdpStatus.value = { ok: false, message: result.error || 'Connection failed' }
+    }
+  } catch (e) {
+    cdpStatus.value = { ok: false, message: e.message }
+  } finally {
+    isTestingCdp.value = false
+  }
+}
 
 function clearLoginPoll() {
   stopLoginPoll.value?.()
@@ -61,7 +88,9 @@ async function startLogin() {
   clearLoginPoll()
 
   try {
-    const result = await startSsoSession(blackboardUrl.value.trim(), {})
+    const result = await startSsoSession(blackboardUrl.value.trim(), {
+      cdpUrl: cdpUrl.value.trim() || undefined,
+    })
     sessionId.value = result.sessionId
     viewport.value = result.viewport ?? { width: 1280, height: 720 }
     if (result.blackboardUrl) {
@@ -202,15 +231,64 @@ async function cancelSync() {
     await closeSession(sessionId.value).catch(() => {})
   }
   sessionId.value = null
-  currentStep.value = 'url'
+  currentStep.value = cdpUrl.value?.trim() ? 'url' : 'cdp'
   loginStatus.value = null
 }
 </script>
 
 <template>
   <div class="space-y-6">
+    <!-- Step 0: Connect your browser via CDP -->
+    <div v-if="currentStep === 'cdp'" class="space-y-5">
+      <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+        <h4 class="font-semibold text-gray-900">Connect your browser</h4>
+        <p class="text-sm text-gray-700">
+          Sign-in runs in your own Chrome on your computer. Set up a tunnel so the server can drive that browser:
+        </p>
+        <ol class="text-sm text-gray-700 list-decimal pl-5 space-y-2">
+          <li>
+            Launch Chrome with debugging enabled:
+            <pre class="mt-1 px-3 py-2 bg-gray-900 text-gray-100 rounded text-xs overflow-x-auto"><code>chrome.exe --remote-debugging-port=9222 --user-data-dir=%TEMP%\bb-cdp</code></pre>
+          </li>
+          <li>
+            In a separate terminal, expose port 9222 with ngrok:
+            <pre class="mt-1 px-3 py-2 bg-gray-900 text-gray-100 rounded text-xs overflow-x-auto"><code>ngrok http 9222</code></pre>
+          </li>
+          <li>Copy the <code class="px-1 bg-gray-200 rounded text-xs">https://...ngrok-free.app</code> URL ngrok prints, and paste it below.</li>
+        </ol>
+      </div>
+
+      <Input
+        v-model="cdpUrl"
+        label="Browser tunnel URL"
+        placeholder="https://abcd-1-2-3-4.ngrok-free.app"
+        hint="The HTTPS URL from ngrok output. Saved to this browser for next time."
+      />
+
+      <div
+        v-if="cdpStatus"
+        :class="[
+          'text-sm p-3 rounded-xl border',
+          cdpStatus.ok
+            ? 'text-green-700 bg-green-50 border-green-200'
+            : 'text-red-600 bg-red-50 border-red-100',
+        ]"
+      >
+        {{ cdpStatus.message }}
+      </div>
+
+      <button
+        type="button"
+        @click="testCdp"
+        :disabled="!cdpUrl?.trim() || isTestingCdp"
+        class="w-full px-4 py-3 rounded-xl bg-primary-900 text-white text-sm font-semibold hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-primary-900/15 transition-colors"
+      >
+        {{ isTestingCdp ? 'Testing…' : 'Test connection' }}
+      </button>
+    </div>
+
     <!-- Step 1: Enter URL -->
-    <div v-if="currentStep === 'url'" class="space-y-5">
+    <div v-else-if="currentStep === 'url'" class="space-y-5">
       <Input
         v-model="blackboardUrl"
         label="Blackboard URL"

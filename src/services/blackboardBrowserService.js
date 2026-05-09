@@ -59,11 +59,11 @@ export async function startLoginSession(blackboardUrl, options = {}) {
 export async function startSsoSession(blackboardUrl, options = {}) {
   const {
     learnBaseUrl,
-    useSameBrowser = false,
     cdpUrl,
     browserChannel,
     alsoOpenInDefaultBrowser = false,
   } = options
+  const useSameBrowser = options.useSameBrowser ?? !!cdpUrl
   // Current server exposes Playwright start at /start-session (no /sso prefix).
   const data = await fetchJsonAlways(`${API_BASE}/start-session`, {
     method: 'POST',
@@ -88,6 +88,15 @@ export async function sendBrowserInput(sessionId, input) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
+  })
+  return res.json()
+}
+
+export async function testCdpConnection(cdpUrl) {
+  const res = await fetch(apiUrl(`/api/cdp/test`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cdpUrl }),
   })
   return res.json()
 }
