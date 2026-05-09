@@ -1,4 +1,19 @@
 import './load-env.js'
+import { spawnSync } from 'node:child_process'
+
+// Install the Chromium browser binary at server startup. System libraries are
+// already installed at build time via the Dockerfile; this only downloads the
+// browser binary into PLAYWRIGHT_BROWSERS_PATH (/ms-playwright in the container).
+console.log('[playwright] Installing Chromium browser...')
+const installResult = spawnSync('npx', ['playwright', 'install', 'chromium'], {
+  stdio: 'inherit'
+})
+if (installResult.status !== 0) {
+  console.error('[playwright] Chromium install failed')
+  process.exit(1)
+}
+console.log('[playwright] Chromium ready')
+
 import express from 'express'
 import cors from 'cors'
 import { BlackboardScraper } from './blackboard-scraper.js'

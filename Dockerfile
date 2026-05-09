@@ -5,15 +5,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# Install BOTH chromium and chromium-headless-shell. The default headless mode
-# in Playwright 1.49+ uses chrome-headless-shell — a separate binary from the
-# full Chromium browser. Without it, launching with headless: true fails even
-# if chromium is installed.
-#
-# PLAYWRIGHT_BROWSERS_PATH is an absolute path (not HOME-relative), so Render's
-# runtime HOME=/opt/render override can't change where Playwright looks.
+# Install Chromium's system libraries (apt packages) at build time as root.
+# The browser binary itself is downloaded at runtime via spawnSync in index.js.
+# PLAYWRIGHT_BROWSERS_PATH is absolute so Render's HOME=/opt/render override
+# cannot change where Playwright looks for the browser.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN npx playwright install --with-deps chromium chromium-headless-shell
+RUN npx playwright install-deps chromium
 
 ENV NODE_ENV=production
 ENV PLAYWRIGHT_HEADLESS=true
