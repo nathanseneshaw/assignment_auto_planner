@@ -11,6 +11,7 @@ RUN npm ci --omit=dev
 # cannot change where Playwright looks for the browser.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN npx playwright install-deps chromium
+RUN npx playwright install chromium chromium-headless-shell
 
 ENV NODE_ENV=production
 ENV PLAYWRIGHT_HEADLESS=true
