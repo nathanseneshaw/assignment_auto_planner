@@ -1,18 +1,24 @@
 import './load-env.js'
 import { spawnSync } from 'node:child_process'
 
-// Install the Chromium browser binary at server startup. System libraries are
-// already installed at build time via the Dockerfile; this only downloads the
-// browser binary into PLAYWRIGHT_BROWSERS_PATH (/ms-playwright in the container).
-console.log('[playwright] Installing Chromium browser...')
-const installResult = spawnSync('npx', ['playwright', 'install', 'chromium'], {
-  stdio: 'inherit'
-})
+// Install browser binaries at server startup. System libraries are installed
+// at build time via the Dockerfile; this downloads the browser binaries into
+// PLAYWRIGHT_BROWSERS_PATH (/ms-playwright in the container).
+//
+// Both browsers are required: Playwright 1.49+ uses chrome-headless-shell
+// (a separate, lighter binary) when headless: true is passed. Without it,
+// headless launches fail even if the full chromium browser is installed.
+console.log('[playwright] Installing Chromium + headless shell...')
+const installResult = spawnSync(
+  'npx',
+  ['playwright', 'install', 'chromium', 'chromium-headless-shell'],
+  { stdio: 'inherit' }
+)
 if (installResult.status !== 0) {
-  console.error('[playwright] Chromium install failed')
+  console.error('[playwright] Browser install failed')
   process.exit(1)
 }
-console.log('[playwright] Chromium ready')
+console.log('[playwright] Browsers ready')
 
 import express from 'express'
 import cors from 'cors'
