@@ -14,9 +14,9 @@
     "server": "cd src/server && npm start",
     "server:dev": "cd src/server && npm run dev",
     "server:test": "cd src/server && npm test",
-    "server:install": "npm install && npx playwright install chromium",
-    "playwright:install": "cd src/server && npx playwright install chromium",
-    "render:build": "npm install && npx playwright install chromium"
+    "server:install": "npm install && npx playwright install chromium chromium-headless-shell",
+    "playwright:install": "cd src/server && npx playwright install chromium chromium-headless-shell",
+    "render:build": "npm install && npx playwright install chromium chromium-headless-shell"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
