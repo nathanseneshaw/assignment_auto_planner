@@ -6,6 +6,9 @@ import {
   downloadCanvasModuleFilesZip,
   closeCanvasSession,
 } from '../services/canvasBrowserService'
+import LmsBrowserPanel from './LmsBrowserPanel.vue'
+
+const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.isElectron
 
 const props = defineProps({
   mergeImport: {
@@ -115,41 +118,57 @@ async function closeAndReset() {
   currentStep.value = 'extension'
   error.value = ''
 }
+
+function onBrowserSessionReady(sid) {
+  sessionId.value = sid
+  void startSync()
+}
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Step 1: Extension instructions -->
-    <div v-if="currentStep === 'extension'" class="space-y-5">
-      <div class="rounded-xl border border-gray-200 bg-gray-50 p-5 space-y-3">
-        <h4 class="font-semibold text-gray-900">Sync via the Assignment Planner extension</h4>
-        <p class="text-sm text-gray-700">
-          Your browser does the login. The Assignment Planner extension reads your Canvas
-          session cookies and sends them to the server, which does the rest.
+    <!-- Step 1: Extension instructions / Embedded browser (Electron) -->
+    <div v-if="currentStep === 'extension'">
+      <!-- Desktop app: show embedded browser directly -->
+      <div v-if="isElectron">
+        <LmsBrowserPanel
+          lms-type="canvas"
+          :on-success="onBrowserSessionReady"
+        />
+      </div>
+
+      <!-- Web: show extension install instructions -->
+      <div v-else class="space-y-5">
+        <div class="rounded-xl border border-gray-200 bg-gray-50 p-5 space-y-3">
+          <h4 class="font-semibold text-gray-900">Sync via the Assignment Planner extension</h4>
+          <p class="text-sm text-gray-700">
+            Your browser does the login. The Assignment Planner extension reads your Canvas
+            session cookies and sends them to the server, which does the rest.
+          </p>
+          <ol class="text-sm text-gray-700 list-decimal pl-5 space-y-2">
+            <li>
+              <strong>Install the extension</strong> (one-time):
+              open <code class="px-1 bg-gray-200 rounded text-xs">chrome://extensions</code>,
+              turn on <em>Developer mode</em>, click <em>Load unpacked</em>, and select the
+              <code class="px-1 bg-gray-200 rounded text-xs">extension/</code> folder of this project.
+            </li>
+            <li>Open Canvas in a tab and log in normally.</li>
+            <li>Click the Assignment Planner Sync icon in your toolbar.</li>
+            <li>Click <strong>Sync this site</strong>. This window will open automatically.</li>
+          </ol>
+        </div>
+
+        <div
+          v-if="error"
+          class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100"
+        >
+          {{ error }}
+        </div>
+
+        <p class="text-xs text-gray-500">
+          Nothing else to configure here — close this when you're ready to head to Canvas.
         </p>
-        <ol class="text-sm text-gray-700 list-decimal pl-5 space-y-2">
-          <li>
-            <strong>Install the extension</strong> (one-time):
-            open <code class="px-1 bg-gray-200 rounded text-xs">chrome://extensions</code>,
-            turn on <em>Developer mode</em>, click <em>Load unpacked</em>, and select the
-            <code class="px-1 bg-gray-200 rounded text-xs">extension/</code> folder of this project.
-          </li>
-          <li>Open Canvas in a tab and log in normally.</li>
-          <li>Click the Assignment Planner Sync icon in your toolbar.</li>
-          <li>Click <strong>Sync this site</strong>. This window will open automatically.</li>
-        </ol>
       </div>
-
-      <div
-        v-if="error"
-        class="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-100"
-      >
-        {{ error }}
-      </div>
-
-      <p class="text-xs text-gray-500">
-        Nothing else to configure here — close this when you're ready to head to Canvas.
-      </p>
     </div>
 
     <!-- Step 2: Syncing -->

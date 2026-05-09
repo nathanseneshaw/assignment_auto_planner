@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Automatically plan and manage your assignments from Blackboard",
   "type": "module",
+  "main": "electron/main.js",
   "engines": {
     "node": ">=18"
   },
@@ -15,7 +16,10 @@
     "server:dev": "cd src/server && npm run dev",
     "server:test": "cd src/server && npm test",
     "server:install": "npm install",
-    "render:build": "npm install"
+    "render:build": "npm install",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env ELECTRON_DEV=true electron .\"",
+    "electron:build": "vite build && electron-builder",
+    "electron:preview": "cross-env ELECTRON_DEV=false electron ."
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
@@ -33,11 +37,36 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.4",
-    "vercel": "^53.2.0",
     "@vitejs/plugin-vue": "^5.1.4",
     "autoprefixer": "^10.5.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "electron": "^34.5.8",
+    "electron-builder": "^25.1.8",
     "postcss": "^8.5.10",
     "tailwindcss": "^4.2.4",
-    "vite": "^5.4.10"
+    "vercel": "^53.2.0",
+    "vite": "^5.4.10",
+    "wait-on": "^8.0.5"
+  },
+  "build": {
+    "appId": "com.assignmentplanner.app",
+    "productName": "Assignment Planner",
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }
