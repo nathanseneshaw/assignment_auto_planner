@@ -133,16 +133,26 @@ async function syncOneFeed(supabase, userId, feed) {
       feedId: feed.id,
       occurrences,
     })
+    const writeErrors = counts.errors || []
+    const syncError = writeErrors.length > 0
+      ? `${writeErrors.length} item(s) failed to save: ${writeErrors[0].error}`
+      : null
     await supabase
       .from('ics_feeds')
       .update({
         last_synced_at: startedAt,
-        last_sync_status: 'success',
-        last_sync_error: null,
+        last_sync_status: writeErrors.length > 0 && occurrences.length > 0 && counts.assignmentsInserted + counts.assignmentsUpdated === 0 ? 'error' : 'success',
+        last_sync_error: syncError,
       })
       .eq('id', feed.id)
       .eq('user_id', userId)
-    return { feedId: feed.id, success: true, ...counts, occurrenceCount: occurrences.length }
+    return {
+      feedId: feed.id,
+      success: true,
+      ...counts,
+      occurrenceCount: occurrences.length,
+      writeErrors: counts.errors || [],
+    }
   } catch (e) {
     const msg = e?.message || String(e)
     await supabase
