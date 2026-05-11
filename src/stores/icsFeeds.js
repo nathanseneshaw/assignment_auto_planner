@@ -1,3 +1,15 @@
+/**
+ * ICS feeds Pinia store.
+ *
+ * Manages the user's saved iCalendar subscriptions and orchestrates server-side
+ * sync. After every sync we re-hydrate the courses + assignments stores from
+ * Supabase so the UI reflects what the server just upserted.
+ *
+ * State flags:
+ * - `loading` : list fetch is in flight.
+ * - `syncing` : a sync POST is in flight (mutually exclusive across all feeds).
+ * - `lastSyncResult` / `lastError` : surfaced to the UI for status badges.
+ */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as icsService from '../services/icsService'
@@ -12,6 +24,7 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
 
   const hasFeeds = computed(() => feeds.value.length > 0)
 
+  /** Reload the saved feed list from the server. On failure clears local state. */
   async function fetchFeeds() {
     loading.value = true
     lastError.value = null
@@ -25,6 +38,7 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     }
   }
 
+  /** Subscribe to a new feed and optimistically append it to the local list. */
   async function addFeed(url, label) {
     lastError.value = null
     try {
@@ -37,6 +51,7 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     }
   }
 
+  /** Unsubscribe and remove from local cache. */
   async function removeFeed(id) {
     lastError.value = null
     try {
@@ -48,6 +63,11 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     }
   }
 
+  /**
+   * Sync all feeds, then refresh the feed list (for updated timestamps) and
+   * hydrate the LMS stores so newly created courses/assignments appear.
+   * Guarded by `syncing` so the user can't double-trigger.
+   */
   async function syncAll() {
     if (syncing.value) return null
     syncing.value = true
@@ -72,6 +92,7 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     }
   }
 
+  /** Same as {@link syncAll} but scoped to a single feed id. */
   async function syncOne(id) {
     if (syncing.value) return null
     syncing.value = true
@@ -94,6 +115,7 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     }
   }
 
+  /** Clear in-memory state — called on sign-out so the next user starts clean. */
   function reset() {
     feeds.value = []
     lastSyncResult.value = null

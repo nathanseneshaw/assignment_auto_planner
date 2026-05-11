@@ -1,7 +1,17 @@
+/**
+ * Read-side counterpart to `lmsSupabaseSync.js`.
+ *
+ * On demand (e.g. after sign-in or after an ICS sync), pull the user's
+ * courses + assignments from Supabase and **fully replace** the local Pinia
+ * state with the result. This is intentionally not merged — Supabase is the
+ * source of truth here, and any local-only edits would have been pushed up
+ * by the background sync first.
+ */
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
 
+/** Color palette assigned round-robin so hydration is deterministic per-position. */
 const courseColors = [
   { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
   { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
@@ -13,6 +23,11 @@ const courseColors = [
   { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
 ]
 
+/**
+ * Convert a Supabase `due_at` timestamp into the `YYYY-MM-DD` string the UI
+ * uses everywhere. Bad/missing input falls back to today so the calendar
+ * grid doesn't crash on a malformed row.
+ */
 function dueDateFromDb(dueAt) {
   if (!dueAt) return new Date().toISOString().split('T')[0]
   const d = new Date(dueAt)
@@ -20,6 +35,11 @@ function dueDateFromDb(dueAt) {
   return d.toISOString().split('T')[0]
 }
 
+/**
+ * Map a Supabase `courses` row → the shape `useCoursesStore` expects.
+ * `index` is the row position used to pick a color, so reordering the source
+ * query would shuffle colors (acceptable trade-off for determinism).
+ */
 function mapCourseRow(row, index) {
   const id = row.id
   const source = row.source || 'manual'
@@ -37,6 +57,7 @@ function mapCourseRow(row, index) {
     term: row.term != null ? String(row.term) : '',
   }
 
+  // Surface the external id under the LMS-specific field the rest of the app reads.
   if (source === 'canvas' && external) {
     course.canvasCourseId = external
   } else if (source === 'blackboard' && external) {
@@ -46,6 +67,11 @@ function mapCourseRow(row, index) {
   return course
 }
 
+/**
+ * Map a Supabase `assignments` row → the shape `useAssignmentsStore` expects.
+ * Defaults `status='pending'`, no subtasks, 0% progress — local task state is
+ * not stored server-side yet, so hydration always starts these fresh.
+ */
 function mapAssignmentRow(row, course) {
   const id = row.id
   const ext = row.external_assignment_id != null ? String(row.external_assignment_id).trim() : ''
@@ -65,6 +91,7 @@ function mapAssignmentRow(row, course) {
     description: row.description != null ? String(row.description) : '',
   }
 
+  // Like courses: route the external id into the LMS-specific field.
   if (src === 'canvas' && ext) {
     return { ...base, canvasAssignmentId: ext, importSource: 'canvas' }
   }
@@ -76,6 +103,10 @@ function mapAssignmentRow(row, course) {
 
 /**
  * Replace courses and assignments in Pinia from the signed-in user's Supabase rows.
+ *
+ * No-ops when Supabase is unconfigured or the user is signed out — callers
+ * can safely invoke this on every navigation or after every sync without
+ * guarding themselves.
  */
 export async function hydrateLmsStoresFromSupabase() {
   if (!isSupabaseConfigured || !supabase) return
@@ -89,6 +120,7 @@ export async function hydrateLmsStoresFromSupabase() {
   const coursesStore = useCoursesStore()
   const assignmentsStore = useAssignmentsStore()
 
+  // Pull both tables in series — assignments need the courses lookup table for `courseName`.
   const { data: courseRows, error: cErr } = await supabase
     .from('courses')
     .select('*')
@@ -112,6 +144,7 @@ export async function hydrateLmsStoresFromSupabase() {
   }
 
   const courses = (courseRows || []).map((row, i) => mapCourseRow(row, i))
+  // O(1) lookup so we can stitch course names onto assignments cheaply.
   const courseById = Object.fromEntries(courses.map((c) => [c.id, c]))
 
   const assignments = (assignmentRows || []).map((row) =>
