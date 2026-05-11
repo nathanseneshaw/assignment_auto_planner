@@ -35,7 +35,16 @@ function readCalendarName(text) {
 
 /**
  * Heuristically extract { courseExternalId, courseName } from an event.
- * Order: Canvas /courses/<id> URL → [bracket] in SUMMARY → CATEGORIES → X-WR-CALNAME → 'Unknown course'.
+ *
+ * Priority:
+ *   1. Canvas /courses/<numeric-id>          → canvas:<id>
+ *   2. Blackboard course_id=_xxx_x           → bb:<id>
+ *   3. [Bracket] in SUMMARY (Canvas style)   → canvas:<id> via map, else name:<bracket>
+ *   4. "Course: ..." line in DESCRIPTION     → name:<line>     (Blackboard classic)
+ *   5. CATEGORIES                            → name:<category> (Brightspace, BB Ultra)
+ *   6. Course code in SUMMARY (e.g. CS 3340) → name:<code>     (fallback heuristic)
+ *   7. X-WR-CALNAME                          → cal:<name>
+ *   8. 'Unknown course'
  *
  * bracketToCanvasId is an optional Map<bracketNameLower, canvasNumericId> built by
  * parseAndExpand in a first pass. It lets bracket-name-only events (e.g. calendar
@@ -46,9 +55,11 @@ export function extractCourse(event, calendarName, bracketToCanvasId) {
   const summary = stringOf(event.summary)
   const description = stringOf(event.description)
   const url = stringOf(event.url)
+  const location = stringOf(event.location)
+  const haystack = `${description} ${url} ${location}`
 
-  // 1. Canvas: /courses/<id> in DESCRIPTION or URL is the most stable id
-  const canvasMatch = (description + ' ' + url).match(/\/courses\/(\d+)/)
+  // 1. Canvas: /courses/<numeric-id> in DESCRIPTION/URL/LOCATION
+  const canvasMatch = haystack.match(/\/courses\/(\d+)/)
   if (canvasMatch) {
     const bracketName = extractBracketName(summary)
     return {
@@ -57,9 +68,24 @@ export function extractCourse(event, calendarName, bracketToCanvasId) {
     }
   }
 
-  // 2. SUMMARY with [Course Code] suffix or prefix (Canvas convention).
+  // 2. Blackboard: course_id=_NNNN_N (classic) or /ultra/courses/_NNNN_N/ (Ultra).
+  // Blackboard's internal id format uses underscores, so the Canvas regex above
+  // intentionally won't match these.
+  const bbMatch = haystack.match(/course_id=(_\d+_\d+)|\/courses\/(_\d+_\d+)/)
+  if (bbMatch) {
+    const bbId = bbMatch[1] || bbMatch[2]
+    const fromDesc = extractCourseLineFromDescription(description)
+    const fromCode = extractCourseCodeFromText(summary) || extractCourseCodeFromText(description)
+    const bracketName = extractBracketName(summary)
+    return {
+      courseExternalId: `bb:${bbId}`,
+      courseName: fromDesc || bracketName || fromCode || `Blackboard course ${bbId}`,
+    }
+  }
+
+  // 3. [Bracket] in SUMMARY (Canvas convention).
   // If a prior event already mapped this bracket name to a canvas course id, reuse
-  // that id so both event types land in the same course row.
+  // it so both event types land in the same course row.
   const bracketName = extractBracketName(summary)
   if (bracketName) {
     const knownCanvasId = bracketToCanvasId?.get(bracketName.toLowerCase())
@@ -75,7 +101,16 @@ export function extractCourse(event, calendarName, bracketToCanvasId) {
     }
   }
 
-  // 3. CATEGORIES (Brightspace / Blackboard Ultra often populate this)
+  // 4. "Course: <name>" / "Course Name: <name>" line in DESCRIPTION (Blackboard classic).
+  const courseLine = extractCourseLineFromDescription(description)
+  if (courseLine) {
+    return {
+      courseExternalId: `name:${courseLine.toLowerCase()}`,
+      courseName: courseLine,
+    }
+  }
+
+  // 5. CATEGORIES (Brightspace / Blackboard Ultra often populate this)
   const categories = readCategories(event)
   if (categories.length > 0) {
     const name = categories[0]
@@ -85,7 +120,18 @@ export function extractCourse(event, calendarName, bracketToCanvasId) {
     }
   }
 
-  // 4. Calendar-level name (typical for per-course feeds)
+  // 6. Course code anywhere in SUMMARY or DESCRIPTION (e.g. "Lab 5 - CS 3340.501").
+  // This is a heuristic and may misfire on assignment titles containing digit
+  // sequences, so it sits below the higher-confidence checks above.
+  const code = extractCourseCodeFromText(summary) || extractCourseCodeFromText(description)
+  if (code) {
+    return {
+      courseExternalId: `name:${code.toLowerCase()}`,
+      courseName: code,
+    }
+  }
+
+  // 7. Calendar-level name (typical for per-course feeds)
   if (calendarName) {
     return {
       courseExternalId: `cal:${calendarName.toLowerCase()}`,
@@ -93,11 +139,34 @@ export function extractCourse(event, calendarName, bracketToCanvasId) {
     }
   }
 
-  // 5. Fallback bucket
+  // 8. Fallback bucket
   return {
     courseExternalId: 'name:unknown course',
     courseName: 'Unknown course',
   }
+}
+
+/**
+ * Pull a "Course: ..." line out of an event DESCRIPTION.
+ * Blackboard typically writes this as the first line of the body. Tolerates
+ * "Course Name:" and strips any inline HTML node-ical left behind.
+ */
+function extractCourseLineFromDescription(s) {
+  if (!s) return ''
+  const m = s.match(/(?:^|\n)\s*Course(?:\s*Name)?\s*[:\-]\s*([^\r\n]+)/i)
+  if (!m) return ''
+  return m[1].replace(/<[^>]+>/g, '').trim()
+}
+
+/**
+ * Find a course-code-shaped substring (e.g. "CS 3340", "MATH-2418.501").
+ * Used only as a last-ditch heuristic when no structured fields identify the course.
+ */
+function extractCourseCodeFromText(s) {
+  if (!s) return ''
+  const m = s.match(/\b([A-Z]{2,5}[\s\-]?\d{3,4}(?:\.\d+)?)\b/)
+  if (!m) return ''
+  return m[1].trim()
 }
 
 function extractBracketName(s) {
