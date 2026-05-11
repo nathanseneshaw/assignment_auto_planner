@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -15,7 +15,6 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
     },
   })
 
@@ -25,28 +24,6 @@ function createWindow() {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 }
-
-// Read cookies from a webview partition and return them to the renderer.
-ipcMain.handle('extract-lms-cookies', async (_e, { url, partition }) => {
-  const ses = partition ? session.fromPartition(partition) : session.defaultSession
-  const { hostname } = new URL(url)
-  const raw = await ses.cookies.get({ domain: hostname })
-  return raw.map((c) => ({
-    name: c.name,
-    value: c.value,
-    domain: c.domain,
-    path: c.path,
-    secure: c.secure,
-    httpOnly: c.httpOnly,
-    sameSite: c.sameSite || 'Lax',
-  }))
-})
-
-// Clear all cookies in the LMS partition so the next login starts fresh.
-ipcMain.handle('clear-lms-session', async (_e, { partition }) => {
-  const ses = session.fromPartition(partition)
-  await ses.clearStorageData()
-})
 
 app.whenReady().then(() => {
   createWindow()

@@ -23,6 +23,7 @@ import {
   normalizeCanvasBaseUrl,
   verifyCanvasCookieSession,
 } from './canvas-lms.js'
+import icsRoutes from './ics-routes.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -54,6 +55,9 @@ app.use(
   })
 )
 app.use(express.json({ limit: '1mb' }))
+
+// ICS calendar feed sync (replaces LMS scraping for new users).
+app.use(icsRoutes)
 
 function normalizeUrl(input) {
   let url = String(input || '').trim()
@@ -376,4 +380,8 @@ app.listen(PORT, HOST, () => {
   console.log('  POST /api/canvas/scrape-files/:sessionId — Stream ZIP of Canvas files')
   console.log('  POST /api/canvas/sync-token — Token-based Canvas sync (no browser)')
   console.log('  POST /api/blackboard/login|course|sync — Direct credentials login (non-SSO)')
+  console.log('  GET  /api/ics/feeds — list ICS feeds for the signed-in user')
+  console.log('  POST /api/ics/feeds — add an ICS feed URL')
+  console.log('  DELETE /api/ics/feeds/:id — remove an ICS feed (assignments are kept)')
+  console.log('  POST /api/ics/sync — fetch + parse + upsert one or all ICS feeds')
 })
