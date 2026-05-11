@@ -29,6 +29,9 @@ function clientFor(req) {
   return createClient(url, anon, {
     global: { headers: { Authorization: auth } },
     auth: { persistSession: false, autoRefreshToken: false },
+    // Realtime is not used server-side; disabling it prevents the
+    // "Node.js 20 has no native WebSocket" warning from Supabase.
+    realtime: { transport: null },
   })
 }
 
