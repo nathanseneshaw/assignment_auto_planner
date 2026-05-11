@@ -10,6 +10,7 @@ import { useAuthStore } from './stores/auth'
 import { isSupabaseConfigured } from './lib/supabase'
 import { hydrateLmsStoresFromSupabase } from './services/lmsSupabaseHydration'
 import { useSupabaseStoreSync } from './composables/useSupabaseStoreSync'
+import { useIcsAutoSync } from './composables/useIcsAutoSync'
 
 const route = useRoute()
 
@@ -19,6 +20,7 @@ const tasksStore = useTasksStore()
 const authStore = useAuthStore()
 
 useSupabaseStoreSync()
+useIcsAutoSync()
 
 onMounted(async () => {
   if (isSupabaseConfigured && authStore.user) {
