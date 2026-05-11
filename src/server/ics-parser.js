@@ -36,8 +36,13 @@ function readCalendarName(text) {
 /**
  * Heuristically extract { courseExternalId, courseName } from an event.
  * Order: Canvas /courses/<id> URL → [bracket] in SUMMARY → CATEGORIES → X-WR-CALNAME → 'Unknown course'.
+ *
+ * bracketToCanvasId is an optional Map<bracketNameLower, canvasNumericId> built by
+ * parseAndExpand in a first pass. It lets bracket-name-only events (e.g. calendar
+ * announcements) resolve to the same canvas:<id> as assignment events for the same
+ * course, preventing duplicate course rows.
  */
-export function extractCourse(event, calendarName) {
+export function extractCourse(event, calendarName, bracketToCanvasId) {
   const summary = stringOf(event.summary)
   const description = stringOf(event.description)
   const url = stringOf(event.url)
@@ -52,9 +57,18 @@ export function extractCourse(event, calendarName) {
     }
   }
 
-  // 2. SUMMARY with [Course Code] suffix or prefix (Canvas convention)
+  // 2. SUMMARY with [Course Code] suffix or prefix (Canvas convention).
+  // If a prior event already mapped this bracket name to a canvas course id, reuse
+  // that id so both event types land in the same course row.
   const bracketName = extractBracketName(summary)
   if (bracketName) {
+    const knownCanvasId = bracketToCanvasId?.get(bracketName.toLowerCase())
+    if (knownCanvasId) {
+      return {
+        courseExternalId: `canvas:${knownCanvasId}`,
+        courseName: bracketName,
+      }
+    }
     return {
       courseExternalId: `name:${bracketName.toLowerCase()}`,
       courseName: bracketName,
@@ -169,8 +183,8 @@ function toDate(v) {
  * and giving each occurrence a unique external id (so they don't collide on the
  * (user_id, external_assignment_id) unique index).
  */
-export function expandEvent(event, calendarName) {
-  const course = extractCourse(event, calendarName)
+export function expandEvent(event, calendarName, bracketToCanvasId) {
+  const course = extractCourse(event, calendarName, bracketToCanvasId)
   const out = []
 
   const baseStart = toDate(event.start)
@@ -206,7 +220,7 @@ export function expandEvent(event, calendarName) {
         const ovDue = toDate(override.due)
         const ovEnd = override.type === 'VTODO' ? null : toDate(override.end)
         const overrideEnd = ovDue || ovEnd || ovStart
-        const overrideCourse = extractCourse(override, calendarName)
+        const overrideCourse = extractCourse(override, calendarName, bracketToCanvasId)
         const overrideUid = `${stringOf(event.uid) || 'evt'}@${occStart.toISOString()}`
         out.push(
           normalizeOccurrence(
@@ -237,12 +251,28 @@ export function expandEvent(event, calendarName) {
 
 /**
  * Convenience: parse the raw ICS text into a flat array of normalized occurrences.
+ *
+ * Runs a first pass over all events to build a bracketName→canvasId map so that
+ * calendar/announcement events (which lack a /courses/ URL) resolve to the same
+ * course row as assignment events for the same course.
  */
 export function parseAndExpand(text) {
   const { calendarName, events } = parseIcsBuffer(text)
+
+  // First pass: collect bracket-name → canvas numeric id mappings from events
+  // that have both a [bracket] summary and a /courses/<id> URL.
+  const bracketToCanvasId = new Map()
+  for (const ev of events) {
+    const canvasMatch = (stringOf(ev.description) + ' ' + stringOf(ev.url)).match(/\/courses\/(\d+)/)
+    if (canvasMatch) {
+      const bracket = extractBracketName(stringOf(ev.summary))
+      if (bracket) bracketToCanvasId.set(bracket.toLowerCase(), canvasMatch[1])
+    }
+  }
+
   const out = []
   for (const ev of events) {
-    for (const occ of expandEvent(ev, calendarName)) out.push(occ)
+    for (const occ of expandEvent(ev, calendarName, bracketToCanvasId)) out.push(occ)
   }
   return { calendarName, occurrences: out }
 }
