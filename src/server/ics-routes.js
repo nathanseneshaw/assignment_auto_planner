@@ -126,7 +126,10 @@ async function syncOneFeed(supabase, userId, feed) {
   const startedAt = new Date().toISOString()
   try {
     const text = await fetchIcsFeed(feed.url)
-    const { occurrences } = parseAndExpand(text)
+    const { occurrences } = parseAndExpand(text, {
+      feedLabel: feed.label || null,
+      feedId: feed.id,
+    })
     const counts = await writeOccurrences({
       supabase,
       userId,
@@ -171,7 +174,7 @@ async function syncOneFeed(supabase, userId, feed) {
 router.post('/api/ics/sync', requireUser, async (req, res) => {
   const feedId = req.body?.feedId || null
   try {
-    let q = req.supabase.from('ics_feeds').select('id, url').eq('user_id', req.user.id)
+    let q = req.supabase.from('ics_feeds').select('id, url, label').eq('user_id', req.user.id)
     if (feedId) q = q.eq('id', feedId)
     const { data: feeds, error } = await q
     if (error) throw error

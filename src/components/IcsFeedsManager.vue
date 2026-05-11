@@ -114,8 +114,9 @@ async function handleSyncAll() {
       />
       <Input
         v-model="newLabel"
-        label="Label (optional)"
-        placeholder="e.g. Fall 2026 — Canvas"
+        label="Course name (recommended for Blackboard / D2L)"
+        placeholder="e.g. CS 3340 — Computer Architecture"
+        hint="Used as the course name when the feed itself doesn't identify one. Leave blank for multi-course feeds like Canvas."
       />
       <div>
         <Button :loading="addInFlight" @click="handleAdd">Add feed</Button>

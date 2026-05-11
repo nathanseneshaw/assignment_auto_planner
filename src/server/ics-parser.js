@@ -51,7 +51,10 @@ function readCalendarName(text) {
  * announcements) resolve to the same canvas:<id> as assignment events for the same
  * course, preventing duplicate course rows.
  */
-export function extractCourse(event, calendarName, bracketToCanvasId) {
+export function extractCourse(event, calendarName, bracketToCanvasId, opts = {}) {
+  const feedLabel = opts.feedLabel ? String(opts.feedLabel).trim() : ''
+  const feedId = opts.feedId || ''
+
   const summary = stringOf(event.summary)
   const description = stringOf(event.description)
   const url = stringOf(event.url)
@@ -131,17 +134,29 @@ export function extractCourse(event, calendarName, bracketToCanvasId) {
     }
   }
 
-  // 7. Calendar-level name (typical for per-course feeds)
+  // 7. User-provided feed label.
+  // For per-course feeds that carry no event-level course identity (typical of
+  // Blackboard gradebook feeds), the label the user entered when adding the feed
+  // is the only reliable course name we have.
+  if (feedLabel) {
+    return {
+      courseExternalId: `label:${feedLabel.toLowerCase()}`,
+      courseName: feedLabel,
+    }
+  }
+
+  // 8. X-WR-CALNAME. Qualified by feedId so two feeds from the same institution
+  // (both X-WR-CALNAME = "University of X") don't collapse into one course row.
   if (calendarName) {
     return {
-      courseExternalId: `cal:${calendarName.toLowerCase()}`,
+      courseExternalId: feedId ? `feed:${feedId}` : `cal:${calendarName.toLowerCase()}`,
       courseName: calendarName,
     }
   }
 
-  // 8. Fallback bucket
+  // 9. Fallback bucket
   return {
-    courseExternalId: 'name:unknown course',
+    courseExternalId: feedId ? `feed:${feedId}` : 'name:unknown course',
     courseName: 'Unknown course',
   }
 }
@@ -252,8 +267,8 @@ function toDate(v) {
  * and giving each occurrence a unique external id (so they don't collide on the
  * (user_id, external_assignment_id) unique index).
  */
-export function expandEvent(event, calendarName, bracketToCanvasId) {
-  const course = extractCourse(event, calendarName, bracketToCanvasId)
+export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
+  const course = extractCourse(event, calendarName, bracketToCanvasId, opts)
   const out = []
 
   const baseStart = toDate(event.start)
@@ -289,7 +304,7 @@ export function expandEvent(event, calendarName, bracketToCanvasId) {
         const ovDue = toDate(override.due)
         const ovEnd = override.type === 'VTODO' ? null : toDate(override.end)
         const overrideEnd = ovDue || ovEnd || ovStart
-        const overrideCourse = extractCourse(override, calendarName, bracketToCanvasId)
+        const overrideCourse = extractCourse(override, calendarName, bracketToCanvasId, opts)
         const overrideUid = `${stringOf(event.uid) || 'evt'}@${occStart.toISOString()}`
         out.push(
           normalizeOccurrence(
@@ -325,7 +340,7 @@ export function expandEvent(event, calendarName, bracketToCanvasId) {
  * calendar/announcement events (which lack a /courses/ URL) resolve to the same
  * course row as assignment events for the same course.
  */
-export function parseAndExpand(text) {
+export function parseAndExpand(text, opts = {}) {
   const { calendarName, events } = parseIcsBuffer(text)
 
   // First pass: collect bracket-name → canvas numeric id mappings from events
@@ -341,7 +356,7 @@ export function parseAndExpand(text) {
 
   const out = []
   for (const ev of events) {
-    for (const occ of expandEvent(ev, calendarName, bracketToCanvasId)) out.push(occ)
+    for (const occ of expandEvent(ev, calendarName, bracketToCanvasId, opts)) out.push(occ)
   }
   return { calendarName, occurrences: out }
 }
