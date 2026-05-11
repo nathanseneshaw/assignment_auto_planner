@@ -1,8 +1,8 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue'
-import { Button, Card, Input, Badge, EmptyState } from './ui'
-import { useIcsFeedsStore } from '../stores/icsFeeds'
-import { useAuthStore } from '../stores/auth'
+import { Button, Card, Input, Badge, EmptyState } from '../ui'
+import { useIcsFeedsStore } from '../../stores/icsFeeds'
+import { useAuthStore } from '../../stores/auth'
 
 const feedsStore = useIcsFeedsStore()
 const authStore = useAuthStore()
