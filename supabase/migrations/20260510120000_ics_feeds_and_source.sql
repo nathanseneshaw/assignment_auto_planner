@@ -36,6 +36,8 @@ CREATE POLICY ics_feeds_delete_own ON public.ics_feeds FOR DELETE TO authenticat
 
 COMMENT ON TABLE public.ics_feeds IS 'User-provided ICS calendar URLs (LMS / Google Calendar / etc.).';
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ics_feeds TO authenticated;
+
 -- 2. Widen the source / import_source CHECK constraints to allow 'ics'.
 -- The original constraints were inline, so Postgres auto-named them.
 -- Drop by exact name when present; create the widened versions.
