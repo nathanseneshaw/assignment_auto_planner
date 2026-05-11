@@ -1,8 +1,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import Sidebar from '../components/common/Sidebar.vue'
-import TopBar from '../components/common/TopBar.vue'
-import MobileNav from '../components/common/MobileNav.vue'
+import Sidebar from '../common/Sidebar.vue'
+import TopBar from '../common/TopBar.vue'
+import MobileNav from '../common/MobileNav.vue'
 
 const sidebarOpen = ref(true)
 const mobileMenuOpen = ref(false)
