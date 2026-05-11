@@ -86,23 +86,12 @@ async function handleSyncAll() {
 
 <template>
   <Card padding="md">
-    <div class="flex items-start justify-between gap-4 mb-4">
-      <div>
-        <h3 class="text-lg font-semibold text-gray-900">Calendar feeds (ICS)</h3>
-        <p class="text-sm text-gray-500 mt-1">
-          Paste the ICS subscription URL from Canvas, Brightspace, Blackboard, or any tool that exports an iCalendar feed.
-          Imported assignments are stored in your account and stay visible even if your instructor removes them later.
-        </p>
-      </div>
-      <Button
-        v-if="feedsStore.feeds.length > 0"
-        size="sm"
-        variant="secondary"
-        :loading="feedsStore.syncing"
-        @click="handleSyncAll"
-      >
-        Sync all
-      </Button>
+    <div class="mb-4">
+      <h3 class="text-lg font-semibold text-gray-900">Calendar feeds (ICS)</h3>
+      <p class="text-sm text-gray-500 mt-1">
+        Paste the ICS subscription URL from Canvas, Brightspace, Blackboard, or any tool that exports an iCalendar feed.
+        Imported assignments are stored in your account and stay visible even if your instructor removes them later.
+      </p>
     </div>
 
     <div class="space-y-3 mb-6">
@@ -111,12 +100,6 @@ async function handleSyncAll() {
         label="Calendar URL"
         placeholder="https://canvas.instructure.com/feeds/calendars/user_xxx.ics"
         :error="formError"
-      />
-      <Input
-        v-model="newLabel"
-        label="Course name (recommended for Blackboard / D2L)"
-        placeholder="e.g. CS 3340 — Computer Architecture"
-        hint="Used as the course name when the feed itself doesn't identify one. Leave blank for multi-course feeds like Canvas."
       />
       <div>
         <Button :loading="addInFlight" @click="handleAdd">Add feed</Button>
@@ -141,7 +124,20 @@ async function handleSyncAll() {
       description="Add a feed above to start importing assignments."
     />
 
-    <ul v-else class="space-y-3">
+    <template v-else>
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-sm font-medium text-gray-700">Your feeds</span>
+        <Button
+          size="sm"
+          variant="secondary"
+          :loading="feedsStore.syncing"
+          @click="handleSyncAll"
+        >
+          Sync all
+        </Button>
+      </div>
+
+      <ul class="space-y-3">
       <li
         v-for="feed in feedsStore.feeds"
         :key="feed.id"
@@ -160,7 +156,7 @@ async function handleSyncAll() {
           <div class="text-xs text-gray-500 mt-1">
             Last synced: {{ formatTimestamp(feed.last_synced_at) }}
           </div>
-          <div v-if="feed.last_sync_error" class="text-xs text-danger-600 mt-1 break-words">
+          <div v-if="feed.last_sync_error" class="text-xs text-danger-600 mt-1 wrap-break-word">
             {{ feed.last_sync_error }}
           </div>
         </div>
@@ -177,5 +173,6 @@ async function handleSyncAll() {
         </div>
       </li>
     </ul>
+    </template>
   </Card>
 </template>
