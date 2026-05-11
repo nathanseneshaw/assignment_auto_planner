@@ -1,3 +1,14 @@
+/**
+ * Assignments Pinia store.
+ *
+ * Each assignment is keyed by a local UUID (`id`) and may also carry:
+ *   - `supabaseAssignmentId` — the server-side row id once persisted.
+ *   - `canvasAssignmentId` / `blackboardId` — external LMS identifiers.
+ *   - `tasks` — nested subtasks used to compute `progress`.
+ *
+ * Like courses, mutations attempt a best-effort upsert to Supabase but never
+ * block the UI; the background sync composable handles retries / catch-up.
+ */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useCoursesStore } from './courses'
@@ -12,21 +23,29 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     return [...assignments.value].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
   })
 
+  /**
+   * Today's date as `YYYY-MM-DD` in the **user's local timezone**. We never use
+   * `toISOString()` here because that would shift to UTC and put assignments
+   * due today into "yesterday" for anyone west of UTC.
+   */
   function localDateKey() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
+  /** Not-yet-due, still-open assignments sorted by due date. */
   const upcomingAssignments = computed(() => {
     const today = localDateKey()
     return assignmentsByDueDate.value.filter(a => a.dueDate >= today && a.status !== 'completed')
   })
 
+  /** Past-due and still incomplete — surfaced as warnings in the UI. */
   const overdueAssignments = computed(() => {
     const today = localDateKey()
     return assignments.value.filter(a => a.dueDate < today && a.status !== 'completed')
   })
 
+  /** Lookup table for course detail pages: `{ [courseId]: Assignment[] }`. */
   const assignmentsByCourse = computed(() => {
     const grouped = {}
     assignments.value.forEach(assignment => {
@@ -38,6 +57,11 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     return grouped
   })
 
+  /**
+   * Add a new assignment. Defaults: `status='pending'`, no tasks, 0% progress.
+   * Kicks off a best-effort Supabase upsert; failures are silent here and
+   * picked up by the background sync.
+   */
   function addAssignment(assignment) {
     const newAssignment = {
       id: crypto.randomUUID(),
@@ -49,6 +73,8 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     }
     assignments.value.push(newAssignment)
 
+    // Fire-and-forget persist. Requires the parent course to already exist
+    // (or to be persistable) — orphan assignments are skipped here.
     void (async () => {
       const coursesStore = useCoursesStore()
       const parent = coursesStore.getCourseById(assignment.courseId)
@@ -69,6 +95,11 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     return newAssignment
   }
 
+  /**
+   * Patch an existing assignment by id. Mirrors to Supabase only when the row
+   * is already tracked there (either via supabaseAssignmentId or a Canvas/BB id);
+   * otherwise the background sync will eventually pick it up.
+   */
   function updateAssignment(id, updates) {
     const index = assignments.value.findIndex((a) => a.id === id)
     if (index === -1) return
@@ -93,6 +124,7 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     })()
   }
 
+  /** Local-only delete; intentionally does not remove the Supabase row. */
   function deleteAssignment(id) {
     assignments.value = assignments.value.filter(a => a.id !== id)
   }
@@ -106,6 +138,10 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     return assignments.value.find(a => a.id === id)
   }
 
+  /**
+   * Recompute the `progress` percentage from the assignment's subtasks. When
+   * every subtask is completed, also flip the assignment's status to completed.
+   */
   function updateProgress(id) {
     const assignment = getAssignmentById(id)
     if (assignment && assignment.tasks.length > 0) {
@@ -117,6 +153,7 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     }
   }
 
+  /** Force an assignment to completed regardless of subtask state. */
   function markAssignmentComplete(id) {
     updateAssignment(id, {
       status: 'completed',
@@ -125,6 +162,10 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     })
   }
 
+  /**
+   * Re-open an assignment. Re-derives progress from subtasks so the UI does
+   * not jump from 100% to 0% if some subtasks remain complete.
+   */
   function markAssignmentIncomplete(id) {
     const assignment = getAssignmentById(id)
     if (!assignment) return

@@ -1,17 +1,37 @@
+/**
+ * Auth store — wraps Supabase Auth in a Pinia store and mirrors the current
+ * user's display name/email into the profile store so the rest of the app can
+ * stay LMS/auth-agnostic.
+ *
+ * Lifecycle:
+ * - `init()` runs once from `App.vue` on boot, then every Supabase auth event
+ *   updates `user` / `session` reactively.
+ * - `ready` flips to true after init completes (used by the router guard to
+ *   wait for session restoration before redirecting).
+ */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useProfileStore } from './profile'
 
 export const useAuthStore = defineStore('auth', () => {
+  /** Current Supabase user, or `null` when signed out. */
   const user = ref(null)
+  /** Full session object (contains access/refresh tokens). */
   const session = ref(null)
+  /** True after the initial session restore completes — gates the router. */
   const ready = ref(false)
 
+  // Guard against `init()` being called twice (it wires up a global listener).
   let initialized = false
 
   const isAuthenticated = computed(() => !!session.value)
 
+  /**
+   * Push the signed-in user's name/email into the profile store. Existing
+   * profile values win when the OAuth/email metadata does not supply one
+   * (e.g. magic-link signups have no full_name).
+   */
   function syncProfileFromAuth(u) {
     if (!u) return
     const profileStore = useProfileStore()
@@ -26,6 +46,10 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
+  /**
+   * Restore any persisted session and subscribe to future auth changes.
+   * Safe to call before Supabase is configured — just marks the store ready.
+   */
   async function init() {
     if (initialized) return
     initialized = true
@@ -35,11 +59,13 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
 
+    // Step 1: read whatever Supabase persisted across reloads.
     const { data: { session: existing } } = await supabase.auth.getSession()
     session.value = existing
     user.value = existing?.user ?? null
     if (user.value) syncProfileFromAuth(user.value)
 
+    // Step 2: keep state in sync with future sign-ins, token refreshes, sign-outs.
     supabase.auth.onAuthStateChange((_event, newSession) => {
       session.value = newSession
       user.value = newSession?.user ?? null
@@ -49,6 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
     ready.value = true
   }
 
+  /** Email/password sign-in. Returns Supabase's `{ data, error }` shape unchanged. */
   async function signInWithPassword(email, password) {
     if (!supabase) {
       return {
@@ -58,6 +85,10 @@ export const useAuthStore = defineStore('auth', () => {
     return supabase.auth.signInWithPassword({ email, password })
   }
 
+  /**
+   * Create an account. Redirects the confirmation email back to the in-app
+   * dashboard so the user lands authenticated after clicking the link.
+   */
   async function signUp(email, password, fullName) {
     if (!supabase) {
       return {
@@ -75,6 +106,7 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
+  /** Clear the current session (server- and client-side). */
   async function signOut() {
     if (!supabase) return
     await supabase.auth.signOut()

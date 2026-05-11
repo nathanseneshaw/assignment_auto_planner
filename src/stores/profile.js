@@ -1,168 +1,32 @@
+/**
+ * Profile store. Persists display name / email / avatar to localStorage so
+ * the sidebar and settings page render with the user's identity before any
+ * network round-trip.
+ */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 export const useProfileStore = defineStore('profile', () => {
   const profile = ref({
     name: '',
     email: '',
-    avatar: null
+    avatar: null,
   })
-
-  const lmsConnections = ref({
-    canvas: {
-      connected: false,
-      authMode: 'token',
-      apiUrl: '',
-      apiToken: '',
-      serverSessionId: '',
-      lastSynced: null
-    },
-    blackboard: {
-      connected: false,
-      apiUrl: '',
-      username: '',
-      password: '',
-      courseIds: [],
-      availableCourses: [],
-      lastSynced: null
-    }
-  })
-
-  const isCanvasConnected = computed(() => lmsConnections.value.canvas.connected)
-  const isBlackboardConnected = computed(() => lmsConnections.value.blackboard.connected)
-  const hasAnyLmsConnected = computed(() => isCanvasConnected.value || isBlackboardConnected.value)
 
   function updateProfile(data) {
     profile.value = { ...profile.value, ...data }
     saveToLocalStorage()
   }
 
-  function connectCanvas(apiUrl, apiToken) {
-    lmsConnections.value.canvas = {
-      connected: true,
-      authMode: 'token',
-      apiUrl: apiUrl.trim(),
-      apiToken: apiToken.trim(),
-      serverSessionId: '',
-      lastSynced: new Date().toISOString()
-    }
-    saveToLocalStorage()
-    return true
-  }
-
-  /** Canvas via embedded browser sync (no API token); user signs in in a real browser window. */
-  function connectCanvasBrowser(apiUrl) {
-    lmsConnections.value.canvas = {
-      connected: true,
-      authMode: 'browser',
-      apiUrl: apiUrl.trim(),
-      apiToken: '',
-      serverSessionId: '',
-      lastSynced: new Date().toISOString()
-    }
-    saveToLocalStorage()
-    return true
-  }
-
-  function disconnectCanvas() {
-    lmsConnections.value.canvas = {
-      connected: false,
-      authMode: 'token',
-      apiUrl: '',
-      apiToken: '',
-      serverSessionId: '',
-      lastSynced: null
-    }
-    saveToLocalStorage()
-  }
-
-  function connectBlackboard(apiUrl, username, password, courseIds = [], availableCourses = []) {
-    lmsConnections.value.blackboard = {
-      connected: true,
-      apiUrl: apiUrl.trim(),
-      username: username.trim(),
-      password: password,
-      courseIds: courseIds,
-      availableCourses: availableCourses,
-      lastSynced: new Date().toISOString()
-    }
-    saveToLocalStorage()
-    return true
-  }
-
-  function connectBlackboardBrowser(apiUrl) {
-    const previous = lmsConnections.value.blackboard || {}
-    lmsConnections.value.blackboard = {
-      connected: true,
-      apiUrl: apiUrl.trim(),
-      username: previous.username || '',
-      password: previous.password || '',
-      courseIds: Array.isArray(previous.courseIds) ? previous.courseIds : [],
-      availableCourses: Array.isArray(previous.availableCourses) ? previous.availableCourses : [],
-      lastSynced: new Date().toISOString()
-    }
-    saveToLocalStorage()
-    return true
-  }
-
-  function updateBlackboardCourses(courseIds, availableCourses) {
-    lmsConnections.value.blackboard.courseIds = courseIds
-    if (availableCourses) {
-      lmsConnections.value.blackboard.availableCourses = availableCourses
-    }
-    saveToLocalStorage()
-  }
-
-  function disconnectBlackboard() {
-    lmsConnections.value.blackboard = {
-      connected: false,
-      apiUrl: '',
-      username: '',
-      password: '',
-      courseIds: [],
-      availableCourses: [],
-      lastSynced: null
-    }
-    saveToLocalStorage()
-  }
-
-  function syncLms(platform) {
-    if (platform === 'canvas' && lmsConnections.value.canvas.connected) {
-      lmsConnections.value.canvas.lastSynced = new Date().toISOString()
-    } else if (platform === 'blackboard' && lmsConnections.value.blackboard.connected) {
-      lmsConnections.value.blackboard.lastSynced = new Date().toISOString()
-    }
-    saveToLocalStorage()
-  }
-
   function saveToLocalStorage() {
     localStorage.setItem('profile', JSON.stringify(profile.value))
-    localStorage.setItem('lmsConnections', JSON.stringify(lmsConnections.value))
   }
 
   function loadFromLocalStorage() {
     try {
       const savedProfile = localStorage.getItem('profile')
-      const savedLms = localStorage.getItem('lmsConnections')
-
       if (savedProfile) {
         profile.value = JSON.parse(savedProfile)
-      }
-      if (savedLms) {
-        const parsed = JSON.parse(savedLms)
-        lmsConnections.value = parsed
-        const c = lmsConnections.value.canvas
-        if (c?.authMode === 'oauth') {
-          c.connected = false
-          c.serverSessionId = ''
-          c.authMode = 'token'
-        }
-        if (c && c.authMode == null) {
-          if (c.apiToken) c.authMode = 'token'
-          else if (c.serverSessionId) c.authMode = 'browser'
-          else c.authMode = 'browser'
-        }
-        if (c && c.serverSessionId == null) c.serverSessionId = ''
       }
     } catch (e) {
       console.warn('[profile] Failed to load from localStorage, using defaults:', e)
@@ -173,18 +37,6 @@ export const useProfileStore = defineStore('profile', () => {
 
   return {
     profile,
-    lmsConnections,
-    isCanvasConnected,
-    isBlackboardConnected,
-    hasAnyLmsConnected,
     updateProfile,
-    connectCanvas,
-    connectCanvasBrowser,
-    disconnectCanvas,
-    connectBlackboard,
-    connectBlackboardBrowser,
-    updateBlackboardCourses,
-    disconnectBlackboard,
-    syncLms
   }
 })

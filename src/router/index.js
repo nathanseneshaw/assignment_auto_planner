@@ -1,3 +1,15 @@
+/**
+ * Vue Router config + auth guard.
+ *
+ * Routes are lazy-loaded so each page lands in its own webpack chunk. Route
+ * `meta` drives the guard:
+ *   - `requiresAuth` : redirect anonymous users to /login (preserving target via ?redirect=).
+ *   - `guestOnly`    : redirect already-signed-in users away from /login and /register.
+ *   - `landingPage`  : signed-in users skip the marketing page and go straight to /dashboard.
+ *
+ * When Supabase is not configured the guard is a no-op so the app remains
+ * usable in pure local-storage / demo mode.
+ */
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
@@ -58,17 +70,24 @@ const router = createRouter({
   routes,
 })
 
+/**
+ * Single global guard handles: tab title, landing redirect, auth wall, and
+ * "don't let signed-in users see /login or /register" bouncing.
+ */
 router.beforeEach((to, from, next) => {
+  // Browser tab title — set on every nav, not just initial mount.
   document.title = `${to.meta.title} | Assignment Auto-Planner`
 
   const authStore = useAuthStore()
 
+  // Signed-in users skip the marketing page and land in the app.
   if (isSupabaseConfigured && authStore.isAuthenticated && to.name === 'Landing') {
     next({ path: '/dashboard' })
     return
   }
 
   if (isSupabaseConfigured) {
+    // Auth wall — bounce anonymous users to login, preserving where they were headed.
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
       next({
         name: 'Login',
@@ -76,6 +95,7 @@ router.beforeEach((to, from, next) => {
       })
       return
     }
+    // Already authed? /login and /register make no sense — send to dashboard.
     if (to.meta.guestOnly && authStore.isAuthenticated) {
       next({ path: '/dashboard' })
       return

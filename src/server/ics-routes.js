@@ -1,3 +1,18 @@
+/**
+ * Express router for ICS feed CRUD and sync.
+ *
+ * All routes require the caller to send a Supabase JWT in `Authorization:
+ * Bearer <token>`. The middleware {@link requireUser} verifies the token and
+ * attaches a per-request, JWT-scoped Supabase client (`req.supabase`) — the
+ * database's Row-Level Security policies then enforce that the user can only
+ * see and modify their own rows. We never use the service-role key here.
+ *
+ * Routes:
+ *   GET    /api/ics/feeds       — list the caller's feeds.
+ *   POST   /api/ics/feeds       — subscribe to a feed (validates URL by fetching once).
+ *   DELETE /api/ics/feeds/:id   — unsubscribe (DB row only; no Supabase storage purge).
+ *   POST   /api/ics/sync        — fetch + parse + write for one feed (or all of the user's).
+ */
 import { Router } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { fetchIcsFeed } from './ics-fetcher.js'
@@ -54,6 +69,11 @@ async function requireUser(req, res, next) {
   }
 }
 
+/**
+ * Coerce user input into a fetchable URL: rewrite `webcal://` (the iCalendar
+ * scheme handler) to `https://`, and assume `https://` when no scheme is given.
+ * Returns `''` for empty input so callers can reject with a 400.
+ */
 function normalizeUrlInput(input) {
   let s = String(input || '').trim()
   if (!s) return ''
@@ -122,6 +142,16 @@ router.delete('/api/ics/feeds/:id', requireUser, async (req, res) => {
   }
 })
 
+/**
+ * Run the full pipeline for one feed: fetch ICS text → parse → write to DB →
+ * record the result on the `ics_feeds` row.
+ *
+ * - "Partial-success" semantics: per-row write errors are collected but the
+ *   sync as a whole is still considered successful unless *every* occurrence
+ *   failed to insert (i.e. the feed had events but nothing landed in the DB).
+ * - Fetch / parse failures fall through to the catch block and mark the feed
+ *   `error` with the message truncated to 500 chars.
+ */
 async function syncOneFeed(supabase, userId, feed) {
   const startedAt = new Date().toISOString()
   try {
@@ -144,6 +174,8 @@ async function syncOneFeed(supabase, userId, feed) {
       .from('ics_feeds')
       .update({
         last_synced_at: startedAt,
+        // Only mark `error` when there were events but none landed. Otherwise
+        // we'd flap to red on transient single-row failures.
         last_sync_status: writeErrors.length > 0 && occurrences.length > 0 && counts.assignmentsInserted + counts.assignmentsUpdated === 0 ? 'error' : 'success',
         last_sync_error: syncError,
       })
@@ -171,6 +203,13 @@ async function syncOneFeed(supabase, userId, feed) {
   }
 }
 
+/**
+ * Sync one feed (when `feedId` is supplied) or every feed the user owns.
+ *
+ * Feeds are processed serially — the Supabase free tier limits concurrent
+ * inserts and we'd rather take a few extra seconds than have one feed's
+ * burst starve the others. Per-feed results are aggregated into `totals`.
+ */
 router.post('/api/ics/sync', requireUser, async (req, res) => {
   const feedId = req.body?.feedId || null
   try {
@@ -182,6 +221,7 @@ router.post('/api/ics/sync', requireUser, async (req, res) => {
       return res.json({ success: true, syncedFeeds: 0, results: [] })
     }
 
+    // Serial loop on purpose — see route header comment.
     const results = []
     for (const f of feeds) {
       const r = await syncOneFeed(req.supabase, req.user.id, f)

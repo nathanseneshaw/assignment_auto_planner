@@ -1,3 +1,14 @@
+/**
+ * Courses Pinia store.
+ *
+ * Each course has a local UUID (`id`) used by the UI plus an optional
+ * `supabaseCourseId` (server-side UUID) once it has been persisted. LMS-imported
+ * rows also carry `canvasCourseId` / `blackboardId` for matching during re-sync.
+ *
+ * Persistence side-effects: `addCourse` and `updateCourse` fire-and-forget an
+ * upsert to Supabase. The deeper background sync (`useSupabaseStoreSync`)
+ * additionally debounces flushes for any other mutations.
+ */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { persistCourseToSupabase } from '../services/lmsSupabaseSync'
@@ -6,13 +17,22 @@ export const useCoursesStore = defineStore('courses', () => {
   const courses = ref([])
   const loading = ref(false)
   const error = ref(null)
-  /** local course id → in-flight persist promise (dedupes concurrent upserts) */
+  /**
+   * local course id → in-flight persist promise.
+   * Dedupes concurrent upserts so a burst of mutations on the same row only
+   * triggers a single network round-trip.
+   */
   const coursePersistPromises = new Map()
 
+  /** Alphabetical view; used by every page that lists courses. */
   const coursesSorted = computed(() => {
     return [...courses.value].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   })
 
+  /**
+   * Tailwind class triplets cycled through when adding new courses, so each
+   * card gets a distinct accent without the user having to pick one.
+   */
   const courseColors = [
     { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
     { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
@@ -26,18 +46,23 @@ export const useCoursesStore = defineStore('courses', () => {
 
   /**
    * Ensure this local course has a row in public.courses (Supabase). Resolves the Supabase UUID or null.
+   *
+   * Idempotent and re-entrant: parallel callers share the same in-flight
+   * promise via {@link coursePersistPromises} so we never double-insert.
    */
   async function ensureSupabaseCourseRow(localCourseId) {
     const initial = getCourseById(localCourseId)
     if (!initial) return null
     if (initial.supabaseCourseId) return initial.supabaseCourseId
 
+    // A concurrent caller is already persisting this row — reuse their promise.
     if (coursePersistPromises.has(localCourseId)) {
       return coursePersistPromises.get(localCourseId)
     }
 
     const p = (async () => {
       try {
+        // Re-read inside the async closure in case the row gained an id while queued.
         const latest = getCourseById(localCourseId)
         if (!latest) return null
         if (latest.supabaseCourseId) return latest.supabaseCourseId
@@ -58,6 +83,10 @@ export const useCoursesStore = defineStore('courses', () => {
     return p
   }
 
+  /**
+   * Insert a new course. Auto-assigns id/timestamp/color and kicks off a
+   * background Supabase upsert. The caller's `course` fields override defaults.
+   */
   function addCourse(course) {
     const colorIndex = courses.value.length % courseColors.length
     const newCourse = {
@@ -71,6 +100,11 @@ export const useCoursesStore = defineStore('courses', () => {
     return newCourse
   }
 
+  /**
+   * Merge `updates` into an existing course and persist if it is already
+   * tracked server-side (`supabaseCourseId`) or has an external LMS id
+   * (Canvas/Blackboard) that lets the server upsert it.
+   */
   function updateCourse(id, updates) {
     const index = courses.value.findIndex(c => c.id === id)
     if (index !== -1) {
@@ -79,6 +113,8 @@ export const useCoursesStore = defineStore('courses', () => {
       const hasExtId =
         (merged.canvasCourseId != null && String(merged.canvasCourseId).trim() !== '') ||
         (merged.blackboardId != null && String(merged.blackboardId).trim() !== '')
+      // Skip persistence for purely-local courses that have never reached Supabase yet —
+      // the background sync (useSupabaseStoreSync) will pick them up.
       if (!merged.supabaseCourseId && !hasExtId) return
 
       void persistCourseToSupabase(merged).then((rid) => {
@@ -91,6 +127,7 @@ export const useCoursesStore = defineStore('courses', () => {
     }
   }
 
+  /** Local-only delete; the Supabase row is intentionally left in place. */
   function deleteCourse(id) {
     courses.value = courses.value.filter(c => c.id !== id)
   }
