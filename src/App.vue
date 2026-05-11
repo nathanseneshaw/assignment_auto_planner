@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import MainLayout from './layouts/MainLayout.vue'
+import MainLayout from './components/layouts/MainLayout.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import { useCoursesStore } from './stores/courses'
 import { useAssignmentsStore } from './stores/assignments'

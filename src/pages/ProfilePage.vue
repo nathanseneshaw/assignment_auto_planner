@@ -5,7 +5,7 @@ import { useProfileStore } from '../stores/profile'
 import { Card, Button } from '../components/ui'
 import { useAuthStore } from '../stores/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
-import IcsFeedsManager from '../components/IcsFeedsManager.vue'
+import IcsFeedsManager from '../components/features/IcsFeedsManager.vue'
 
 const router = useRouter()
 
