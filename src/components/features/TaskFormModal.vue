@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Modal, Input, Select, Button } from '../ui'
+import { Modal, Input, Dropdown, Button } from '../ui'
 import { useAssignmentsStore } from '../../stores/assignments'
 import { useCoursesStore } from '../../stores/courses'
 
@@ -53,6 +53,16 @@ const filteredAssignments = computed(() => {
   if (!courseId.value) return assignmentsStore.assignments
   return assignmentsStore.assignments.filter(a => a.courseId === courseId.value)
 })
+
+const courseOptions = computed(() => [
+  { value: '', label: 'No course' },
+  ...coursesStore.courses.map(c => ({ value: c.id, label: c.name })),
+])
+
+const assignmentOptions = computed(() => [
+  { value: '', label: 'No assignment' },
+  ...filteredAssignments.value.map(a => ({ value: a.id, label: a.title })),
+])
 
 // When assignment changes, sync the course field to match
 watch(assignmentId, (newId) => {
@@ -126,7 +136,7 @@ function handleSubmit() {
 
 <template>
   <Modal :modelValue="modelValue" :title="modalTitle" size="lg" @close="close" @update:modelValue="emit('update:modelValue', $event)">
-    <form class="space-y-5" @submit.prevent="handleSubmit">
+    <form id="task-form" class="space-y-5" @submit.prevent="handleSubmit">
       <!-- Title -->
       <Input
         v-model="title"
@@ -173,38 +183,20 @@ function handleSubmit() {
       </div>
 
       <!-- Course -->
-      <Select v-model="courseId" label="Course">
-        <option value="">No course</option>
-        <option
-          v-for="course in coursesStore.courses"
-          :key="course.id"
-          :value="course.id"
-        >
-          {{ course.name }}
-        </option>
-      </Select>
+      <Dropdown v-model="courseId" label="Course" :options="courseOptions" />
 
       <!-- Assignment (filtered by course) -->
-      <Select v-model="assignmentId" label="Assignment">
-        <option value="">No assignment</option>
-        <option
-          v-for="a in filteredAssignments"
-          :key="a.id"
-          :value="a.id"
-        >
-          {{ a.title }}
-        </option>
-      </Select>
+      <Dropdown v-model="assignmentId" label="Assignment" :options="assignmentOptions" />
     </form>
 
     <template #footer>
       <div class="flex gap-3 justify-end">
         <Button variant="secondary" type="button" @click="close">Cancel</Button>
         <Button
+          type="submit"
+          form="task-form"
           variant="primary"
-          type="button"
           :disabled="!title.trim() || !scheduledDate"
-          @click="handleSubmit"
         >
           {{ isEditing ? 'Save Changes' : 'Add Task' }}
         </Button>

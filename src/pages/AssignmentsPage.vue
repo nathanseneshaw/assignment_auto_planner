@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAssignmentsStore } from '../stores/assignments'
 import { useCoursesStore } from '../stores/courses'
-import { Card, Modal, Input, Select, Button, Badge, EmptyState, ConfirmDialog } from '../components/ui'
+import { Card, Modal, Input, Dropdown, Button, Badge, EmptyState, ConfirmDialog } from '../components/ui'
 import { resolveAssignmentCourseName, importSourceLabel } from '../utils/assignmentDisplay.js'
 
 const route = useRoute()
@@ -21,6 +21,22 @@ const filterCourse = ref('all')
 /** 'all' | 'active' | 'completed' */
 const filterCompletion = ref('all')
 const searchQuery = ref('')
+
+const courseFilterOptions = computed(() => [
+  { value: 'all', label: 'All Courses' },
+  ...coursesStore.courses.map(c => ({ value: c.id, label: c.name })),
+])
+
+const completionFilterOptions = [
+  { value: 'all', label: 'All assignments' },
+  { value: 'active', label: 'Active only' },
+  { value: 'completed', label: 'Completed only' },
+]
+
+const modalCourseOptions = computed(() => [
+  { value: '', label: 'Select a course' },
+  ...coursesStore.courses.map(c => ({ value: c.id, label: c.name })),
+])
 
 const formData = ref({
   title: '',
@@ -298,25 +314,12 @@ onMounted(() => {
 
         <!-- Course Filter -->
         <div class="sm:w-48">
-          <Select v-model="filterCourse">
-            <option value="all">All Courses</option>
-            <option 
-              v-for="course in coursesStore.courses" 
-              :key="course.id" 
-              :value="course.id"
-            >
-              {{ course.name }}
-            </option>
-          </Select>
+          <Dropdown v-model="filterCourse" :options="courseFilterOptions" />
         </div>
 
         <!-- Completion filter -->
         <div class="sm:w-44">
-          <Select v-model="filterCompletion">
-            <option value="all">All assignments</option>
-            <option value="active">Active only</option>
-            <option value="completed">Completed only</option>
-          </Select>
+          <Dropdown v-model="filterCompletion" :options="completionFilterOptions" />
         </div>
       </div>
     </Card>
@@ -479,7 +482,7 @@ onMounted(() => {
 
     <!-- Add/Edit Assignment Modal -->
     <Modal v-model="showModal" :title="modalTitle" size="lg" @close="resetForm">
-      <form @submit.prevent="saveAssignment" class="space-y-5">
+      <form id="assignment-form" @submit.prevent="saveAssignment" class="space-y-5">
         <Input
           v-model="formData.title"
           label="Assignment Title"
@@ -498,16 +501,7 @@ onMounted(() => {
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select v-model="formData.courseId" label="Course">
-            <option value="">Select a course</option>
-            <option 
-              v-for="course in coursesStore.courses" 
-              :key="course.id" 
-              :value="course.id"
-            >
-              {{ course.name }}
-            </option>
-          </Select>
+          <Dropdown v-model="formData.courseId" label="Course" :options="modalCourseOptions" />
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -529,12 +523,13 @@ onMounted(() => {
 
       <template #footer>
         <div class="flex gap-3 justify-end">
-          <Button variant="secondary" @click="showModal = false; resetForm()">
+          <Button type="button" variant="secondary" @click="showModal = false; resetForm()">
             Cancel
           </Button>
-          <Button 
-            variant="primary" 
-            @click="saveAssignment"
+          <Button
+            type="submit"
+            form="assignment-form"
+            variant="primary"
             :disabled="!formData.title.trim() || !formData.dueDate"
           >
             {{ isEditing ? 'Save Changes' : 'Add Assignment' }}
