@@ -192,8 +192,8 @@ function getCourseColor(courseId) {
           icon="M5 13l4 4L19 7"
           title="No tasks for today"
           description="Add assignments to get tasks scheduled"
-          action-label="Add Assignment"
-          @action="router.push('/assignments')"
+          action-label="Add Task"
+          @action="router.push('/tasks')"
         />
 
         <div v-else class="space-y-2">
