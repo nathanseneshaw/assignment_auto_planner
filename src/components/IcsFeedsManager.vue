@@ -94,7 +94,7 @@ async function handleSyncAll() {
       </p>
     </div>
 
-    <div class="space-y-3 mb-6">
+    <form class="space-y-3 mb-6" @submit.prevent="handleAdd">
       <Input
         v-model="newUrl"
         label="Calendar URL"
@@ -102,9 +102,9 @@ async function handleSyncAll() {
         :error="formError"
       />
       <div>
-        <Button :loading="addInFlight" @click="handleAdd">Add feed</Button>
+        <Button type="submit" :loading="addInFlight">Add feed</Button>
       </div>
-    </div>
+    </form>
 
     <div v-if="feedsStore.lastError" class="mb-4 text-sm text-danger-700 bg-danger-50 border border-danger-200 rounded-xl p-3">
       {{ feedsStore.lastError }}

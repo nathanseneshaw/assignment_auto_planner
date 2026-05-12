@@ -299,7 +299,7 @@ onMounted(() => {
       size="md"
       @close="resetForm"
     >
-      <form @submit.prevent="addCourse" class="space-y-5">
+      <form id="course-form" @submit.prevent="addCourse" class="space-y-5">
         <Input
           v-model="newCourse.name"
           label="Course Name"
@@ -324,12 +324,13 @@ onMounted(() => {
 
       <template #footer>
         <div class="flex gap-3 justify-end">
-          <Button variant="secondary" @click="showAddModal = false; resetForm()">
+          <Button type="button" variant="secondary" @click="showAddModal = false; resetForm()">
             Cancel
           </Button>
-          <Button 
-            variant="primary" 
-            @click="addCourse"
+          <Button
+            type="submit"
+            form="course-form"
+            variant="primary"
             :disabled="!newCourse.name.trim()"
           >
             {{ editingCourse ? 'Save Changes' : 'Add Course' }}

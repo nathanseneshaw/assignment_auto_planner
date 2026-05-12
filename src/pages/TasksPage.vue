@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useTasksStore } from '../stores/tasks'
 import { useAssignmentsStore } from '../stores/assignments'
 import { useCoursesStore } from '../stores/courses'
-import { Card, Button, EmptyState, ConfirmDialog } from '../components/ui'
+import { Card, Button, EmptyState, ConfirmDialog, Dropdown } from '../components/ui'
 import TaskFormModal from '../components/features/TaskFormModal.vue'
 
 const tasksStore = useTasksStore()
@@ -198,14 +198,15 @@ const PRIORITY_BADGE = {
 
         <!-- Status filter -->
         <div class="sm:w-44">
-          <select
+          <Dropdown
             v-model="filterStatus"
-            class="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 hover:border-gray-300 transition-colors"
-          >
-            <option value="all">All tasks</option>
-            <option value="active">Active only</option>
-            <option value="completed">Completed only</option>
-          </select>
+            size="sm"
+            :options="[
+              { value: 'all', label: 'All tasks' },
+              { value: 'active', label: 'Active only' },
+              { value: 'completed', label: 'Completed only' },
+            ]"
+          />
         </div>
       </div>
     </Card>
