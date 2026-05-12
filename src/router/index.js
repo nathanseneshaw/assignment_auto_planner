@@ -46,6 +46,12 @@ const routes = [
     meta: { title: 'Assignments', requiresAuth: true },
   },
   {
+    path: '/tasks',
+    name: 'Tasks',
+    component: () => import('../pages/TasksPage.vue'),
+    meta: { title: 'Tasks', requiresAuth: true },
+  },
+  {
     path: '/planner',
     name: 'Planner',
     component: () => import('../pages/PlannerPage.vue'),
