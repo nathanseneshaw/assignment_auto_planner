@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTasksStore } from '../../stores/tasks'
 import { useAssignmentsStore } from '../../stores/assignments'
@@ -51,6 +51,26 @@ const userName = computed(() => {
 const showSearch = ref(false)
 const searchQuery = ref('')
 const showNotifications = ref(false)
+const dismissedNotifications = ref(new Set())
+const notificationsEl = ref(null)
+
+function onNotificationsOutsideClick(e) {
+  if (notificationsEl.value && !notificationsEl.value.contains(e.target)) {
+    showNotifications.value = false
+  }
+}
+
+watch(showNotifications, (val) => {
+  if (val) {
+    nextTick(() => document.addEventListener('click', onNotificationsOutsideClick))
+  } else {
+    document.removeEventListener('click', onNotificationsOutsideClick)
+  }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onNotificationsOutsideClick)
+})
 
 const searchResults = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -132,6 +152,14 @@ const notifications = computed(() => {
   
   return items
 })
+
+const visibleNotifications = computed(() =>
+  notifications.value.filter(n => !dismissedNotifications.value.has(n.id))
+)
+
+function dismissNotification(id) {
+  dismissedNotifications.value = new Set([...dismissedNotifications.value, id])
+}
 
 function handleSearch() {
   if (searchResults.value.assignments.length > 0) {
@@ -320,7 +348,7 @@ function goToTask(task) {
         </div>
 
         <!-- Notifications -->
-        <div class="relative">
+        <div ref="notificationsEl" class="relative">
           <button
             @click="showNotifications = !showNotifications"
             class="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl transition-colors"
@@ -328,8 +356,8 @@ function goToTask(task) {
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <span 
-              v-if="notifications.length > 0"
+            <span
+              v-if="visibleNotifications.length > 0"
               class="absolute top-1 right-1 w-2 h-2 bg-danger-500 rounded-full animate-pulse"
             ></span>
           </button>
@@ -342,10 +370,10 @@ function goToTask(task) {
             >
               <div class="px-4 py-3 border-b border-gray-100/80 dark:border-gray-700/80 flex items-center justify-between">
                 <h3 class="text-[15px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Notifications</h3>
-                <span v-if="notifications.length" class="text-xs text-gray-500 dark:text-gray-400">{{ notifications.length }} new</span>
+                <span v-if="visibleNotifications.length" class="text-xs text-gray-500 dark:text-gray-400">{{ visibleNotifications.length }} new</span>
               </div>
 
-              <div v-if="notifications.length === 0" class="p-6 text-center">
+              <div v-if="visibleNotifications.length === 0" class="p-6 text-center">
                 <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                   <svg class="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -356,9 +384,9 @@ function goToTask(task) {
 
               <div v-else class="max-h-64 overflow-y-auto">
                 <div
-                  v-for="notification in notifications"
+                  v-for="notification in visibleNotifications"
                   :key="notification.id"
-                  class="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors border-b border-gray-50 dark:border-gray-700/50 last:border-0"
+                  class="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors border-b border-gray-50 dark:border-gray-700/50 last:border-0 group"
                 >
                   <div class="flex items-start gap-3">
                     <div
@@ -375,10 +403,20 @@ function goToTask(task) {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="notification.icon" />
                       </svg>
                     </div>
-                    <div>
+                    <div class="flex-1 min-w-0">
                       <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ notification.title }}</p>
                       <p class="text-xs text-gray-500 dark:text-gray-400">{{ notification.message }}</p>
                     </div>
+                    <button
+                      type="button"
+                      @click.stop="dismissNotification(notification.id)"
+                      class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200/70 dark:hover:bg-gray-600/70 transition-all"
+                      title="Dismiss"
+                    >
+                      <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>
