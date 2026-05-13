@@ -87,8 +87,8 @@ async function handleSyncAll() {
 <template>
   <Card padding="md">
     <div class="mb-4">
-      <h3 class="text-lg font-semibold text-gray-900">Calendar feeds (ICS)</h3>
-      <p class="text-sm text-gray-500 mt-1">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Calendar feeds (ICS)</h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
         Paste the ICS subscription URL from Canvas, Brightspace, Blackboard, or any tool that exports an iCalendar feed.
         Imported assignments are stored in your account and stay visible even if your instructor removes them later.
       </p>
@@ -106,11 +106,11 @@ async function handleSyncAll() {
       </div>
     </form>
 
-    <div v-if="feedsStore.lastError" class="mb-4 text-sm text-danger-700 bg-danger-50 border border-danger-200 rounded-xl p-3">
+    <div v-if="feedsStore.lastError" class="mb-4 text-sm text-danger-700 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-800/60 rounded-xl p-3">
       {{ feedsStore.lastError }}
     </div>
 
-    <div v-if="lastSyncTotals" class="mb-4 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-xl p-3">
+    <div v-if="lastSyncTotals" class="mb-4 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-xl p-3">
       Last sync: +{{ lastSyncTotals.assignmentsInserted }} new assignment(s),
       {{ lastSyncTotals.assignmentsUpdated }} updated,
       +{{ lastSyncTotals.coursesInserted }} new course(s).
@@ -126,7 +126,7 @@ async function handleSyncAll() {
 
     <template v-else>
       <div class="flex items-center justify-between mb-3">
-        <span class="text-sm font-medium text-gray-700">Your feeds</span>
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Your feeds</span>
         <Button
           size="sm"
           variant="secondary"
@@ -141,11 +141,11 @@ async function handleSyncAll() {
       <li
         v-for="feed in feedsStore.feeds"
         :key="feed.id"
-        class="flex items-start justify-between gap-4 border border-gray-200 rounded-xl p-3"
+        class="flex items-start justify-between gap-4 border border-gray-200 dark:border-gray-700 rounded-xl p-3"
       >
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
-            <div class="font-medium text-gray-900 truncate">
+            <div class="font-medium text-gray-900 dark:text-gray-100 truncate">
               {{ feed.label || feed.url }}
             </div>
             <Badge :variant="statusVariant(feed.last_sync_status)" size="sm" dot>

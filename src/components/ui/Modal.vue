@@ -77,20 +77,20 @@ onUnmounted(() => {
         
         <!-- Modal Content -->
         <div 
-          class="relative bg-white rounded-2xl border border-gray-200/80 shadow-[0_24px_48px_-12px_rgba(15,23,42,0.18)] w-full overflow-hidden"
+          class="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(15,23,42,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full overflow-hidden"
           :class="sizeClasses[size]"
           @click.stop
         >
           <!-- Header -->
-          <div v-if="title || $slots.header" class="flex items-center justify-between px-6 py-4 border-b border-gray-100/80">
+          <div v-if="title || $slots.header" class="flex items-center justify-between px-6 py-4 border-b border-gray-100/80 dark:border-gray-700/80">
             <slot name="header">
-              <h3 class="text-[17px] font-semibold text-gray-900 tracking-tight">{{ title }}</h3>
+              <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">{{ title }}</h3>
             </slot>
-            <button 
+            <button
               v-if="closable"
               type="button"
               @click="close"
-              class="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100/80 rounded-xl transition-colors"
+              class="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl transition-colors"
             >
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -104,7 +104,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Footer -->
-          <div v-if="$slots.footer" class="px-6 py-4 border-t border-gray-100/80 bg-gray-50/50">
+          <div v-if="$slots.footer" class="px-6 py-4 border-t border-gray-100/80 dark:border-gray-700/80 bg-gray-50/50 dark:bg-gray-800/50">
             <slot name="footer" />
           </div>
         </div>

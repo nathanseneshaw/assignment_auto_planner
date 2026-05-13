@@ -266,14 +266,14 @@ function getCourseColor(courseId) {
     <div class="flex flex-col gap-4">
       <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Planner</h2>
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Planner</h2>
           <p class="text-gray-500">Switch between week and month to plan your tasks</p>
         </div>
 
         <div class="flex flex-col items-stretch sm:items-end gap-3">
           <!-- View tabs -->
           <div
-            class="inline-flex self-stretch sm:self-auto p-1 rounded-xl bg-gray-100/90 border border-gray-200/80 shadow-sm shadow-gray-900/5"
+            class="inline-flex self-stretch sm:self-auto p-1 rounded-xl bg-gray-100/90 dark:bg-gray-700/80 border border-gray-200/80 dark:border-gray-600/80 shadow-sm shadow-gray-900/5"
             role="tablist"
             aria-label="Planner view"
           >
@@ -284,8 +284,8 @@ function getCourseColor(courseId) {
               class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200"
               :class="
                 viewMode === 'week'
-                  ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200/80'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-gray-200/80 dark:ring-gray-600/80'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
               "
               @click="viewMode = 'week'"
             >
@@ -298,8 +298,8 @@ function getCourseColor(courseId) {
               class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200"
               :class="
                 viewMode === 'month'
-                  ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200/80'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-gray-200/80 dark:ring-gray-600/80'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
               "
               @click="viewMode = 'month'"
             >
@@ -310,21 +310,21 @@ function getCourseColor(courseId) {
           <!-- Week navigation -->
           <div
             v-if="viewMode === 'week'"
-            class="flex items-center gap-2 bg-white rounded-xl border border-gray-200 p-1.5"
+            class="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1.5"
           >
             <button
               type="button"
-              class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               @click="previousWeek"
             >
-              <svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
 
             <button
               type="button"
-              class="px-4 py-2 text-sm font-medium text-primary-800 hover:bg-primary-50 rounded-lg transition-colors"
+              class="px-4 py-2 text-sm font-medium text-primary-800 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
               @click="goToTodayWeek"
             >
               Today
@@ -332,17 +332,17 @@ function getCourseColor(courseId) {
 
             <button
               type="button"
-              class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               @click="nextWeek"
             >
-              <svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
             </button>
 
-            <div class="w-px h-6 bg-gray-200 mx-1 hidden sm:block" />
+            <div class="w-px h-6 bg-gray-200 dark:bg-gray-600 mx-1 hidden sm:block" />
 
-            <span class="px-2 sm:px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
+            <span class="px-2 sm:px-3 text-sm font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
               {{ weekRange }}
             </span>
           </div>
@@ -350,21 +350,21 @@ function getCourseColor(courseId) {
           <!-- Month navigation -->
           <div
             v-else
-            class="flex items-center gap-2 bg-white rounded-xl border border-gray-200 p-1.5"
+            class="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1.5"
           >
             <button
               type="button"
-              class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               @click="previousMonth"
             >
-              <svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
 
             <button
               type="button"
-              class="px-4 py-2 text-sm font-medium text-primary-800 hover:bg-primary-50 rounded-lg transition-colors"
+              class="px-4 py-2 text-sm font-medium text-primary-800 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
               @click="goToThisMonth"
             >
               This month
@@ -372,17 +372,17 @@ function getCourseColor(courseId) {
 
             <button
               type="button"
-              class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               @click="nextMonth"
             >
-              <svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
             </button>
 
-            <div class="w-px h-6 bg-gray-200 mx-1 hidden sm:block" />
+            <div class="w-px h-6 bg-gray-200 dark:bg-gray-600 mx-1 hidden sm:block" />
 
-            <span class="px-2 sm:px-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
+            <span class="px-2 sm:px-3 text-sm font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
               {{ monthYearLabel }}
             </span>
           </div>
@@ -391,11 +391,11 @@ function getCourseColor(courseId) {
     </div>
 
     <!-- Period stats -->
-    <Card class="bg-gray-50/60 border-gray-200/80">
+    <Card class="bg-gray-50/60 dark:bg-gray-800/60 border-gray-200/80 dark:border-gray-700/80">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div class="flex items-center gap-4">
           <div
-            class="w-14 h-14 rounded-2xl bg-white border border-gray-200/70 shadow-sm shadow-gray-900/5 flex items-center justify-center"
+            class="w-14 h-14 rounded-2xl bg-white dark:bg-gray-700 border border-gray-200/70 dark:border-gray-600/70 shadow-sm shadow-gray-900/5 flex items-center justify-center"
           >
             <svg
               class="w-7 h-7 text-primary-800"
@@ -412,8 +412,8 @@ function getCourseColor(courseId) {
             </svg>
           </div>
           <div>
-            <h3 class="text-[17px] font-semibold text-gray-900 tracking-tight">{{ periodLabel }}</h3>
-            <p class="text-sm text-gray-600">
+            <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">{{ periodLabel }}</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
               {{ periodStats.completed }} of {{ periodStats.total }} scheduled items completed
             </p>
           </div>
@@ -422,11 +422,11 @@ function getCourseColor(courseId) {
         <div class="flex items-center gap-4">
           <div class="w-32 sm:w-40">
             <div class="flex justify-between text-sm mb-1">
-              <span class="text-gray-600">Progress</span>
-              <span class="font-semibold text-gray-900">{{ periodStats.percentage }}%</span>
+              <span class="text-gray-600 dark:text-gray-400">Progress</span>
+              <span class="font-semibold text-gray-900 dark:text-gray-100">{{ periodStats.percentage }}%</span>
             </div>
             <div
-              class="h-2 bg-gray-200/80 rounded-full overflow-hidden ring-1 ring-inset ring-gray-200/50"
+              class="h-2 bg-gray-200/80 dark:bg-gray-700/80 rounded-full overflow-hidden ring-1 ring-inset ring-gray-200/50 dark:ring-gray-600/50"
             >
               <div
                 class="h-full bg-gradient-to-r from-primary-800 to-primary-950 rounded-full transition-all duration-500"
@@ -447,8 +447,8 @@ function getCourseColor(courseId) {
             day.isToday
               ? 'bg-primary-900 text-white border-primary-900'
               : day.isWeekend
-                ? 'bg-gray-100 text-gray-600 border-gray-200'
-                : 'bg-white text-gray-900 border-gray-200'
+                ? 'bg-gray-100 dark:bg-gray-700/60 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600'
+                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700'
           ]"
         >
           <p
@@ -471,10 +471,10 @@ function getCourseColor(courseId) {
           class="flex-1 border-2 border-t-0 rounded-b-xl p-1.5 sm:p-2 overflow-y-auto max-h-[480px] transition-colors"
           :class="[
             day.isToday
-              ? 'border-primary-200/80 bg-primary-50/40'
+              ? 'border-primary-200/80 dark:border-primary-700/60 bg-primary-50/40 dark:bg-primary-900/20'
               : day.isWeekend
-                ? 'border-gray-200 bg-gray-50/50'
-                : 'border-gray-200 bg-white'
+                ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/20'
+                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
           ]"
         >
           <div v-if="day.items.length === 0" class="h-full min-h-[120px] flex items-center justify-center">
@@ -499,7 +499,7 @@ function getCourseColor(courseId) {
                   :class="
                     item.completed
                       ? 'bg-primary-900 border-primary-900'
-                      : 'border-gray-400 group-hover:border-primary-700 bg-white'
+                      : 'border-gray-400 group-hover:border-primary-700 bg-white dark:bg-gray-700'
                   "
                 >
                   <svg
@@ -537,10 +537,10 @@ function getCourseColor(courseId) {
     <!-- Month grid -->
     <div
       v-show="viewMode === 'month'"
-      class="rounded-2xl border border-gray-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden overflow-x-auto"
+      class="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden overflow-x-auto"
     >
       <div class="min-w-[640px] sm:min-w-0">
-        <div class="grid grid-cols-7 border-b border-gray-200 bg-gray-50/90">
+        <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 bg-gray-50/90 dark:bg-gray-700/60">
           <div
             v-for="label in weekdayLabels"
             :key="label"
@@ -549,27 +549,27 @@ function getCourseColor(courseId) {
             {{ label }}
           </div>
         </div>
-        <div class="divide-y divide-gray-100">
-          <div v-for="(row, ri) in monthWeekRows" :key="ri" class="grid grid-cols-7 divide-x divide-gray-100">
+        <div class="divide-y divide-gray-100 dark:divide-gray-700">
+          <div v-for="(row, ri) in monthWeekRows" :key="ri" class="grid grid-cols-7 divide-x divide-gray-100 dark:divide-gray-700">
             <div
               v-for="day in row"
               :key="day.dateKey"
               class="min-h-[100px] sm:min-h-[140px] p-1 sm:p-2 flex flex-col gap-1 transition-colors"
               :class="[
-                !day.inMonth ? 'bg-gray-50/70 text-gray-400' : '',
+                !day.inMonth ? 'bg-gray-50/70 dark:bg-gray-800/40 text-gray-400' : '',
                 day.inMonth && day.isToday
-                  ? 'bg-primary-50/50 ring-1 ring-inset ring-primary-200/60 z-[1]'
+                  ? 'bg-primary-50/50 dark:bg-primary-900/20 ring-1 ring-inset ring-primary-200/60 dark:ring-primary-700/40 z-1'
                   : '',
-                day.inMonth && day.isWeekend && !day.isToday ? 'bg-gray-50/40' : ''
+                day.inMonth && day.isWeekend && !day.isToday ? 'bg-gray-50/40 dark:bg-gray-700/20' : ''
               ]"
             >
               <div class="flex items-center justify-between gap-1 shrink-0">
                 <span
                   class="text-xs sm:text-sm font-semibold tabular-nums"
                   :class="[
-                    !day.inMonth ? 'text-gray-300' : '',
-                    day.inMonth && day.isToday ? 'text-primary-900' : '',
-                    day.inMonth && !day.isToday ? 'text-gray-900' : ''
+                    !day.inMonth ? 'text-gray-300 dark:text-gray-600' : '',
+                    day.inMonth && day.isToday ? 'text-primary-900 dark:text-primary-400' : '',
+                    day.inMonth && !day.isToday ? 'text-gray-900 dark:text-gray-100' : ''
                   ]"
                 >
                   {{ day.dayNumber }}
@@ -601,7 +601,7 @@ function getCourseColor(courseId) {
                   <div class="flex items-start gap-1">
                     <div
                       class="flex-shrink-0 mt-0.5 w-3 h-3 rounded-full border border-gray-400 flex items-center justify-center"
-                      :class="item.completed ? 'bg-primary-900 border-primary-900' : 'bg-white'"
+                      :class="item.completed ? 'bg-primary-900 border-primary-900' : 'bg-white dark:bg-gray-700'"
                     >
                       <svg
                         v-if="item.completed"
@@ -638,7 +638,7 @@ function getCourseColor(courseId) {
     <!-- Course legend -->
     <Card v-if="coursesStore.courses.length > 0">
       <div class="flex items-center justify-between mb-3">
-        <h4 class="text-sm font-semibold text-gray-900">Course legend</h4>
+        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Course legend</h4>
         <span class="text-xs text-gray-500">{{ coursesStore.courses.length }} courses</span>
       </div>
       <div class="flex flex-wrap gap-3">

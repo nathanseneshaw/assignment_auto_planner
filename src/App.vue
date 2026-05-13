@@ -7,6 +7,7 @@ import { useCoursesStore } from './stores/courses'
 import { useAssignmentsStore } from './stores/assignments'
 import { useTasksStore } from './stores/tasks'
 import { useAuthStore } from './stores/auth'
+import { useProfileStore } from './stores/profile'
 import { isSupabaseConfigured } from './lib/supabase'
 import { hydrateLmsStoresFromSupabase } from './services/lmsSupabaseHydration'
 import { useSupabaseStoreSync } from './composables/useSupabaseStoreSync'
@@ -18,9 +19,19 @@ const coursesStore = useCoursesStore()
 const assignmentsStore = useAssignmentsStore()
 const tasksStore = useTasksStore()
 const authStore = useAuthStore()
+const profileStore = useProfileStore()
 
 useSupabaseStoreSync()
 useIcsAutoSync()
+
+function applyTheme(dark) {
+  document.documentElement.classList.toggle('dark', !!dark)
+}
+
+// Apply persisted theme immediately before first render
+applyTheme(profileStore.profile.darkMode)
+
+watch(() => profileStore.profile.darkMode, applyTheme)
 
 onMounted(async () => {
   if (isSupabaseConfigured && authStore.user) {

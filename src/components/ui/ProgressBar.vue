@@ -56,13 +56,13 @@ const progressColor = computed(() => {
   <div class="w-full">
     <div v-if="showLabel" class="flex items-center justify-between mb-1">
       <slot name="label">
-        <span class="text-sm font-medium text-gray-700">Progress</span>
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-400">Progress</span>
       </slot>
-      <span class="text-sm font-medium text-gray-900">{{ value }}%</span>
+      <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ value }}%</span>
     </div>
     
-    <div 
-      class="w-full bg-gray-200/90 rounded-full overflow-hidden ring-1 ring-inset ring-gray-200/50"
+    <div
+      class="w-full bg-gray-200/90 dark:bg-gray-700 rounded-full overflow-hidden ring-1 ring-inset ring-gray-200/50 dark:ring-gray-600/50"
       :class="sizeClasses[size]"
     >
       <div 

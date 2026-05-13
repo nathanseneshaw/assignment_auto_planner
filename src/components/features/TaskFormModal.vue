@@ -148,20 +148,20 @@ function handleSubmit() {
 
       <!-- Scheduled Date -->
       <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1.5">
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
           Scheduled Date <span class="text-danger-500">*</span>
         </label>
         <input
           v-model="scheduledDate"
           type="date"
           required
-          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200"
+          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200 scheme-light dark:scheme-dark"
         />
       </div>
 
       <!-- Priority -->
       <div>
-        <label class="block text-sm font-medium text-gray-600 mb-2">Priority</label>
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Priority</label>
         <div class="flex gap-2">
           <button
             v-for="opt in PRIORITY_OPTIONS"
@@ -170,7 +170,7 @@ function handleSubmit() {
             class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all duration-150"
             :class="priorityLevel === opt.value
               ? opt.activeClasses
-              : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+              : 'bg-white dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
             @click="priorityLevel = opt.value"
           >
             <span

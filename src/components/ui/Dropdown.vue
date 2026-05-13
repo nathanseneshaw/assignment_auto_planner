@@ -55,13 +55,13 @@ const triggerClasses = computed(() => {
       ? 'pl-3 pr-12 py-2 text-sm'
       : 'pl-4 pr-14 py-2.5 text-[15px]'
   return [
-    'w-full rounded-2xl border bg-white text-gray-900 font-medium tracking-tight antialiased text-left',
+    'w-full rounded-2xl border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium tracking-tight antialiased text-left',
     'shadow-[0_1px_2px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]',
     'transition-[border-color,box-shadow] duration-200 ease-out',
     'focus:outline-none cursor-pointer',
     open.value
-      ? 'border-primary-400/75 ring-2 ring-primary-500/25'
-      : 'border-gray-200/90 hover:border-gray-300 hover:shadow-[0_2px_6px_-2px_rgba(15,23,42,0.07),0_1px_2px_rgba(15,23,42,0.05)]',
+      ? 'border-primary-400/75 dark:border-primary-600/75 ring-2 ring-primary-500/25'
+      : 'border-gray-200/90 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-[0_2px_6px_-2px_rgba(15,23,42,0.07),0_1px_2px_rgba(15,23,42,0.05)]',
     size,
   ]
 })
@@ -74,13 +74,13 @@ const chevronWrapClasses = computed(() => {
     return [
       base,
       dim,
-      'border-primary-200/90 bg-gradient-to-b from-primary-50/90 to-primary-100/50 text-primary-700',
+      'border-primary-200/90 dark:border-primary-700/60 bg-gradient-to-b from-primary-50/90 dark:from-primary-900/40 to-primary-100/50 dark:to-primary-900/20 text-primary-700 dark:text-primary-400',
     ]
   }
   return [
     base,
     dim,
-    'border-gray-200/80 bg-gradient-to-b from-white to-gray-100/95 text-gray-500 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85)]',
+    'border-gray-200/80 dark:border-gray-700 bg-gradient-to-b from-white dark:from-gray-700 to-gray-100/95 dark:to-gray-700/80 text-gray-500 dark:text-gray-400 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85)] dark:shadow-none',
   ]
 })
 
@@ -89,7 +89,7 @@ const chevronSize = computed(() => (props.size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h
 
 <template>
   <div class="space-y-1.5">
-    <label v-if="label" class="block text-sm font-medium text-gray-600">
+    <label v-if="label" class="block text-sm font-medium text-gray-600 dark:text-gray-400">
       {{ label }}
       <span v-if="required" class="text-danger-500">*</span>
     </label>
@@ -121,7 +121,7 @@ const chevronSize = computed(() => (props.size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h
       >
         <div
           v-if="open"
-          class="absolute left-0 right-0 mt-1.5 z-50 rounded-xl border border-gray-200/80 bg-white overflow-hidden shadow-[0_4px_20px_rgba(15,23,42,0.10),0_1px_4px_rgba(15,23,42,0.06)]"
+          class="absolute left-0 right-0 mt-1.5 z-50 rounded-xl border border-gray-200/80 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow-[0_4px_20px_rgba(15,23,42,0.10),0_1px_4px_rgba(15,23,42,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
         >
           <button
             v-for="opt in options"
@@ -131,7 +131,7 @@ const chevronSize = computed(() => (props.size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h
             :class="
               opt.value === modelValue
                 ? 'bg-primary-900 text-white'
-                : 'text-gray-700 hover:bg-gray-50'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
             "
             @click="select(opt.value)"
           >

@@ -40,18 +40,18 @@ const icons = {
 
 const colors = {
   danger: {
-    bg: 'bg-danger-100',
-    icon: 'text-danger-600',
+    bg: 'bg-danger-100 dark:bg-danger-900/40',
+    icon: 'text-danger-600 dark:text-danger-400',
     button: 'danger'
   },
   warning: {
-    bg: 'bg-warning-100',
-    icon: 'text-warning-600',
+    bg: 'bg-warning-100 dark:bg-warning-900/40',
+    icon: 'text-warning-600 dark:text-warning-400',
     button: 'primary'
   },
   primary: {
-    bg: 'bg-primary-100',
-    icon: 'text-primary-600',
+    bg: 'bg-primary-100 dark:bg-primary-900/40',
+    icon: 'text-primary-600 dark:text-primary-400',
     button: 'primary'
   }
 }
@@ -81,10 +81,10 @@ function confirm() {
         ></div>
         
         <!-- Dialog -->
-        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform">
+        <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform">
           <div class="p-6">
             <!-- Icon -->
-            <div 
+            <div
               class="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4"
               :class="colors[variant].bg"
             >
@@ -102,17 +102,17 @@ function confirm() {
 
             <!-- Content -->
             <div class="text-center">
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
                 {{ title }}
               </h3>
-              <p class="text-gray-500">
+              <p class="text-gray-500 dark:text-gray-400">
                 {{ message }}
               </p>
             </div>
           </div>
 
           <!-- Actions -->
-          <div class="flex gap-3 p-4 bg-gray-50 border-t border-gray-100">
+          <div class="flex gap-3 p-4 bg-gray-50 dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-700">
             <Button 
               variant="secondary" 
               @click="close"
