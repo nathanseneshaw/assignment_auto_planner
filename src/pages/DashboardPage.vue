@@ -18,36 +18,36 @@ const stats = computed(() => [
     value: tasksStore.todaysTasks.length,
     completed: tasksStore.todaysTasks.filter(t => t.completed).length,
     icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-    bgColor: 'bg-primary-50',
-    iconBg: 'bg-primary-100',
-    textColor: 'text-primary-600'
+    bgColor: 'bg-primary-50 dark:bg-primary-900/30',
+    iconBg: 'bg-primary-100 dark:bg-primary-800/50',
+    textColor: 'text-primary-600 dark:text-primary-400'
   },
   {
     label: 'Upcoming',
     value: assignmentsStore.upcomingAssignments.length,
     subtitle: 'assignments',
     icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
-    bgColor: 'bg-sky-50',
-    iconBg: 'bg-sky-100',
-    textColor: 'text-sky-700'
+    bgColor: 'bg-sky-50 dark:bg-sky-900/30',
+    iconBg: 'bg-sky-100 dark:bg-sky-900/50',
+    textColor: 'text-sky-700 dark:text-sky-400'
   },
   {
     label: 'Overdue',
     value: tasksStore.overdueTasks.length,
     subtitle: 'tasks',
     icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-    bgColor: tasksStore.overdueTasks.length > 0 ? 'bg-danger-50' : 'bg-gray-50',
-    iconBg: tasksStore.overdueTasks.length > 0 ? 'bg-danger-100' : 'bg-gray-100',
-    textColor: tasksStore.overdueTasks.length > 0 ? 'text-danger-600' : 'text-gray-600'
+    bgColor: tasksStore.overdueTasks.length > 0 ? 'bg-danger-50 dark:bg-danger-900/30' : 'bg-gray-50 dark:bg-gray-700/50',
+    iconBg: tasksStore.overdueTasks.length > 0 ? 'bg-danger-100 dark:bg-danger-900/50' : 'bg-gray-100 dark:bg-gray-700',
+    textColor: tasksStore.overdueTasks.length > 0 ? 'text-danger-600 dark:text-danger-400' : 'text-gray-600 dark:text-gray-400'
   },
   {
     label: 'Courses',
     value: coursesStore.courses.length,
     subtitle: 'active',
     icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
-    bgColor: 'bg-warning-50',
-    iconBg: 'bg-warning-100',
-    textColor: 'text-warning-600'
+    bgColor: 'bg-warning-50 dark:bg-warning-900/30',
+    iconBg: 'bg-warning-100 dark:bg-warning-900/50',
+    textColor: 'text-warning-600 dark:text-warning-400'
   },
 ])
 
@@ -90,10 +90,10 @@ function deadlineSubtitle(assignment) {
 
 function getUrgencyClass(dateString) {
   const days = getDaysUntil(dateString)
-  if (days < 0) return 'text-danger-600 bg-danger-50 ring-1 ring-danger-200'
-  if (days <= 1) return 'text-danger-600 bg-danger-50'
-  if (days <= 3) return 'text-warning-600 bg-warning-50'
-  return 'text-gray-600 bg-gray-100'
+  if (days < 0) return 'text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/30 ring-1 ring-danger-200 dark:ring-danger-800/60'
+  if (days <= 1) return 'text-danger-600 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/30'
+  if (days <= 3) return 'text-warning-600 dark:text-warning-400 bg-warning-50 dark:bg-warning-900/30'
+  return 'text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700/60'
 }
 
 function getCourseColor(courseId) {
@@ -109,8 +109,8 @@ function getCourseColor(courseId) {
       <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary-700 via-primary-900 to-primary-800 rounded-l-2xl" aria-hidden="true" />
       <div class="relative pl-4 sm:pl-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
         <div>
-          <h2 class="text-2xl sm:text-[1.65rem] font-semibold text-gray-900 tracking-tight">Welcome back</h2>
-          <p class="mt-2 text-[15px] text-gray-500 max-w-md leading-relaxed">
+          <h2 class="text-2xl sm:text-[1.65rem] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Welcome back</h2>
+          <p class="mt-2 text-[15px] text-gray-500 dark:text-gray-400 max-w-md leading-relaxed">
             {{ tasksStore.todaysTasks.length > 0 
               ? `You have ${tasksStore.todaysTasks.filter(t => !t.completed).length} tasks left today — steady progress wins.`
               : "Nothing on the calendar today. A good moment to plan ahead."
@@ -141,10 +141,10 @@ function getCourseColor(courseId) {
       >
         <div class="flex items-start justify-between">
           <div>
-            <p class="text-3xl font-bold text-gray-900">
+            <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">
               {{ stat.completed !== undefined ? `${stat.completed}/${stat.value}` : stat.value }}
             </p>
-            <p class="text-sm text-gray-500 mt-1">{{ stat.label }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ stat.label }}</p>
           </div>
           <div :class="[stat.iconBg, 'p-2.5 rounded-xl']">
             <svg 
@@ -175,10 +175,10 @@ function getCourseColor(courseId) {
       <!-- Today's Tasks -->
       <Card>
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-[17px] font-semibold text-gray-900 tracking-tight">Today's tasks</h3>
-          <router-link 
-            to="/planner" 
-            class="text-[13px] font-semibold text-gray-600 hover:text-primary-900 transition-colors flex items-center gap-1"
+          <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Today's tasks</h3>
+          <router-link
+            to="/tasks"
+            class="text-[13px] font-semibold text-gray-600 dark:text-gray-400 hover:text-primary-900 dark:hover:text-primary-400 transition-colors flex items-center gap-1"
           >
             View all
             <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -200,34 +200,28 @@ function getCourseColor(courseId) {
           <div 
             v-for="task in todaysTasks" 
             :key="task.id"
-            class="group flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50/80 transition-colors cursor-pointer border border-transparent hover:border-gray-100/80"
+            class="group flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors cursor-pointer border border-transparent hover:border-gray-100/80 dark:hover:border-gray-700/60"
             @click="tasksStore.toggleTaskComplete(task.id)"
           >
             <button 
               class="flex-shrink-0 w-6 h-6 rounded-full border-2 transition-all flex items-center justify-center"
-              :class="task.completed 
-                ? 'bg-primary-900 border-primary-900 scale-100' 
-                : 'border-gray-300 group-hover:border-primary-600/50'"
+              :class="task.completed
+                ? 'bg-primary-900 border-primary-900 scale-100'
+                : 'border-gray-300 dark:border-gray-600 group-hover:border-primary-600/50'"
             >
               <svg v-if="task.completed" class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
               </svg>
             </button>
             <div class="flex-1 min-w-0">
-              <p 
+              <p
                 class="font-medium truncate transition-all"
-                :class="task.completed ? 'text-gray-400 line-through' : 'text-gray-900'"
+                :class="task.completed ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'"
               >
                 {{ task.title }}
               </p>
-              <p class="text-sm text-gray-500 truncate">{{ task.assignmentTitle }}</p>
+              <p class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ task.assignmentTitle }}</p>
             </div>
-            <span 
-              class="text-xs px-2 py-1 rounded-lg"
-              :class="[getCourseColor(task.courseId).bg, getCourseColor(task.courseId).text]"
-            >
-              {{ task.courseName?.split(' ')[0] }}
-            </span>
           </div>
         </div>
       </Card>
@@ -235,10 +229,10 @@ function getCourseColor(courseId) {
       <!-- Upcoming Deadlines -->
       <Card>
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-[17px] font-semibold text-gray-900 tracking-tight">Upcoming deadlines</h3>
-          <router-link 
-            to="/assignments" 
-            class="text-[13px] font-semibold text-gray-600 hover:text-primary-900 transition-colors flex items-center gap-1"
+          <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Upcoming deadlines</h3>
+          <router-link
+            to="/assignments"
+            class="text-[13px] font-semibold text-gray-600 dark:text-gray-400 hover:text-primary-900 dark:hover:text-primary-400 transition-colors flex items-center gap-1"
           >
             View all
             <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -260,12 +254,12 @@ function getCourseColor(courseId) {
           <div 
             v-for="assignment in upcomingDeadlines" 
             :key="assignment.id"
-            class="p-3 rounded-xl border border-gray-100/90 hover:border-gray-200/90 hover:shadow-[0_2px_8px_rgba(15,23,42,0.05)] transition-all"
+            class="p-3 rounded-xl border border-gray-100/90 dark:border-gray-700/60 hover:border-gray-200/90 dark:hover:border-gray-600/60 hover:shadow-[0_2px_8px_rgba(15,23,42,0.05)] transition-all"
           >
             <div class="flex items-start justify-between gap-3 mb-2">
               <div class="flex-1 min-w-0">
-                <p class="font-medium text-gray-900 truncate">{{ assignment.title }}</p>
-                <p class="text-sm text-gray-500">{{ deadlineSubtitle(assignment) }}</p>
+                <p class="font-medium text-gray-900 dark:text-gray-100 truncate">{{ assignment.title }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ deadlineSubtitle(assignment) }}</p>
               </div>
               <span 
                 class="text-xs font-medium px-2.5 py-1 rounded-lg whitespace-nowrap"
@@ -282,45 +276,45 @@ function getCourseColor(courseId) {
 
     <!-- Quick Actions -->
     <Card>
-      <h3 class="text-[17px] font-semibold text-gray-900 tracking-tight mb-4">Quick actions</h3>
+      <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight mb-4">Quick actions</h3>
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <button 
+        <button
           type="button"
           @click="router.push({ path: '/assignments', query: { action: 'add' } })"
-          class="group p-4 rounded-2xl border border-dashed border-gray-200/90 hover:border-primary-300/60 hover:bg-gray-50/80 transition-all"
+          class="group p-4 rounded-2xl border border-dashed border-gray-200/90 dark:border-gray-700/60 hover:border-primary-300/60 dark:hover:border-primary-700/60 hover:bg-gray-50/80 dark:hover:bg-gray-700/40 transition-all"
         >
-          <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-gray-100/80 group-hover:bg-white group-hover:ring-1 group-hover:ring-gray-200/80 flex items-center justify-center transition-all">
-            <svg class="w-5 h-5 text-gray-500 group-hover:text-primary-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-gray-100/80 dark:bg-gray-700/80 group-hover:bg-white dark:group-hover:bg-gray-600 group-hover:ring-1 group-hover:ring-gray-200/80 dark:group-hover:ring-gray-500/60 flex items-center justify-center transition-all">
+            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-900 dark:group-hover:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
           </div>
-          <p class="text-[13px] font-semibold text-gray-600 group-hover:text-gray-900">Add assignment</p>
+          <p class="text-[13px] font-semibold text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-100">Add assignment</p>
         </button>
 
-        <button 
+        <button
           type="button"
           @click="router.push({ path: '/course', query: { action: 'add' } })"
-          class="group p-4 rounded-2xl border border-dashed border-gray-200/90 hover:border-primary-300/60 hover:bg-gray-50/80 transition-all"
+          class="group p-4 rounded-2xl border border-dashed border-gray-200/90 dark:border-gray-700/60 hover:border-primary-300/60 dark:hover:border-primary-700/60 hover:bg-gray-50/80 dark:hover:bg-gray-700/40 transition-all"
         >
-          <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-gray-100/80 group-hover:bg-white group-hover:ring-1 group-hover:ring-gray-200/80 flex items-center justify-center transition-all">
-            <svg class="w-5 h-5 text-gray-500 group-hover:text-primary-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-gray-100/80 dark:bg-gray-700/80 group-hover:bg-white dark:group-hover:bg-gray-600 group-hover:ring-1 group-hover:ring-gray-200/80 dark:group-hover:ring-gray-500/60 flex items-center justify-center transition-all">
+            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-900 dark:group-hover:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
           </div>
-          <p class="text-[13px] font-semibold text-gray-600 group-hover:text-gray-900">Add course</p>
+          <p class="text-[13px] font-semibold text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-100">Add course</p>
         </button>
 
-        <button 
+        <button
           type="button"
           @click="router.push('/planner')"
-          class="group p-4 rounded-2xl border border-dashed border-gray-200/90 hover:border-primary-300/60 hover:bg-gray-50/80 transition-all"
+          class="group p-4 rounded-2xl border border-dashed border-gray-200/90 dark:border-gray-700/60 hover:border-primary-300/60 dark:hover:border-primary-700/60 hover:bg-gray-50/80 dark:hover:bg-gray-700/40 transition-all"
         >
-          <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-gray-100/80 group-hover:bg-white group-hover:ring-1 group-hover:ring-gray-200/80 flex items-center justify-center transition-all">
-            <svg class="w-5 h-5 text-gray-500 group-hover:text-primary-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-gray-100/80 dark:bg-gray-700/80 group-hover:bg-white dark:group-hover:bg-gray-600 group-hover:ring-1 group-hover:ring-gray-200/80 dark:group-hover:ring-gray-500/60 flex items-center justify-center transition-all">
+            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-900 dark:group-hover:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <p class="text-[13px] font-semibold text-gray-600 group-hover:text-gray-900">View planner</p>
+          <p class="text-[13px] font-semibold text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-100">View planner</p>
         </button>
       </div>
     </Card>

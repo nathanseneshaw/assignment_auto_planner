@@ -11,10 +11,16 @@ export const useProfileStore = defineStore('profile', () => {
     name: '',
     email: '',
     avatar: null,
+    darkMode: false,
   })
 
   function updateProfile(data) {
     profile.value = { ...profile.value, ...data }
+    saveToLocalStorage()
+  }
+
+  function toggleDarkMode() {
+    profile.value.darkMode = !profile.value.darkMode
     saveToLocalStorage()
   }
 
@@ -26,7 +32,8 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       const savedProfile = localStorage.getItem('profile')
       if (savedProfile) {
-        profile.value = JSON.parse(savedProfile)
+        // Merge so new fields (like darkMode) keep their defaults when missing from saved data
+        profile.value = { ...profile.value, ...JSON.parse(savedProfile) }
       }
     } catch (e) {
       console.warn('[profile] Failed to load from localStorage, using defaults:', e)
@@ -38,5 +45,6 @@ export const useProfileStore = defineStore('profile', () => {
   return {
     profile,
     updateProfile,
+    toggleDarkMode,
   }
 })

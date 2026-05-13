@@ -38,7 +38,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(71,85,105,0.06),transparent_50%),#fafafa]">
+  <div class="main-layout-bg min-h-screen">
     <Sidebar 
       :open="sidebarOpen" 
       :mobile-open="mobileMenuOpen"

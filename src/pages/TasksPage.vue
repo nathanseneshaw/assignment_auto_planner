@@ -133,9 +133,9 @@ function getAssignmentTitle(task) {
 }
 
 const PRIORITY_BADGE = {
-  urgent: { label: 'Urgent', classes: 'bg-danger-50 text-danger-600 border border-danger-200' },
-  high:   { label: 'High',   classes: 'bg-amber-50 text-amber-700 border border-amber-200' },
-  normal: { label: 'Normal', classes: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+  urgent: { label: 'Urgent', classes: 'bg-danger-50 dark:bg-danger-900/30 text-danger-600 dark:text-danger-400 border border-danger-200 dark:border-danger-700/50' },
+  high:   { label: 'High',   classes: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50' },
+  normal: { label: 'Normal', classes: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50' },
 }
 </script>
 
@@ -144,7 +144,7 @@ const PRIORITY_BADGE = {
     <!-- Header -->
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
       <div>
-        <h2 class="text-2xl font-bold text-gray-900">Tasks</h2>
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Tasks</h2>
         <p class="text-gray-500">Plan and track your daily study tasks</p>
       </div>
       <Button @click="openAddModal" variant="primary">
@@ -158,21 +158,21 @@ const PRIORITY_BADGE = {
     <!-- Stats -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <Card padding="md" class="text-center">
-        <p class="text-3xl font-bold text-gray-900">{{ stats.total }}</p>
+        <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ stats.total }}</p>
         <p class="text-sm text-gray-500">Total</p>
       </Card>
       <Card padding="md" class="text-center">
-        <p class="text-3xl font-bold text-emerald-700">{{ stats.completed }}</p>
+        <p class="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{{ stats.completed }}</p>
         <p class="text-sm text-gray-500">Completed</p>
       </Card>
       <Card padding="md" class="text-center">
-        <p class="text-3xl font-bold" :class="stats.overdue > 0 ? 'text-danger-600' : 'text-gray-400'">
+        <p class="text-3xl font-bold" :class="stats.overdue > 0 ? 'text-danger-600 dark:text-danger-400' : 'text-gray-400 dark:text-gray-600'">
           {{ stats.overdue }}
         </p>
         <p class="text-sm text-gray-500">Overdue</p>
       </Card>
       <Card padding="md" class="text-center">
-        <p class="text-3xl font-bold text-primary-800">{{ stats.today }}</p>
+        <p class="text-3xl font-bold text-primary-800 dark:text-primary-400">{{ stats.today }}</p>
         <p class="text-sm text-gray-500">Due Today</p>
       </Card>
     </div>
@@ -181,7 +181,7 @@ const PRIORITY_BADGE = {
     <Card>
       <div class="flex flex-col sm:flex-row gap-3">
         <!-- Date filter -->
-        <div class="flex rounded-xl border border-gray-200 overflow-hidden">
+        <div class="flex rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <button
             v-for="opt in [{ value: 'today', label: 'Today' }, { value: 'week', label: 'This Week' }, { value: 'all', label: 'All' }]"
             :key="opt.value"
@@ -189,7 +189,7 @@ const PRIORITY_BADGE = {
             class="px-4 py-2 text-sm font-medium transition-colors"
             :class="filterDate === opt.value
               ? 'bg-primary-900 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-50'"
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'"
             @click="filterDate = opt.value"
           >
             {{ opt.label }}
@@ -235,7 +235,7 @@ const PRIORITY_BADGE = {
           >
             {{ formatDateHeading(date) }}
           </h3>
-          <div class="flex-1 h-px bg-gray-100"></div>
+          <div class="flex-1 h-px bg-gray-100 dark:bg-gray-700"></div>
           <span class="text-xs text-gray-400">
             {{ groupedByDate[date].filter(t => t.completed).length }}/{{ groupedByDate[date].length }}
           </span>
@@ -248,10 +248,10 @@ const PRIORITY_BADGE = {
             :key="task.id"
             class="group flex items-center gap-3 p-3.5 rounded-xl border transition-all"
             :class="task.completed
-              ? 'bg-gray-50/60 border-gray-100'
+              ? 'bg-gray-50/60 dark:bg-gray-700/30 border-gray-100 dark:border-gray-700/60'
               : isOverdue(task)
-                ? 'bg-white border-danger-200 hover:border-danger-300'
-                : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'"
+                ? 'bg-white dark:bg-gray-800 border-danger-200 dark:border-danger-700/60 hover:border-danger-300 dark:hover:border-danger-600'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm'"
           >
             <!-- Checkbox -->
             <button
@@ -261,7 +261,7 @@ const PRIORITY_BADGE = {
                 ? 'bg-emerald-500 border-emerald-500'
                 : isOverdue(task)
                   ? 'border-danger-400 hover:border-danger-500'
-                  : 'border-gray-300 hover:border-primary-400'"
+                  : 'border-gray-300 dark:border-gray-600 hover:border-primary-400'"
               @click="tasksStore.toggleTaskComplete(task.id)"
             >
               <svg v-if="task.completed" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
@@ -273,7 +273,7 @@ const PRIORITY_BADGE = {
             <div class="flex-1 min-w-0">
               <p
                 class="text-sm font-medium leading-snug"
-                :class="task.completed ? 'line-through text-gray-400' : 'text-gray-900'"
+                :class="task.completed ? 'line-through text-gray-400' : 'text-gray-900 dark:text-gray-100'"
               >
                 {{ task.title }}
               </p>
@@ -300,7 +300,7 @@ const PRIORITY_BADGE = {
                 <!-- Assignment badge -->
                 <span
                   v-if="getAssignmentTitle(task)"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                 >
                   <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -319,7 +319,7 @@ const PRIORITY_BADGE = {
             <div class="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 type="button"
-                class="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-all"
+                class="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-all"
                 title="Edit task"
                 @click="openEditModal(task)"
               >
@@ -329,7 +329,7 @@ const PRIORITY_BADGE = {
               </button>
               <button
                 type="button"
-                class="p-1.5 text-gray-400 hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-all"
+                class="p-1.5 text-gray-400 hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30 rounded-lg transition-all"
                 title="Delete task"
                 @click="promptDelete(task)"
               >
