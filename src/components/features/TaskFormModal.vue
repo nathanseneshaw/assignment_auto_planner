@@ -24,13 +24,13 @@ const PRIORITY_OPTIONS = [
   {
     value: 'high',
     label: 'High',
-    activeClasses: 'bg-amber-50 border-amber-300 text-amber-700',
+    activeClasses: 'bg-amber-50 border-amber-300 text-amber-700 shadow-[0_0_8px_2px_rgba(251,191,36,0.35)]',
     dot: 'bg-amber-400',
   },
   {
     value: 'urgent',
     label: 'Urgent',
-    activeClasses: 'bg-danger-50 border-danger-300 text-danger-600',
+    activeClasses: 'bg-danger-50 border-danger-300 text-danger-600 shadow-[0_0_8px_2px_rgba(239,68,68,0.35)]',
     dot: 'bg-danger-500',
   },
 ]
