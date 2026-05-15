@@ -26,11 +26,11 @@ const paddingClasses = {
 </script>
 
 <template>
-  <div 
-    class="bg-white rounded-2xl border border-gray-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_2px_8px_rgba(15,23,42,0.04)] transition-[box-shadow,border-color,transform] duration-200 ease-out"
+  <div
+    class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_2px_8px_rgba(15,23,42,0.04)] transition-[box-shadow,border-color,transform] duration-200 ease-out"
     :class="[
       paddingClasses[padding],
-      hover ? 'hover:shadow-[0_4px_16px_rgba(15,23,42,0.07)] hover:border-gray-300/90' : '',
+      hover ? 'hover:shadow-[0_4px_16px_rgba(15,23,42,0.07)] hover:border-gray-300/90 dark:hover:border-gray-600/90' : '',
       clickable ? 'cursor-pointer active:scale-[0.995]' : ''
     ]"
     @click="clickable ? emit('click', $event) : null"

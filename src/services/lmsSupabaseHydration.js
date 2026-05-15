@@ -10,6 +10,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
+import { useTasksStore } from '../stores/tasks'
 
 /** Color palette assigned round-robin so hydration is deterministic per-position. */
 const courseColors = [
@@ -119,8 +120,9 @@ export async function hydrateLmsStoresFromSupabase() {
 
   const coursesStore = useCoursesStore()
   const assignmentsStore = useAssignmentsStore()
+  const tasksStore = useTasksStore()
 
-  // Pull both tables in series — assignments need the courses lookup table for `courseName`.
+  // Pull tables in series — assignments need courses for courseName; tasks need assignments.
   const { data: courseRows, error: cErr } = await supabase
     .from('courses')
     .select('*')
@@ -143,6 +145,16 @@ export async function hydrateLmsStoresFromSupabase() {
     return
   }
 
+  const { data: taskRows, error: tErr } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('scheduled_date', { ascending: true })
+
+  if (tErr) {
+    console.warn('[lmsSupabaseHydration] tasks', tErr.message || tErr)
+  }
+
   const courses = (courseRows || []).map((row, i) => mapCourseRow(row, i))
   // O(1) lookup so we can stitch course names onto assignments cheaply.
   const courseById = Object.fromEntries(courses.map((c) => [c.id, c]))
@@ -151,6 +163,24 @@ export async function hydrateLmsStoresFromSupabase() {
     mapAssignmentRow(row, courseById[row.course_id])
   )
 
+  // Map Supabase task rows → Pinia task shape.
+  const tasks = (taskRows || []).map((row) => {
+    const assignment = assignments.find(a => a.id === row.assignment_id)
+    return {
+      id: row.id,
+      supabaseTaskId: row.id,
+      createdAt: row.created_at || new Date().toISOString(),
+      title: row.title || 'Untitled task',
+      scheduledDate: row.scheduled_date,
+      priority: row.priority ?? 0,
+      completed: row.completed ?? false,
+      assignmentId: assignment?.id || row.assignment_id || null,
+      courseId: row.course_id || assignment?.courseId || null,
+      courseName: assignment?.courseName || courseById[row.course_id]?.name || null,
+    }
+  })
+
   coursesStore.replaceFromHydration(courses)
   assignmentsStore.replaceFromHydration(assignments)
+  tasksStore.hydrateFromSupabase(tasks)
 }

@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAssignmentsStore } from '../stores/assignments'
 import { useCoursesStore } from '../stores/courses'
-import { Card, Modal, Input, Select, Button, Badge, EmptyState, ConfirmDialog } from '../components/ui'
+import { Card, Modal, Input, Dropdown, Button, Badge, EmptyState, ConfirmDialog } from '../components/ui'
 import { resolveAssignmentCourseName, importSourceLabel } from '../utils/assignmentDisplay.js'
 
 const route = useRoute()
@@ -21,6 +21,22 @@ const filterCourse = ref('all')
 /** 'all' | 'active' | 'completed' */
 const filterCompletion = ref('all')
 const searchQuery = ref('')
+
+const courseFilterOptions = computed(() => [
+  { value: 'all', label: 'All Courses' },
+  ...coursesStore.courses.map(c => ({ value: c.id, label: c.name })),
+])
+
+const completionFilterOptions = [
+  { value: 'all', label: 'All assignments' },
+  { value: 'active', label: 'Active only' },
+  { value: 'completed', label: 'Completed only' },
+]
+
+const modalCourseOptions = computed(() => [
+  { value: '', label: 'Select a course' },
+  ...coursesStore.courses.map(c => ({ value: c.id, label: c.name })),
+])
 
 const formData = ref({
   title: '',
@@ -245,8 +261,8 @@ onMounted(() => {
     <!-- Header -->
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
       <div>
-        <h2 class="text-2xl font-bold text-gray-900">Assignments</h2>
-        <p class="text-gray-500">Manage and track all your assignments</p>
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Assignments</h2>
+        <p class="text-gray-500 dark:text-gray-400">Manage and track all your assignments</p>
       </div>
       <Button @click="openAddModal" variant="primary">
         <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -259,7 +275,7 @@ onMounted(() => {
     <!-- Stats Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <Card padding="md" class="text-center">
-        <p class="text-3xl font-bold text-gray-900">{{ assignmentStats.total }}</p>
+        <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ assignmentStats.total }}</p>
         <p class="text-sm text-gray-500">Total</p>
       </Card>
       <Card padding="md" class="text-center">
@@ -291,32 +307,19 @@ onMounted(() => {
               v-model="searchQuery"
               type="text"
               placeholder="Search assignments..."
-              class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
         </div>
 
         <!-- Course Filter -->
         <div class="sm:w-48">
-          <Select v-model="filterCourse">
-            <option value="all">All Courses</option>
-            <option 
-              v-for="course in coursesStore.courses" 
-              :key="course.id" 
-              :value="course.id"
-            >
-              {{ course.name }}
-            </option>
-          </Select>
+          <Dropdown v-model="filterCourse" :options="courseFilterOptions" />
         </div>
 
         <!-- Completion filter -->
         <div class="sm:w-44">
-          <Select v-model="filterCompletion">
-            <option value="all">All assignments</option>
-            <option value="active">Active only</option>
-            <option value="completed">Completed only</option>
-          </Select>
+          <Dropdown v-model="filterCompletion" :options="completionFilterOptions" />
         </div>
       </div>
     </Card>
@@ -340,7 +343,7 @@ onMounted(() => {
         :key="assignment.id"
         hover
         class="group transition-shadow"
-        :class="assignment.status === 'completed' ? 'bg-primary-50/25 ring-1 ring-primary-100' : ''"
+        :class="assignment.status === 'completed' ? 'bg-primary-50/25 dark:bg-primary-900/10 ring-1 ring-primary-100 dark:ring-primary-900/30' : ''"
       >
         <div class="flex flex-col gap-3">
           <!-- Header Row -->
@@ -350,7 +353,7 @@ onMounted(() => {
               <div class="flex flex-wrap items-center gap-2 mb-2">
                 <h3
                   class="text-lg font-semibold"
-                  :class="assignment.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-900'"
+                  :class="assignment.status === 'completed' ? 'text-gray-500 dark:text-gray-500 line-through' : 'text-gray-900 dark:text-gray-100'"
                 >
                   {{ assignment.title }}
                 </h3>
@@ -369,7 +372,7 @@ onMounted(() => {
                 </span>
                 <span
                   v-if="assignmentImportLabel(assignment)"
-                  class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-600 border border-gray-200/80"
+                  class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200/80 dark:border-gray-600/80"
                 >
                   {{ assignmentImportLabel(assignment) }}
                 </span>
@@ -388,7 +391,7 @@ onMounted(() => {
               <button 
                 type="button"
                 @click.stop="openEditModal(assignment)"
-                class="p-2 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                class="p-2 text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                 title="Edit assignment"
               >
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -398,7 +401,7 @@ onMounted(() => {
               <button 
                 type="button"
                 @click.stop="promptDeleteAssignment(assignment)"
-                class="p-2 text-gray-400 hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                class="p-2 text-gray-400 hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                 title="Delete assignment"
               >
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -411,7 +414,7 @@ onMounted(() => {
           <!-- Description (Expandable) -->
           <div v-if="assignment.description" class="relative">
             <p 
-              class="text-gray-600 whitespace-pre-wrap"
+              class="text-gray-600 dark:text-gray-400 whitespace-pre-wrap"
               :class="{ 'line-clamp-2': !isExpanded(assignment.id) }"
             >
               {{ assignment.description }}
@@ -438,13 +441,13 @@ onMounted(() => {
 
           <!-- Completion: same pattern as “Show more” — text actions in a footer strip -->
           <div 
-            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-3 border-t border-gray-100"
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-3 border-t border-gray-100 dark:border-gray-700/80"
           >
             <p 
               v-if="assignment.status === 'completed'" 
-              class="text-sm text-gray-600 flex items-center gap-2"
+              class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2"
             >
-              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 shrink-0">
+              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 shrink-0">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
@@ -458,7 +461,7 @@ onMounted(() => {
               <button
                 v-if="assignment.status !== 'completed'"
                 type="button"
-                class="text-sm font-semibold text-gray-700 hover:text-primary-900 transition-colors"
+                class="text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-900 dark:hover:text-primary-400 transition-colors"
                 @click.stop="toggleAssignmentComplete(assignment)"
               >
                 Mark complete
@@ -466,7 +469,7 @@ onMounted(() => {
               <button
                 v-else
                 type="button"
-                class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                class="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
                 @click.stop="toggleAssignmentComplete(assignment)"
               >
                 Mark active again
@@ -479,7 +482,7 @@ onMounted(() => {
 
     <!-- Add/Edit Assignment Modal -->
     <Modal v-model="showModal" :title="modalTitle" size="lg" @close="resetForm">
-      <form @submit.prevent="saveAssignment" class="space-y-5">
+      <form id="assignment-form" @submit.prevent="saveAssignment" class="space-y-5">
         <Input
           v-model="formData.title"
           label="Assignment Title"
@@ -488,36 +491,27 @@ onMounted(() => {
         />
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description</label>
           <textarea
             v-model="formData.description"
             rows="4"
             placeholder="Add any details about the assignment..."
-            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
           ></textarea>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select v-model="formData.courseId" label="Course">
-            <option value="">Select a course</option>
-            <option 
-              v-for="course in coursesStore.courses" 
-              :key="course.id" 
-              :value="course.id"
-            >
-              {{ course.name }}
-            </option>
-          </Select>
+          <Dropdown v-model="formData.courseId" label="Course" :options="modalCourseOptions" />
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Due Date <span class="text-danger-500">*</span>
             </label>
             <input
               v-model="formData.dueDate"
               type="date"
               required
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent scheme-light dark:scheme-dark"
             />
           </div>
         </div>
@@ -529,12 +523,13 @@ onMounted(() => {
 
       <template #footer>
         <div class="flex gap-3 justify-end">
-          <Button variant="secondary" @click="showModal = false; resetForm()">
+          <Button type="button" variant="secondary" @click="showModal = false; resetForm()">
             Cancel
           </Button>
-          <Button 
-            variant="primary" 
-            @click="saveAssignment"
+          <Button
+            type="submit"
+            form="assignment-form"
+            variant="primary"
             :disabled="!formData.title.trim() || !formData.dueDate"
           >
             {{ isEditing ? 'Save Changes' : 'Add Assignment' }}

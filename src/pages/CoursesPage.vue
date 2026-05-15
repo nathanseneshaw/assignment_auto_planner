@@ -149,7 +149,7 @@ onMounted(() => {
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h2 class="text-2xl font-bold text-gray-900">Courses</h2>
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Courses</h2>
         <p class="text-gray-500">Manage your courses and track progress</p>
       </div>
       <Button @click="openAddModal" variant="primary">
@@ -165,15 +165,15 @@ onMounted(() => {
       <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary-800 to-primary-950 rounded-l-2xl" aria-hidden="true" />
       <div class="pl-4 grid grid-cols-3 gap-4 sm:gap-6">
         <div class="text-center sm:text-left">
-          <p class="text-3xl sm:text-4xl font-semibold text-gray-900 tracking-tight">{{ totalStats.courses }}</p>
+          <p class="text-3xl sm:text-4xl font-semibold text-gray-900 dark:text-gray-100 tracking-tight">{{ totalStats.courses }}</p>
           <p class="text-gray-500 text-sm mt-1 font-medium">Active courses</p>
         </div>
-        <div class="text-center sm:text-left border-x border-gray-100 px-2 sm:px-4">
-          <p class="text-3xl sm:text-4xl font-semibold text-gray-900 tracking-tight">{{ totalStats.assignments }}</p>
+        <div class="text-center sm:text-left border-x border-gray-100 dark:border-gray-700 px-2 sm:px-4">
+          <p class="text-3xl sm:text-4xl font-semibold text-gray-900 dark:text-gray-100 tracking-tight">{{ totalStats.assignments }}</p>
           <p class="text-gray-500 text-sm mt-1 font-medium">Assignments</p>
         </div>
         <div class="text-center sm:text-left">
-          <p class="text-3xl sm:text-4xl font-semibold text-gray-900 tracking-tight">{{ totalStats.completed }}</p>
+          <p class="text-3xl sm:text-4xl font-semibold text-gray-900 dark:text-gray-100 tracking-tight">{{ totalStats.completed }}</p>
           <p class="text-gray-500 text-sm mt-1 font-medium">Completed</p>
         </div>
       </div>
@@ -207,8 +207,8 @@ onMounted(() => {
         <div class="pt-2">
           <!-- Header -->
           <div class="flex items-start justify-between mb-4">
-            <div 
-              class="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm"
+            <div
+              class="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ring-1 ring-inset ring-black/5 dark:ring-white/10"
               :class="course.color.bg"
             >
               <svg 
@@ -224,17 +224,17 @@ onMounted(() => {
             
             <!-- Actions -->
             <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button 
+              <button
                 @click="editCourse(course)"
-                class="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-all"
+                class="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-all"
               >
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </button>
-              <button 
+              <button
                 @click="promptDeleteCourse(course)"
-                class="p-1.5 text-gray-400 hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-all"
+                class="p-1.5 text-gray-400 hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30 rounded-lg transition-all"
               >
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -246,7 +246,7 @@ onMounted(() => {
           <!-- Course Info -->
           <div class="mb-4">
             <div class="flex items-center gap-2 mb-1">
-              <h3 class="text-lg font-semibold text-gray-900 line-clamp-1">{{ courseCardTitle(course) }}</h3>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">{{ courseCardTitle(course) }}</h3>
             </div>
             <div class="flex items-center gap-2 text-sm text-gray-500">
               <span v-if="course.code" class="font-medium">{{ course.code }}</span>
@@ -259,7 +259,7 @@ onMounted(() => {
           <div class="mb-4">
             <div class="flex items-center justify-between text-sm mb-2">
               <span class="text-gray-500">Progress</span>
-              <span class="font-semibold text-gray-900">
+              <span class="font-semibold text-gray-900 dark:text-gray-100">
                 {{ getCompletedCount(course.id) }}/{{ getAssignmentCount(course.id) }} completed
               </span>
             </div>
@@ -271,7 +271,7 @@ onMounted(() => {
           </div>
 
           <!-- Upcoming Assignments -->
-          <div v-if="getUpcomingAssignments(course.id).length > 0" class="border-t border-gray-100 pt-4">
+          <div v-if="getUpcomingAssignments(course.id).length > 0" class="border-t border-gray-100 dark:border-gray-700 pt-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Upcoming</p>
             <div class="space-y-2">
               <div 
@@ -279,13 +279,13 @@ onMounted(() => {
                 :key="assignment.id"
                 class="flex items-center justify-between text-sm"
               >
-                <span class="text-gray-700 truncate flex-1 mr-2">{{ assignment.title }}</span>
+                <span class="text-gray-700 dark:text-gray-300 truncate flex-1 mr-2">{{ assignment.title }}</span>
                 <span class="text-xs text-gray-500 whitespace-nowrap">{{ formatDate(assignment.dueDate) }}</span>
               </div>
             </div>
           </div>
 
-          <div v-else-if="getAssignmentCount(course.id) === 0" class="border-t border-gray-100 pt-4">
+          <div v-else-if="getAssignmentCount(course.id) === 0" class="border-t border-gray-100 dark:border-gray-700 pt-4">
             <p class="text-sm text-gray-400 text-center">No assignments yet</p>
           </div>
         </div>
@@ -299,7 +299,7 @@ onMounted(() => {
       size="md"
       @close="resetForm"
     >
-      <form @submit.prevent="addCourse" class="space-y-5">
+      <form id="course-form" @submit.prevent="addCourse" class="space-y-5">
         <Input
           v-model="newCourse.name"
           label="Course Name"
@@ -324,12 +324,13 @@ onMounted(() => {
 
       <template #footer>
         <div class="flex gap-3 justify-end">
-          <Button variant="secondary" @click="showAddModal = false; resetForm()">
+          <Button type="button" variant="secondary" @click="showAddModal = false; resetForm()">
             Cancel
           </Button>
-          <Button 
-            variant="primary" 
-            @click="addCourse"
+          <Button
+            type="submit"
+            form="course-form"
+            variant="primary"
             :disabled="!newCourse.name.trim()"
           >
             {{ editingCourse ? 'Save Changes' : 'Add Course' }}

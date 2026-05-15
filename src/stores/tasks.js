@@ -1,15 +1,7 @@
-/**
- * Tasks Pinia store — the *subtasks* / planner items, distinct from
- * top-level assignments. Each task is scheduled onto a calendar date
- * (`scheduledDate`) and rolls its completion state up to the parent
- * assignment's progress via {@link useAssignmentsStore.updateProgress}.
- *
- * Not currently mirrored to Supabase; tasks live in memory (and via Pinia
- * persistence plugins if added later).
- */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAssignmentsStore } from './assignments'
+import { persistTaskToSupabase, deleteTaskFromSupabase } from '../services/taskSync'
 
 export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref([])
@@ -26,9 +18,7 @@ export const useTasksStore = defineStore('tasks', () => {
     tasks.value.forEach(task => {
       const date = task.scheduledDate
       if (!date) return
-      if (!grouped[date]) {
-        grouped[date] = []
-      }
+      if (!grouped[date]) grouped[date] = []
       grouped[date].push(task)
     })
     return grouped
@@ -42,9 +32,7 @@ export const useTasksStore = defineStore('tasks', () => {
       .sort((a, b) => a.priority - b.priority)
   })
 
-  const incompleteTasks = computed(() => {
-    return tasks.value.filter(t => !t.completed)
-  })
+  const incompleteTasks = computed(() => tasks.value.filter(t => !t.completed))
 
   /** Past-scheduled but still incomplete tasks. */
   const overdueTasks = computed(() => {
@@ -62,9 +50,19 @@ export const useTasksStore = defineStore('tasks', () => {
       createdAt: new Date().toISOString(),
       completed: false,
       priority: tasks.value.length + 1,
-      ...task
+      supabaseTaskId: null,
+      ...task,
     }
     tasks.value.push(newTask)
+
+    void (async () => {
+      const sid = await persistTaskToSupabase(newTask)
+      if (sid) {
+        const idx = tasks.value.findIndex(t => t.id === newTask.id)
+        if (idx !== -1) tasks.value[idx] = { ...tasks.value[idx], supabaseTaskId: sid }
+      }
+    })()
+
     return newTask
   }
 
@@ -74,24 +72,36 @@ export const useTasksStore = defineStore('tasks', () => {
    */
   function updateTask(id, updates) {
     const index = tasks.value.findIndex(t => t.id === id)
-    if (index !== -1) {
-      tasks.value[index] = { ...tasks.value[index], ...updates }
+    if (index === -1) return
+    tasks.value[index] = { ...tasks.value[index], ...updates }
 
-      if (updates.completed !== undefined) {
-        const task = tasks.value[index]
-        const assignmentsStore = useAssignmentsStore()
-        assignmentsStore.updateProgress(task.assignmentId)
-      }
+    if (updates.completed !== undefined) {
+      const task = tasks.value[index]
+      useAssignmentsStore().updateProgress(task.assignmentId)
+    }
+
+    const task = tasks.value[index]
+    if (task.supabaseTaskId) {
+      void persistTaskToSupabase(task)
     }
   }
 
   function deleteTask(id) {
+    const task = tasks.value.find(t => t.id === id)
     tasks.value = tasks.value.filter(t => t.id !== id)
+    if (task?.supabaseTaskId) {
+      void deleteTaskFromSupabase(task.supabaseTaskId)
+    }
   }
 
   /** Wipe all tasks — used when signing out or switching accounts. */
   function clearAll() {
     tasks.value = []
+  }
+
+  /** Replace tasks from Supabase hydration. */
+  function hydrateFromSupabase(list) {
+    tasks.value = Array.isArray(list) ? list : []
   }
 
   function getTasksByAssignment(assignmentId) {
@@ -100,9 +110,7 @@ export const useTasksStore = defineStore('tasks', () => {
 
   function toggleTaskComplete(id) {
     const task = tasks.value.find(t => t.id === id)
-    if (task) {
-      updateTask(id, { completed: !task.completed })
-    }
+    if (task) updateTask(id, { completed: !task.completed })
   }
 
   /** Drag-and-drop helper: move a task to a different calendar date. */
@@ -112,9 +120,7 @@ export const useTasksStore = defineStore('tasks', () => {
 
   /** Inclusive `[startDate, endDate]` range query, both `YYYY-MM-DD`. */
   function getTasksForDateRange(startDate, endDate) {
-    return tasks.value.filter(t => {
-      return t.scheduledDate >= startDate && t.scheduledDate <= endDate
-    })
+    return tasks.value.filter(t => t.scheduledDate >= startDate && t.scheduledDate <= endDate)
   }
 
   return {
@@ -128,6 +134,7 @@ export const useTasksStore = defineStore('tasks', () => {
     updateTask,
     deleteTask,
     clearAll,
+    hydrateFromSupabase,
     getTasksByAssignment,
     toggleTaskComplete,
     rescheduleTask,
