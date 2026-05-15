@@ -78,11 +78,11 @@ const monthLabels = computed(() => {
 
 function intensityClass(count, inYear) {
   if (!inYear) return 'bg-transparent'
-  if (count === 0)  return 'bg-gray-100'
-  if (count <= 2)   return 'bg-accent-200'
-  if (count <= 5)   return 'bg-warning-300'
-  if (count <= 8)   return 'bg-warning-500'
-  return 'bg-danger-500'
+  if (count === 0)  return 'bg-gray-100 dark:bg-gray-700/60'
+  if (count <= 2)   return 'bg-accent-200 dark:bg-accent-600/70'
+  if (count <= 5)   return 'bg-warning-300 dark:bg-warning-400/80'
+  if (count <= 8)   return 'bg-warning-500 dark:bg-warning-500'
+  return 'bg-danger-500 dark:bg-danger-400'
 }
 
 const hoveredCell = ref(null)
@@ -97,15 +97,21 @@ function onCellEnter(cell) { if (cell.inYear) hoveredCell.value = cell }
 function onCellLeave()     { hoveredCell.value = null }
 
 const DAY_LABELS    = ['Mon', '', 'Wed', '', 'Fri', '', '']
-const LEGEND_CELLS  = ['bg-gray-100', 'bg-accent-200', 'bg-warning-300', 'bg-warning-500', 'bg-danger-500']
+const LEGEND_CELLS  = [
+  'bg-gray-100 dark:bg-gray-700/60',
+  'bg-accent-200 dark:bg-accent-600/70',
+  'bg-warning-300 dark:bg-warning-400/80',
+  'bg-warning-500 dark:bg-warning-500',
+  'bg-danger-500 dark:bg-danger-400',
+]
 </script>
 
 <template>
   <Card padding="lg">
     <!-- Header -->
     <div class="mb-4">
-      <h3 class="text-[17px] font-semibold text-gray-900 tracking-tight">Workload heatmap</h3>
-      <p class="text-sm text-gray-500 mt-0.5">{{ year }} — assignments due + tasks scheduled per day</p>
+      <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Workload heatmap</h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ year }} — assignments due + tasks scheduled per day</p>
     </div>
 
     <!-- Grid -->
@@ -113,7 +119,7 @@ const LEGEND_CELLS  = ['bg-gray-100', 'bg-accent-200', 'bg-warning-300', 'bg-war
       <div class="inline-flex items-start gap-[5px] min-w-max">
 
         <!-- Day-of-week labels -->
-        <div class="flex flex-col shrink-0 text-[11px] text-gray-400 font-medium text-right" style="gap: 3px; padding-top: 20px;">
+        <div class="flex flex-col shrink-0 text-[11px] text-gray-400 dark:text-gray-500 font-medium text-right" style="gap: 3px; padding-top: 20px;">
           <span v-for="(label, i) in DAY_LABELS" :key="i" class="h-[13px] leading-[13px]">{{ label }}</span>
         </div>
 
@@ -124,7 +130,7 @@ const LEGEND_CELLS  = ['bg-gray-100', 'bg-accent-200', 'bg-warning-300', 'bg-war
             <div
               v-for="(_, wi) in gridWeeks"
               :key="wi"
-              class="w-[13px] shrink-0 text-[11px] text-gray-500 font-medium overflow-visible whitespace-nowrap"
+              class="w-[13px] shrink-0 text-[11px] text-gray-500 dark:text-gray-400 font-medium overflow-visible whitespace-nowrap"
             >
               {{ monthLabels.find(l => l.weekIndex === wi)?.label ?? '' }}
             </div>
@@ -144,7 +150,7 @@ const LEGEND_CELLS  = ['bg-gray-100', 'bg-accent-200', 'bg-warning-300', 'bg-war
                 class="w-[13px] h-[13px] rounded-[2px]"
                 :class="[
                   intensityClass(cell.count, cell.inYear),
-                  cell.isToday ? 'ring-2 ring-offset-1 ring-primary-600' : '',
+                  cell.isToday ? 'ring-2 ring-offset-1 ring-primary-500 dark:ring-primary-400 dark:ring-offset-gray-900' : '',
                   !cell.inYear ? 'opacity-0 pointer-events-none' : 'cursor-default',
                 ]"
                 @mouseenter="onCellEnter(cell)"
@@ -161,8 +167,8 @@ const LEGEND_CELLS  = ['bg-gray-100', 'bg-accent-200', 'bg-warning-300', 'bg-war
     <div class="mt-4 flex items-center justify-between gap-4">
       <div class="h-5 flex items-center min-w-0">
         <transition name="fade" mode="out-in">
-          <p v-if="hoveredCell" :key="hoveredCell.dateKey" class="text-[13px] text-gray-600 truncate">
-            <span class="font-semibold text-gray-900">{{ hoveredDateLabel }}</span>
+          <p v-if="hoveredCell" :key="hoveredCell.dateKey" class="text-[13px] text-gray-600 dark:text-gray-300 truncate">
+            <span class="font-semibold text-gray-900 dark:text-gray-100">{{ hoveredDateLabel }}</span>
             &nbsp;—&nbsp;
             <span>{{
               hoveredCell.count === 0
@@ -170,11 +176,11 @@ const LEGEND_CELLS  = ['bg-gray-100', 'bg-accent-200', 'bg-warning-300', 'bg-war
                 : `${hoveredCell.count} item${hoveredCell.count === 1 ? '' : 's'} scheduled`
             }}</span>
           </p>
-          <p v-else key="placeholder" class="text-[13px] text-gray-400 select-none">Hover a cell to see details</p>
+          <p v-else key="placeholder" class="text-[13px] text-gray-400 dark:text-gray-500 select-none">Hover a cell to see details</p>
         </transition>
       </div>
 
-      <div class="flex items-center gap-1.5 shrink-0 text-[11px] text-gray-400 font-medium">
+      <div class="flex items-center gap-1.5 shrink-0 text-[11px] text-gray-400 dark:text-gray-500 font-medium">
         <span>Less</span>
         <div v-for="cls in LEGEND_CELLS" :key="cls" class="w-[13px] h-[13px] rounded-[2px]" :class="cls" />
         <span>More</span>
