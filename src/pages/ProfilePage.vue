@@ -153,7 +153,7 @@ async function signOutAccount() {
         <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100 leading-tight sm:mb-0">Session</h2>
         <div class="flex shrink-0">
           <template v-if="authStore.user">
-            <Button variant="outline" :loading="signingOut" :disabled="signingOut" @click="signOutAccount">
+            <Button variant="secondary" :loading="signingOut" :disabled="signingOut" @click="signOutAccount">
               Sign out
             </Button>
           </template>

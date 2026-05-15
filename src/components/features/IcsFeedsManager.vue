@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue'
-import { Button, Card, Input, Badge, EmptyState } from '../ui'
+import { Button, Card, Input, Badge, EmptyState, ConfirmDialog } from '../ui'
 import { useIcsFeedsStore } from '../../stores/icsFeeds'
 import { useAuthStore } from '../../stores/auth'
 
@@ -11,6 +11,16 @@ const newUrl = ref('')
 const newLabel = ref('')
 const formError = ref('')
 const addInFlight = ref(false)
+
+const showRemoveConfirm = ref(false)
+const feedPendingRemoval = ref(null)
+
+const removeConfirmMessage = computed(() => {
+  const f = feedPendingRemoval.value
+  if (!f) return ''
+  const name = f.label || f.url
+  return `“${name}” will stop syncing. Assignments already imported from this feed will stay in your archive.`
+})
 
 onMounted(async () => {
   if (authStore.user) await feedsStore.fetchFeeds()
@@ -58,8 +68,15 @@ async function handleAdd() {
   }
 }
 
-async function handleRemove(feed) {
-  if (!confirm(`Remove this feed?\n\n${feed.url}\n\nAssignments imported from this feed will stay in your archive.`)) return
+function handleRemove(feed) {
+  feedPendingRemoval.value = feed
+  showRemoveConfirm.value = true
+}
+
+async function confirmRemoveFeed() {
+  const feed = feedPendingRemoval.value
+  feedPendingRemoval.value = null
+  if (!feed) return
   try {
     await feedsStore.removeFeed(feed.id)
   } catch (e) {
@@ -166,5 +183,16 @@ async function handleSyncAll() {
       </li>
     </ul>
     </template>
+
+    <ConfirmDialog
+      v-model="showRemoveConfirm"
+      title="Remove this feed?"
+      :message="removeConfirmMessage"
+      confirm-text="Remove"
+      cancel-text="Cancel"
+      variant="danger"
+      @confirm="confirmRemoveFeed"
+      @cancel="feedPendingRemoval = null"
+    />
   </Card>
 </template>
