@@ -23,13 +23,13 @@ const emit = defineEmits(['action'])
 
 <template>
   <div class="text-center py-12 px-2">
-    <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100/90 ring-1 ring-gray-200/60 flex items-center justify-center">
-      <svg class="w-7 h-7 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100/90 dark:bg-gray-700 ring-1 ring-gray-200/60 dark:ring-gray-600/60 flex items-center justify-center">
+      <svg class="w-7 h-7 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" :d="icon" />
       </svg>
     </div>
     
-    <h3 class="text-[17px] font-semibold text-gray-900 tracking-tight">{{ title }}</h3>
+    <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">{{ title }}</h3>
     <p v-if="description" class="mt-2 text-[15px] text-gray-500 max-w-sm mx-auto leading-relaxed">{{ description }}</p>
     
     <button 
