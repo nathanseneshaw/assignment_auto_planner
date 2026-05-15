@@ -125,16 +125,8 @@ async function handleSyncAll() {
     />
 
     <template v-else>
-      <div class="flex items-center justify-between mb-3">
+      <div class="mb-3">
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Your feeds</span>
-        <Button
-          size="sm"
-          variant="secondary"
-          :loading="feedsStore.syncing"
-          @click="handleSyncAll"
-        >
-          Sync all
-        </Button>
       </div>
 
       <ul class="space-y-3">
