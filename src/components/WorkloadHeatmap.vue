@@ -78,11 +78,11 @@ const monthLabels = computed(() => {
 
 function intensityClass(count, inYear) {
   if (!inYear) return 'bg-transparent'
-  if (count === 0)  return 'bg-gray-100 dark:bg-gray-700/60'
-  if (count <= 2)   return 'bg-accent-200 dark:bg-accent-600/70'
-  if (count <= 5)   return 'bg-warning-300 dark:bg-warning-400/80'
-  if (count <= 8)   return 'bg-warning-500 dark:bg-warning-500'
-  return 'bg-danger-500 dark:bg-danger-400'
+  if (count === 0)  return 'bg-gray-100 dark:bg-white/8'
+  if (count <= 2)   return 'bg-accent-200'
+  if (count <= 5)   return 'bg-warning-300'
+  if (count <= 8)   return 'bg-warning-500'
+  return 'bg-danger-500'
 }
 
 const hoveredCell = ref(null)
@@ -97,13 +97,7 @@ function onCellEnter(cell) { if (cell.inYear) hoveredCell.value = cell }
 function onCellLeave()     { hoveredCell.value = null }
 
 const DAY_LABELS    = ['Mon', '', 'Wed', '', 'Fri', '', '']
-const LEGEND_CELLS  = [
-  'bg-gray-100 dark:bg-gray-700/60',
-  'bg-accent-200 dark:bg-accent-600/70',
-  'bg-warning-300 dark:bg-warning-400/80',
-  'bg-warning-500 dark:bg-warning-500',
-  'bg-danger-500 dark:bg-danger-400',
-]
+const LEGEND_CELLS  = ['bg-gray-100 dark:bg-white/8', 'bg-accent-200', 'bg-warning-300', 'bg-warning-500', 'bg-danger-500']
 </script>
 
 <template>
