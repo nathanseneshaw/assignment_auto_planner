@@ -76,12 +76,16 @@ app.get('/', (_req, res) => {
   })
 })
 
-app.listen(PORT, HOST, () => {
-  console.log(`API server listening on http://${HOST}:${PORT}`)
-  console.log('Endpoints:')
-  console.log('  GET    /api/ics/feeds       — list ICS feeds for the signed-in user')
-  console.log('  POST   /api/ics/feeds       — add an ICS feed URL')
-  console.log('  DELETE /api/ics/feeds/:id   — remove an ICS feed (assignments are kept)')
-  console.log('  POST   /api/ics/sync        — fetch + parse + upsert one or all ICS feeds')
-  console.log('  GET    /api/health          — health probe')
-})
+if (!process.env.VERCEL) {
+  app.listen(PORT, HOST, () => {
+    console.log(`API server listening on http://${HOST}:${PORT}`)
+    console.log('Endpoints:')
+    console.log('  GET    /api/ics/feeds       — list ICS feeds for the signed-in user')
+    console.log('  POST   /api/ics/feeds       — add an ICS feed URL')
+    console.log('  DELETE /api/ics/feeds/:id   — remove an ICS feed (assignments are kept)')
+    console.log('  POST   /api/ics/sync        — fetch + parse + upsert one or all ICS feeds')
+    console.log('  GET    /api/health          — health probe')
+  })
+}
+
+export default app
