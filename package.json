@@ -17,7 +17,8 @@
     "server:test": "cd src/server && npm test",
     "server:install": "npm install",
     "render:build": "npm install",
-    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env ELECTRON_DEV=true electron .\"",
+    "electron:dev": "concurrently \"vite\" \"npm:server:dev\" \"wait-on http://localhost:5173 tcp:127.0.0.1:3001 && cross-env ELECTRON_DEV=true electron .\"",
+    "preelectron:build": "node -e \"const fs=require('fs');if(!fs.existsSync('src/server/.env.local'))fs.writeFileSync('src/server/.env.local','');\"",
     "electron:build": "vite build && electron-builder",
     "electron:preview": "cross-env ELECTRON_DEV=false electron ."
   },
@@ -56,7 +57,12 @@
     "productName": "Assignment Planner",
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "src/server/**/*",
+      "!src/server/node_modules/**/*"
+    ],
+    "extraResources": [
+      { "from": "src/server/.env.local", "to": "server.env.local" }
     ],
     "directories": {
       "output": "release"
