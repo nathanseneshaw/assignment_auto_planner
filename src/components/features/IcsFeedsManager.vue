@@ -15,12 +15,6 @@ const addInFlight = ref(false)
 const showRemoveConfirm = ref(false)
 const feedPendingRemoval = ref(null)
 
-const removeConfirmMessage = computed(() => {
-  const f = feedPendingRemoval.value
-  if (!f) return ''
-  const name = f.label || f.url
-  return `“${name}” will stop syncing. Assignments already imported from this feed will stay in your archive.`
-})
 
 onMounted(async () => {
   if (authStore.user) await feedsStore.fetchFeeds()
@@ -187,12 +181,20 @@ async function handleSyncAll() {
     <ConfirmDialog
       v-model="showRemoveConfirm"
       title="Remove this feed?"
-      :message="removeConfirmMessage"
       confirm-text="Remove"
       cancel-text="Cancel"
       variant="danger"
       @confirm="confirmRemoveFeed"
       @cancel="feedPendingRemoval = null"
-    />
+    >
+      <div class="space-y-3">
+        <p
+          class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/60 rounded-lg px-3 py-2 break-all text-left"
+        >{{ feedPendingRemoval?.url }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          Assignments already imported from this feed will stay in your archive.
+        </p>
+      </div>
+    </ConfirmDialog>
   </Card>
 </template>
