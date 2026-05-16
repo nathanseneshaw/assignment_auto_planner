@@ -2,9 +2,13 @@
   "name": "assignment-auto-planner",
   "private": true,
   "version": "1.0.0",
-  "description": "Automatically plan and manage your assignments from Blackboard",
+  "description": "Plan your coursework by subscribing to your school's iCalendar (ICS) feeds.",
   "type": "module",
   "main": "electron/main.js",
+  "author": {
+    "name": "Nathan",
+    "email": "nathanseneshaw438@gmail.com"
+  },
   "engines": {
     "node": ">=22"
   },
@@ -18,8 +22,8 @@
     "server:install": "npm install",
     "render:build": "npm install",
     "electron:dev": "concurrently \"vite\" \"npm:server:dev\" \"wait-on http://localhost:5173 tcp:127.0.0.1:3001 && cross-env ELECTRON_DEV=true electron .\"",
-    "preelectron:build": "node -e \"const fs=require('fs');if(!fs.existsSync('src/server/.env.local'))fs.writeFileSync('src/server/.env.local','');\"",
-    "electron:build": "vite build && electron-builder",
+    "preelectron:build": "node -e \"const fs=require('fs');if(!fs.existsSync('src/server/.env.local'))fs.writeFileSync('src/server/.env.local','');\" && npm --prefix src/server install --omit=dev && node -e \"const p=require('./src/server/package.json'); if(p.dependencies){delete p.dependencies['assignment-auto-planner'];} require('fs').writeFileSync('./src/server/package.json', JSON.stringify(p,null,2)+'\\n')\"",
+    "electron:build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false vite build && electron-builder",
     "electron:preview": "cross-env ELECTRON_DEV=false electron ."
   },
   "dependencies": {
@@ -55,20 +59,23 @@
   "build": {
     "appId": "com.assignmentplanner.app",
     "productName": "Assignment Planner",
+    "copyright": "Copyright © 2026 Nathan",
+    "forceCodeSigning": false,
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
     "files": [
       "dist/**/*",
-      "electron/**/*",
-      "src/server/**/*",
-      "!src/server/node_modules/**/*"
+      "electron/**/*"
     ],
     "extraResources": [
+      { "from": "src/server", "to": "server", "filter": ["**/*", "!.env*", "!tests/**", "!*.test.*", "!node_modules/assignment-auto-planner/**/*", "!node_modules/.package-lock.json"] },
       { "from": "src/server/.env.local", "to": "server.env.local" }
     ],
     "directories": {
       "output": "release"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "signAndEditExecutable": false
     },
     "mac": {
       "target": "dmg"

@@ -1,14 +1,24 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, session } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'node:fs'
+import { startServer, stopServer } from './server-process.js'
+import logger, { getLogPath } from './logger.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = process.env.ELECTRON_DEV === 'true'
 
+process.on('uncaughtException', (err) => {
+  logger.error('uncaughtException:', err)
+})
+process.on('unhandledRejection', (reason) => {
+  logger.error('unhandledRejection:', reason)
+})
+
 /**
  * Parse a .env-style file and apply any keys that aren't already in process.env.
- * Used to inject Supabase credentials before the Express server module is loaded.
+ * Used to inject Supabase credentials before the Express server child is spawned
+ * — the child inherits process.env, so loading these here makes them visible.
  */
 function applyEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return
@@ -26,18 +36,34 @@ function applyEnvFile(filePath) {
   }
 }
 
-/**
- * Start the embedded Express server. Only called in production — in dev mode
- * the server is started externally by the electron:dev concurrently script.
- */
-async function startServer() {
-  // Credentials are bundled as an extraResource alongside the exe.
-  applyEnvFile(path.join(process.resourcesPath, 'server.env.local'))
-  // Importing index.js starts the server (it calls app.listen() on load).
-  await import('../src/server/index.js')
+function installCsp() {
+  const baseConnect = "'self' http://127.0.0.1:3001 https://*.supabase.co wss://*.supabase.co"
+  const devConnect = `${baseConnect} http://localhost:5173 ws://localhost:5173`
+  const scriptSrc = isDev ? "'self' 'unsafe-eval'" : "'self'"
+  const connectSrc = isDev ? devConnect : baseConnect
+
+  const policy = [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    `connect-src ${connectSrc}`,
+    "frame-ancestors 'none'",
+  ].join('; ')
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [policy],
+      },
+    })
+  })
 }
 
 function createWindow() {
+  logger.info('creating main window')
   const win = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -47,6 +73,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
     },
   })
 
@@ -57,16 +86,60 @@ function createWindow() {
   }
 }
 
+function showErrorWindow(message) {
+  logger.error('showing startup error window:', message)
+  const win = new BrowserWindow({
+    width: 640,
+    height: 420,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    title: 'Assignment Planner — startup error',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+    },
+  })
+  win.setMenuBarVisibility(false)
+  win.loadFile(path.join(__dirname, 'error-window.html'))
+  win.webContents.once('did-finish-load', () => {
+    const payload = JSON.stringify({ message: String(message), logPath: getLogPath() })
+    win.webContents.executeJavaScript(`window.errorInfo = ${payload}; void 0;`).catch(() => {})
+  })
+}
+
 app.whenReady().then(async () => {
-  if (!isDev) {
-    await startServer()
+  // Load packaged env vars BEFORE spawning the server so the child inherits them.
+  // In dev this file won't exist, which is fine — server:dev loads its own .env.
+  if (app.isPackaged) {
+    applyEnvFile(path.join(process.resourcesPath, 'server.env.local'))
   }
+
+  installCsp()
+
+  try {
+    await startServer()
+  } catch (err) {
+    logger.error('Failed to start embedded server:', err)
+    const msg = err && err.stack ? err.stack : (err && err.message) || String(err)
+    showErrorWindow(msg)
+    return
+  }
+
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
+app.on('before-quit', () => {
+  stopServer()
+})
+
 app.on('window-all-closed', () => {
+  stopServer()
   if (process.platform !== 'darwin') app.quit()
 })

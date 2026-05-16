@@ -15,6 +15,7 @@
  */
 import { Router } from 'express'
 import { createClient } from '@supabase/supabase-js'
+import WebSocket from 'ws'
 import { fetchIcsFeed } from './ics-fetcher.js'
 import { parseAndExpand } from './ics-parser.js'
 import { writeOccurrences } from './ics-supabase-writer.js'
@@ -44,9 +45,10 @@ function clientFor(req) {
   return createClient(url, anon, {
     global: { headers: { Authorization: auth } },
     auth: { persistSession: false, autoRefreshToken: false },
-    // Realtime is not used server-side; disabling it prevents the
-    // "Node.js 20 has no native WebSocket" warning from Supabase.
-    realtime: { transport: null },
+    // Electron 34 bundles Node 20, which lacks native WebSocket. We don't use
+    // realtime, but supabase-js still probes for a transport — provide `ws`
+    // so it doesn't warn on every client construction.
+    realtime: { transport: WebSocket },
   })
 }
 
