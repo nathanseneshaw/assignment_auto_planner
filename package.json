@@ -31,7 +31,6 @@
     "@vueuse/core": "^14.2.1",
     "archiver": "^7.0.1",
     "cheerio": "^1.0.0",
-    "claude": "^0.1.2",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "fetch-cookie": "^3.0.1",
