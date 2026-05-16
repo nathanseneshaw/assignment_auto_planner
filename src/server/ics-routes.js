@@ -128,14 +128,73 @@ router.post('/api/ics/feeds', requireUser, async (req, res) => {
   }
 })
 
+/**
+ * Unsubscribe and cascade-delete everything imported from this feed:
+ * linked tasks → assignments → courses → the feed row itself. All filters
+ * include user_id as a defence-in-depth check on top of RLS.
+ */
 router.delete('/api/ics/feeds/:id', requireUser, async (req, res) => {
   try {
-    const { error } = await req.supabase
+    const feedId = req.params.id
+    const userId = req.user.id
+
+    const [assignmentsRes, coursesRes] = await Promise.all([
+      req.supabase
+        .from('assignments')
+        .select('id')
+        .eq('feed_id', feedId)
+        .eq('user_id', userId),
+      req.supabase
+        .from('courses')
+        .select('id')
+        .eq('feed_id', feedId)
+        .eq('user_id', userId),
+    ])
+    if (assignmentsRes.error) throw assignmentsRes.error
+    if (coursesRes.error) throw coursesRes.error
+
+    const assignmentIds = (assignmentsRes.data || []).map(r => r.id)
+    const courseIds = (coursesRes.data || []).map(r => r.id)
+
+    // Clear tasks first so FK references don't block the cascade.
+    if (assignmentIds.length > 0) {
+      const { error } = await req.supabase
+        .from('tasks')
+        .delete()
+        .in('assignment_id', assignmentIds)
+        .eq('user_id', userId)
+      if (error) throw error
+    }
+    if (courseIds.length > 0) {
+      const { error } = await req.supabase
+        .from('tasks')
+        .delete()
+        .in('course_id', courseIds)
+        .eq('user_id', userId)
+      if (error) throw error
+    }
+
+    const { error: assignErr } = await req.supabase
+      .from('assignments')
+      .delete()
+      .eq('feed_id', feedId)
+      .eq('user_id', userId)
+    if (assignErr) throw assignErr
+
+    const { error: courseErr } = await req.supabase
+      .from('courses')
+      .delete()
+      .eq('feed_id', feedId)
+      .eq('user_id', userId)
+    if (courseErr) throw courseErr
+
+    const { error: feedErr } = await req.supabase
       .from('ics_feeds')
       .delete()
-      .eq('id', req.params.id)
-      .eq('user_id', req.user.id)
-    if (error) throw error
+      .eq('id', feedId)
+      .eq('user_id', userId)
+    if (feedErr) throw feedErr
+
     res.json({ success: true })
   } catch (e) {
     res.status(500).json({ success: false, error: e?.message || 'Delete failed' })
