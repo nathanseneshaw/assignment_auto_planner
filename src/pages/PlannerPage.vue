@@ -322,13 +322,9 @@ function getCourseColor(courseId) {
               </svg>
             </button>
 
-            <button
-              type="button"
-              class="px-4 py-2 text-sm font-medium text-primary-800 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
-              @click="goToTodayWeek"
-            >
-              Today
-            </button>
+            <span class="px-3 text-sm font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
+              {{ weekRange }}
+            </span>
 
             <button
               type="button"
@@ -339,12 +335,6 @@ function getCourseColor(courseId) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
             </button>
-
-            <div class="w-px h-6 bg-gray-200 dark:bg-gray-600 mx-1 hidden sm:block" />
-
-            <span class="px-2 sm:px-3 text-sm font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              {{ weekRange }}
-            </span>
           </div>
 
           <!-- Month navigation -->
