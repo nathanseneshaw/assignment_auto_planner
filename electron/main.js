@@ -1,7 +1,6 @@
 import { app, BrowserWindow, session } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import fs from 'node:fs'
 import { startServer, stopServer } from './server-process.js'
 import logger, { getLogPath } from './logger.js'
 
@@ -14,27 +13,6 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   logger.error('unhandledRejection:', reason)
 })
-
-/**
- * Parse a .env-style file and apply any keys that aren't already in process.env.
- * Used to inject Supabase credentials before the Express server child is spawned
- * — the child inherits process.env, so loading these here makes them visible.
- */
-function applyEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return
-  for (let line of fs.readFileSync(filePath, 'utf8').split(/\r?\n/)) {
-    line = line.trim()
-    if (!line || line.startsWith('#')) continue
-    const eq = line.indexOf('=')
-    if (eq <= 0) continue
-    const key = line.slice(0, eq).trim()
-    let val = line.slice(eq + 1).trim()
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.slice(1, -1)
-    }
-    if (process.env[key] === undefined) process.env[key] = val
-  }
-}
 
 function installCsp() {
   const baseConnect = "'self' http://127.0.0.1:3001 https://*.supabase.co wss://*.supabase.co"
@@ -112,12 +90,9 @@ function showErrorWindow(message) {
 }
 
 app.whenReady().then(async () => {
-  // Load packaged env vars BEFORE spawning the server so the child inherits them.
-  // In dev this file won't exist, which is fine — server:dev loads its own .env.
-  if (app.isPackaged) {
-    applyEnvFile(path.join(process.resourcesPath, 'server.env.local'))
-  }
-
+  // Supabase anon creds for the embedded server are baked into the bundle at
+  // build time (see electron/scripts/generate-server-env.js → src/server/env.generated.js).
+  // No runtime env file to load.
   installCsp()
 
   try {
