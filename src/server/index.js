@@ -43,6 +43,16 @@ function parseAllowedOrigins() {
 
 const allowedOrigins = parseAllowedOrigins()
 
+// Fail loudly rather than silently allowing every origin in prod. An empty
+// allowlist here previously fell through to `origin: true` (any origin), which
+// would let any site on the internet call the API with the user's cookies.
+if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
+  throw new Error(
+    'Refusing to start: NODE_ENV=production but ALLOWED_ORIGINS / FRONTEND_URL are empty. ' +
+      'Set at least one allowed origin before booting.'
+  )
+}
+
 // Render / fly.io / typical PaaS terminate TLS at a reverse proxy. Trusting
 // the first proxy hop lets req.ip and req.protocol reflect the real client.
 app.set('trust proxy', 1)

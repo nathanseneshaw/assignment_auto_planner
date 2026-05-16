@@ -1,6 +1,13 @@
 /**
- * Local development: load src/server/.env and src/server/.env.local without the dotenv package.
- * Never overwrites existing process.env (Render / Vercel / CI inject vars first).
+ * Populate process.env with Supabase + config vars. Three sources, in order:
+ *   1. Local .env / .env.local files (developer machine).
+ *   2. Build-time baked credentials in env.generated.js (Electron packaged builds).
+ *   3. Anything the parent process / platform already injected (Vercel, Render, CI).
+ *
+ * Precedence: variables already present in process.env always win, so dev
+ * overrides (env.local) beat baked-in creds, and platform injections beat both.
+ * `applyMerged` only sets keys that are currently undefined, which gives that
+ * ordering regardless of which source loads first.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -41,6 +48,14 @@ function applyMerged(merged) {
   }
 }
 
+// Local dev: .env / .env.local on disk. Absent in packaged builds.
 const base = parseEnvFile(path.join(__dirname, '.env'))
 const local = parseEnvFile(path.join(__dirname, '.env.local'))
 applyMerged({ ...base, ...local })
+
+// Packaged Electron: build-time baked anon creds. Absent in dev.
+const generatedPath = path.join(__dirname, 'env.generated.js')
+if (fs.existsSync(generatedPath)) {
+  const { bakedEnv } = await import('./env.generated.js')
+  applyMerged(bakedEnv)
+}

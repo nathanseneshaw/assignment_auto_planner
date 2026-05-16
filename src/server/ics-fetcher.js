@@ -2,6 +2,7 @@ import { lookup as dnsLookup } from 'node:dns/promises'
 
 const FETCH_TIMEOUT_MS = 10_000
 const MAX_BODY_BYTES = 2 * 1024 * 1024
+const MAX_REDIRECTS = 3
 
 /**
  * Block requests aimed at our own network: localhost, link-local, RFC1918, etc.
@@ -65,21 +66,37 @@ function isPrivateAddress(addr) {
  * - SSRF guard
  */
 export async function fetchIcsFeed(url) {
-  const safeUrl = await assertPublicUrl(url)
+  let currentUrl = await assertPublicUrl(url)
 
   const ac = new AbortController()
   const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS)
   let res
   try {
-    res = await fetch(safeUrl, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: ac.signal,
-      headers: {
-        Accept: 'text/calendar, text/plain;q=0.5, */*;q=0.1',
-        'User-Agent': 'AssignmentAutoPlanner/1.0 (+ICS sync)',
-      },
-    })
+    // Walk redirects manually so we can re-validate each hop against the SSRF
+    // guard — otherwise a public host could 302 us to 127.0.0.1 or cloud
+    // metadata (169.254.169.254) which assertPublicUrl on the original URL
+    // would never catch.
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      res = await fetch(currentUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        signal: ac.signal,
+        headers: {
+          Accept: 'text/calendar, text/plain;q=0.5, */*;q=0.1',
+          'User-Agent': 'AssignmentAutoPlanner/1.0 (+ICS sync)',
+        },
+      })
+
+      if (res.status < 300 || res.status >= 400) break
+
+      const location = res.headers.get('location')
+      if (!location) break
+      if (hop === MAX_REDIRECTS) {
+        throw new Error(`Feed exceeded ${MAX_REDIRECTS} redirects`)
+      }
+      const nextUrl = new URL(location, currentUrl).toString()
+      currentUrl = await assertPublicUrl(nextUrl)
+    }
   } catch (e) {
     clearTimeout(timer)
     if (e?.name === 'AbortError') throw new Error('Feed fetch timed out after 10s')

@@ -100,7 +100,11 @@ export async function startServer() {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
       PORT: String(SERVER_PORT),
-      NODE_ENV: 'production',
+      // Intentionally NOT setting NODE_ENV=production: the embedded server is
+      // a loopback-only sidecar to the desktop app, not an internet-facing
+      // deployment. The src/server/index.js CORS-allowlist boot guard treats
+      // NODE_ENV=production as "this is publicly reachable" — true on Vercel,
+      // false here. Don't claim a stricter posture than reality.
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })

@@ -22,7 +22,7 @@
     "server:install": "npm install",
     "render:build": "npm install",
     "electron:dev": "concurrently \"vite\" \"npm:server:dev\" \"wait-on http://localhost:5173 tcp:127.0.0.1:3001 && cross-env ELECTRON_DEV=true electron .\"",
-    "preelectron:build": "node -e \"const fs=require('fs');if(!fs.existsSync('src/server/.env.local'))fs.writeFileSync('src/server/.env.local','');\" && npm --prefix src/server install --omit=dev && node -e \"const p=require('./src/server/package.json'); if(p.dependencies){delete p.dependencies['assignment-auto-planner'];} require('fs').writeFileSync('./src/server/package.json', JSON.stringify(p,null,2)+'\\n')\"",
+    "preelectron:build": "node electron/scripts/generate-server-env.js && npm --prefix src/server install --omit=dev && node -e \"const p=require('./src/server/package.json'); if(p.dependencies){delete p.dependencies['assignment-auto-planner'];} require('fs').writeFileSync('./src/server/package.json', JSON.stringify(p,null,2)+'\\n')\"",
     "electron:build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false vite build && electron-builder",
     "electron:preview": "cross-env ELECTRON_DEV=false electron ."
   },
@@ -67,8 +67,18 @@
       "electron/**/*"
     ],
     "extraResources": [
-      { "from": "src/server", "to": "server", "filter": ["**/*", "!.env*", "!tests/**", "!*.test.*", "!node_modules/assignment-auto-planner/**/*", "!node_modules/.package-lock.json"] },
-      { "from": "src/server/.env.local", "to": "server.env.local" }
+      {
+        "from": "src/server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!.env*",
+          "!tests/**",
+          "!*.test.*",
+          "!node_modules/assignment-auto-planner/**/*",
+          "!node_modules/.package-lock.json"
+        ]
+      }
     ],
     "directories": {
       "output": "release"
