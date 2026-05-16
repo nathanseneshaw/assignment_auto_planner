@@ -72,6 +72,14 @@ app.use(
 // client can't OOM the process.
 app.use(express.json({ limit: '1mb' }))
 
+// Abort slow requests (e.g. a hung ICS upstream) before they pin the worker.
+app.use((req, res, next) => {
+  req.setTimeout(30_000, () => {
+    if (!res.headersSent) res.status(503).json({ success: false, error: 'Request timeout' })
+  })
+  next()
+})
+
 // ICS calendar feed sync — the sole assignment-ingest mechanism.
 app.use(icsRoutes)
 
@@ -97,5 +105,16 @@ if (!process.env.VERCEL) {
     console.log('  GET    /api/health          — health probe')
   })
 }
+
+// Surface async errors that escaped every route handler so they don't silently
+// kill in-flight requests. uncaughtException means the process is in an unknown
+// state — exit and let the process manager restart cleanly.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason)
+})
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err)
+  process.exit(1)
+})
 
 export default app

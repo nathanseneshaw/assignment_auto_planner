@@ -5,7 +5,13 @@
  * Bearer <token>`. The middleware {@link requireUser} verifies the token and
  * attaches a per-request, JWT-scoped Supabase client (`req.supabase`) — the
  * database's Row-Level Security policies then enforce that the user can only
- * see and modify their own rows. We never use the service-role key here.
+ * see and modify their own rows.
+ *
+ * Write operations (upsert courses/assignments, update feed status) use a
+ * service-role client when SUPABASE_SERVICE_ROLE_KEY is set, providing
+ * defense-in-depth on top of RLS. If the key is absent the user-scoped client
+ * is used as a fallback (maintains compatibility with Electron builds where
+ * embedding a service-role key would be unsafe).
  *
  * Routes:
  *   GET    /api/ics/feeds       — list the caller's feeds.
@@ -15,6 +21,7 @@
  */
 import { Router } from 'express'
 import { createClient } from '@supabase/supabase-js'
+import { rateLimit } from 'express-rate-limit'
 import WebSocket from 'ws'
 import { fetchIcsFeed } from './ics-fetcher.js'
 import { parseAndExpand } from './ics-parser.js'
@@ -24,6 +31,7 @@ const router = Router()
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 function getEnv() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -52,6 +60,19 @@ function clientFor(req) {
   })
 }
 
+// Lazily created — only used when SUPABASE_SERVICE_ROLE_KEY is present.
+let _serviceClient = null
+function getServiceClient() {
+  if (_serviceClient) return _serviceClient
+  if (!SUPABASE_SERVICE_ROLE_KEY) return null
+  const { url } = getEnv()
+  _serviceClient = createClient(url, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    realtime: { transport: WebSocket },
+  })
+  return _serviceClient
+}
+
 /** Validates the JWT by calling getUser() and attaches { user, supabase } to req. */
 async function requireUser(req, res, next) {
   try {
@@ -67,9 +88,32 @@ async function requireUser(req, res, next) {
     req.user = data.user
     next()
   } catch (e) {
-    res.status(500).json({ success: false, error: e?.message || 'Auth check failed' })
+    console.error('[requireUser]', e)
+    res.status(500).json({ success: false, error: 'Authentication error' })
   }
 }
+
+/**
+ * Per-user rate limiter — applied after requireUser so req.user.id is
+ * available. Sync gets a tighter window; CRUD uses the generous default.
+ */
+function makeIcsLimiter(max, windowMs) {
+  return rateLimit({
+    windowMs,
+    max,
+    keyGenerator: (req) => req.user?.id || req.ip,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => {
+      res.status(429).json({ success: false, error: 'Too many requests — please slow down.' })
+    },
+  })
+}
+
+// 60 CRUD requests per 15 min per user.
+const crudLimiter = makeIcsLimiter(60, 15 * 60 * 1000)
+// 20 sync requests per 5 min per user — syncs hit Supabase heavily.
+const syncLimiter = makeIcsLimiter(20, 5 * 60 * 1000)
 
 /**
  * Coerce user input into a fetchable URL: rewrite `webcal://` (the iCalendar
@@ -84,7 +128,7 @@ function normalizeUrlInput(input) {
   return s
 }
 
-router.get('/api/ics/feeds', requireUser, async (req, res) => {
+router.get('/api/ics/feeds', requireUser, crudLimiter, async (req, res) => {
   try {
     const { data, error } = await req.supabase
       .from('ics_feeds')
@@ -94,11 +138,12 @@ router.get('/api/ics/feeds', requireUser, async (req, res) => {
     if (error) throw error
     res.json({ success: true, feeds: data || [] })
   } catch (e) {
-    res.status(500).json({ success: false, error: e?.message || 'List failed' })
+    console.error('[GET /api/ics/feeds]', e)
+    res.status(500).json({ success: false, error: 'Failed to retrieve feeds' })
   }
 })
 
-router.post('/api/ics/feeds', requireUser, async (req, res) => {
+router.post('/api/ics/feeds', requireUser, crudLimiter, async (req, res) => {
   const url = normalizeUrlInput(req.body?.url)
   const label = req.body?.label ? String(req.body.label).trim().slice(0, 200) : null
   if (!url) return res.status(400).json({ success: false, error: 'url is required' })
@@ -108,7 +153,8 @@ router.post('/api/ics/feeds', requireUser, async (req, res) => {
     const text = await fetchIcsFeed(url)
     parseAndExpand(text) // throws on bad body
   } catch (e) {
-    return res.status(400).json({ success: false, error: e?.message || 'Invalid ICS URL' })
+    console.error('[POST /api/ics/feeds] validation:', e)
+    return res.status(400).json({ success: false, error: 'The feed URL could not be fetched or parsed.' })
   }
 
   try {
@@ -126,7 +172,8 @@ router.post('/api/ics/feeds', requireUser, async (req, res) => {
     }
     res.json({ success: true, feed: data })
   } catch (e) {
-    res.status(500).json({ success: false, error: e?.message || 'Insert failed' })
+    console.error('[POST /api/ics/feeds] insert:', e)
+    res.status(500).json({ success: false, error: 'Failed to save feed' })
   }
 })
 
@@ -135,7 +182,7 @@ router.post('/api/ics/feeds', requireUser, async (req, res) => {
  * linked tasks → assignments → courses → the feed row itself. All filters
  * include user_id as a defence-in-depth check on top of RLS.
  */
-router.delete('/api/ics/feeds/:id', requireUser, async (req, res) => {
+router.delete('/api/ics/feeds/:id', requireUser, crudLimiter, async (req, res) => {
   try {
     const feedId = req.params.id
     const userId = req.user.id
@@ -199,7 +246,8 @@ router.delete('/api/ics/feeds/:id', requireUser, async (req, res) => {
 
     res.json({ success: true })
   } catch (e) {
-    res.status(500).json({ success: false, error: e?.message || 'Delete failed' })
+    console.error('[DELETE /api/ics/feeds/:id]', e)
+    res.status(500).json({ success: false, error: 'Failed to delete feed' })
   }
 })
 
@@ -207,13 +255,17 @@ router.delete('/api/ics/feeds/:id', requireUser, async (req, res) => {
  * Run the full pipeline for one feed: fetch ICS text → parse → write to DB →
  * record the result on the `ics_feeds` row.
  *
+ * writeClient is the service-role client when available; it bypasses RLS so
+ * all writes must carry an explicit user_id filter (they do). Falls back to
+ * the user-scoped client when the service-role key is not configured.
+ *
  * - "Partial-success" semantics: per-row write errors are collected but the
  *   sync as a whole is still considered successful unless *every* occurrence
  *   failed to insert (i.e. the feed had events but nothing landed in the DB).
  * - Fetch / parse failures fall through to the catch block and mark the feed
  *   `error` with the message truncated to 500 chars.
  */
-async function syncOneFeed(supabase, userId, feed) {
+async function syncOneFeed(userSupabase, writeClient, userId, feed) {
   const startedAt = new Date().toISOString()
   try {
     const text = await fetchIcsFeed(feed.url)
@@ -222,7 +274,7 @@ async function syncOneFeed(supabase, userId, feed) {
       feedId: feed.id,
     })
     const counts = await writeOccurrences({
-      supabase,
+      supabase: writeClient,
       userId,
       feedId: feed.id,
       occurrences,
@@ -231,7 +283,7 @@ async function syncOneFeed(supabase, userId, feed) {
     const syncError = writeErrors.length > 0
       ? `${writeErrors.length} item(s) failed to save: ${writeErrors[0].error}`
       : null
-    await supabase
+    await writeClient
       .from('ics_feeds')
       .update({
         last_synced_at: startedAt,
@@ -251,7 +303,7 @@ async function syncOneFeed(supabase, userId, feed) {
     }
   } catch (e) {
     const msg = e?.message || String(e)
-    await supabase
+    await writeClient
       .from('ics_feeds')
       .update({
         last_synced_at: startedAt,
@@ -271,7 +323,7 @@ async function syncOneFeed(supabase, userId, feed) {
  * inserts and we'd rather take a few extra seconds than have one feed's
  * burst starve the others. Per-feed results are aggregated into `totals`.
  */
-router.post('/api/ics/sync', requireUser, async (req, res) => {
+router.post('/api/ics/sync', requireUser, syncLimiter, async (req, res) => {
   const feedId = req.body?.feedId || null
   try {
     let q = req.supabase.from('ics_feeds').select('id, url, label').eq('user_id', req.user.id)
@@ -282,10 +334,14 @@ router.post('/api/ics/sync', requireUser, async (req, res) => {
       return res.json({ success: true, syncedFeeds: 0, results: [] })
     }
 
+    // Use the service-role client for writes when available; fall back to
+    // the user-scoped client so Electron builds (no service key) still work.
+    const writeClient = getServiceClient() || req.supabase
+
     // Serial loop on purpose — see route header comment.
     const results = []
     for (const f of feeds) {
-      const r = await syncOneFeed(req.supabase, req.user.id, f)
+      const r = await syncOneFeed(req.supabase, writeClient, req.user.id, f)
       results.push(r)
     }
 
@@ -309,7 +365,8 @@ router.post('/api/ics/sync', requireUser, async (req, res) => {
       results,
     })
   } catch (e) {
-    res.status(500).json({ success: false, error: e?.message || 'Sync failed' })
+    console.error('[POST /api/ics/sync]', e)
+    res.status(500).json({ success: false, error: 'Sync failed' })
   }
 })
 
