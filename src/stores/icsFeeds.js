@@ -51,12 +51,13 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     }
   }
 
-  /** Unsubscribe and remove from local cache. */
+  /** Unsubscribe and remove from local cache, along with all associated courses and assignments. */
   async function removeFeed(id) {
     lastError.value = null
     try {
       await icsService.removeFeed(id)
       feeds.value = feeds.value.filter((f) => f.id !== id)
+      await hydrateLmsStoresFromSupabase()
     } catch (e) {
       lastError.value = e?.message || String(e)
       throw e

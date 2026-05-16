@@ -192,7 +192,7 @@ async function handleSyncAll() {
           class="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/60 rounded-lg px-3 py-2 break-all text-left"
         >{{ feedPendingRemoval?.url }}</p>
         <p class="text-sm text-gray-500 dark:text-gray-400">
-          Assignments already imported from this feed will stay in your archive.
+          All courses and assignments imported from this feed will be permanently deleted.
         </p>
       </div>
     </ConfirmDialog>
