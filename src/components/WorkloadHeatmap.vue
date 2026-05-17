@@ -109,7 +109,7 @@ const LEGEND_CELLS  = ['bg-gray-100 dark:bg-white/8', 'bg-accent-200', 'bg-warni
     </div>
 
     <!-- Grid -->
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto py-1">
       <div class="inline-flex items-start gap-[5px] min-w-max">
 
         <!-- Day-of-week labels -->
