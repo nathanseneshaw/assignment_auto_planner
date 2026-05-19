@@ -29,6 +29,22 @@ const formData = ref({
   dueDate: ''
 })
 
+const courseFilterOptions = computed(() => [
+  { value: 'all', label: 'All Courses' },
+  ...coursesStore.courses.map((c) => ({ value: c.id, label: c.name })),
+])
+
+const completionFilterOptions = [
+  { value: 'all', label: 'All assignments' },
+  { value: 'active', label: 'Active only' },
+  { value: 'completed', label: 'Completed only' },
+]
+
+const courseFormOptions = computed(() => [
+  { value: '', label: 'Select a course' },
+  ...coursesStore.courses.map((c) => ({ value: c.id, label: c.name })),
+])
+
 const filteredAssignments = computed(() => {
   let result = assignmentsStore.assignmentsByDueDate
 
@@ -298,25 +314,12 @@ onMounted(() => {
 
         <!-- Course Filter -->
         <div class="sm:w-48">
-          <Select v-model="filterCourse">
-            <option value="all">All Courses</option>
-            <option 
-              v-for="course in coursesStore.courses" 
-              :key="course.id" 
-              :value="course.id"
-            >
-              {{ course.name }}
-            </option>
-          </Select>
+          <Select v-model="filterCourse" :options="courseFilterOptions" />
         </div>
 
         <!-- Completion filter -->
         <div class="sm:w-44">
-          <Select v-model="filterCompletion">
-            <option value="all">All assignments</option>
-            <option value="active">Active only</option>
-            <option value="completed">Completed only</option>
-          </Select>
+          <Select v-model="filterCompletion" :options="completionFilterOptions" />
         </div>
       </div>
     </Card>
@@ -498,16 +501,7 @@ onMounted(() => {
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select v-model="formData.courseId" label="Course">
-            <option value="">Select a course</option>
-            <option 
-              v-for="course in coursesStore.courses" 
-              :key="course.id" 
-              :value="course.id"
-            >
-              {{ course.name }}
-            </option>
-          </Select>
+          <Select v-model="formData.courseId" label="Course" :options="courseFormOptions" />
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">

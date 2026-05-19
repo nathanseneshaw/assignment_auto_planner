@@ -11,6 +11,10 @@ export const useProfileStore = defineStore('profile', () => {
     name: '',
     email: '',
     avatar: null,
+    // Course Planner: code of the user's school (one of the supported scrapers),
+    // e.g. 'rice' | 'ttu' | 'tamu' | 'smu'. Empty string = not set; the planner
+    // page will prompt the user to choose.
+    school: '',
   })
 
   function updateProfile(data) {

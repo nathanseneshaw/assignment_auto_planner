@@ -20,6 +20,7 @@ import './load-env.js'
 import express from 'express'
 import cors from 'cors'
 import icsRoutes from './ics-routes.js'
+import coursePlannerRoutes from './course-planner-routes.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -65,6 +66,9 @@ app.use(express.json({ limit: '1mb' }))
 // ICS calendar feed sync — the sole assignment-ingest mechanism.
 app.use(icsRoutes)
 
+// Course planner — public on-demand scrapers for Rice / TTU / TAMU / SMU.
+app.use(coursePlannerRoutes)
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
@@ -79,9 +83,13 @@ app.get('/', (_req, res) => {
 app.listen(PORT, HOST, () => {
   console.log(`API server listening on http://${HOST}:${PORT}`)
   console.log('Endpoints:')
-  console.log('  GET    /api/ics/feeds       — list ICS feeds for the signed-in user')
-  console.log('  POST   /api/ics/feeds       — add an ICS feed URL')
-  console.log('  DELETE /api/ics/feeds/:id   — remove an ICS feed (assignments are kept)')
-  console.log('  POST   /api/ics/sync        — fetch + parse + upsert one or all ICS feeds')
-  console.log('  GET    /api/health          — health probe')
+  console.log('  GET    /api/ics/feeds                              — list ICS feeds for the signed-in user')
+  console.log('  POST   /api/ics/feeds                              — add an ICS feed URL')
+  console.log('  DELETE /api/ics/feeds/:id                          — remove an ICS feed (assignments are kept)')
+  console.log('  POST   /api/ics/sync                               — fetch + parse + upsert one or all ICS feeds')
+  console.log('  GET    /api/course-planner/schools                 — list supported universities')
+  console.log('  GET    /api/course-planner/:school/terms           — list terms for a school')
+  console.log('  GET    /api/course-planner/:school/subjects?term=  — list subjects for a term')
+  console.log('  GET    /api/course-planner/:school/sections?term=&subject=  — sections for a subject')
+  console.log('  GET    /api/health                                 — health probe')
 })

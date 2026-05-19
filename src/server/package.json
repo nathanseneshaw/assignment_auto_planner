@@ -10,7 +10,6 @@
     "start": "node index.js",
     "dev": "node --watch index.js",
     "test": "node --test ./tests/*.test.mjs",
-    "playwright:install": "playwright install chromium",
-    "render-build": "cd ../.. && npm install && npx playwright install chromium"
+    "render-build": "cd ../.. && npm install"
   }
 }

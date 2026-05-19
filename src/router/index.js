@@ -58,6 +58,12 @@ const routes = [
     meta: { title: 'Courses', requiresAuth: true },
   },
   {
+    path: '/course-planner',
+    name: 'CoursePlanner',
+    component: () => import('../pages/CoursePlannerPage.vue'),
+    meta: { title: 'Course Planner', requiresAuth: true },
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import('../pages/ProfilePage.vue'),

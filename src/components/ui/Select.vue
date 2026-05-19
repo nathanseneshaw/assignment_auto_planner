@@ -1,5 +1,5 @@
 <script setup>
-import { computed, useAttrs } from 'vue'
+import { computed, ref, onMounted, onUnmounted, useAttrs } from 'vue'
 
 defineOptions({ inheritAttrs: false })
 
@@ -33,59 +33,78 @@ const props = defineProps({
     default: 'md',
     validator: (v) => ['sm', 'md'].includes(v),
   },
+  // When provided, renders a custom styled dropdown instead of native <select>
+  options: {
+    type: Array,
+    default: null,
+  },
+  placeholder: {
+    type: String,
+    default: 'Select…',
+  },
 })
 
 const emit = defineEmits(['update:modelValue', 'change', 'focus', 'blur'])
-
 const attrs = useAttrs()
 
-const selectClasses = computed(() => {
-  const size =
-    props.size === 'sm'
-      ? ['pl-3 pr-12 py-2 text-sm']
-      : ['pl-4 pr-14 py-2.5 text-[15px]']
+// ── Custom dropdown state ────────────────────────────────────────────────────
+const open = ref(false)
+const containerRef = ref(null)
+const triggerRef = ref(null)
 
-  return [
-      'w-full rounded-2xl border bg-white text-gray-900 font-medium tracking-tight antialiased',
-      'shadow-[0_1px_2px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]',
-      'transition-[border-color,box-shadow] duration-200 ease-out',
-      'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 focus-visible:ring-offset-0',
-      'hover:border-gray-300 hover:shadow-[0_2px_6px_-2px_rgba(15,23,42,0.07),0_1px_2px_rgba(15,23,42,0.05)]',
-      'active:shadow-[0_1px_2px_rgba(15,23,42,0.05)]',
-      'appearance-none cursor-pointer',
-      'disabled:cursor-not-allowed disabled:border-gray-200/70 disabled:bg-gray-50 disabled:text-gray-500 disabled:shadow-none disabled:hover:border-gray-200/70 disabled:hover:shadow-none',
-      props.error
-        ? 'border-danger-300/90 bg-danger-50/35 focus-visible:border-danger-400 focus-visible:ring-danger-500/20'
-        : 'border-gray-200/90 focus-visible:border-primary-400/75',
-      ...size,
-    ]
+const selectedOption = computed(() => {
+  if (!props.options) return null
+  return props.options.find((o) => String(o.value) === String(props.modelValue)) || null
 })
 
-const chevronWrapClasses = computed(() => {
-  const base =
-    'pointer-events-none absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-lg border transition-[border-color,background-color,color,box-shadow] duration-200 ease-out'
-  const dim = props.size === 'sm' ? 'h-7 w-7' : 'h-9 w-9'
-  if (props.disabled) {
-    return [base, dim, 'border-transparent bg-gray-100/90 text-gray-400']
+const displayLabel = computed(() => selectedOption.value?.label ?? '')
+
+function toggle() {
+  if (props.disabled) return
+  open.value = !open.value
+}
+
+function selectOption(option) {
+  if (option.disabled) return
+  emit('update:modelValue', option.value)
+  emit('change', option.value)
+  open.value = false
+  triggerRef.value?.focus()
+}
+
+function onClickOutside(e) {
+  if (!containerRef.value?.contains(e.target)) open.value = false
+}
+
+function onKeydown(e) {
+  if (e.key === 'Escape' && open.value) {
+    open.value = false
+    triggerRef.value?.focus()
   }
-  if (props.error) {
-    return [
-      base,
-      dim,
-      'border-danger-200/70 bg-white/80 text-danger-500 group-focus-within:border-danger-300 group-focus-within:bg-danger-50/80',
-    ]
-  }
+}
+
+onMounted(() => document.addEventListener('mousedown', onClickOutside))
+onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
+
+// ── Native <select> helpers (fallback mode) ──────────────────────────────────
+const selectClasses = computed(() => {
+  const size = props.size === 'sm' ? ['pl-3 pr-10 py-2 text-sm'] : ['pl-4 pr-11 py-2.5 text-[15px]']
   return [
-    base,
-    dim,
-    'border-gray-200/80 bg-gradient-to-b from-white to-gray-100/95 text-gray-500 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85)]',
-    'group-focus-within:border-primary-200/90 group-focus-within:bg-gradient-to-b group-focus-within:from-primary-50/90 group-focus-within:to-primary-100/50 group-focus-within:text-primary-700 group-focus-within:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]',
+    'w-full rounded-xl border bg-white text-gray-900 font-medium tracking-tight',
+    'transition-[border-color,box-shadow,background-color] duration-200',
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20',
+    'appearance-none cursor-pointer',
+    'disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed',
+    props.error
+      ? 'border-danger-300 bg-danger-50/50 focus-visible:ring-danger-500/25'
+      : 'border-gray-200 hover:border-gray-300/90 focus-visible:border-primary-300/80',
+    ...size,
   ]
 })
 
-const chevronSize = computed(() => (props.size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'))
+const chevronSize = computed(() => (props.size === 'sm' ? 'w-4 h-4' : 'w-[18px] h-[18px]'))
 
-function onChange(e) {
+function onNativeChange(e) {
   const v = e.target.value
   emit('update:modelValue', v)
   emit('change', v)
@@ -99,54 +118,139 @@ function onChange(e) {
       <span v-if="required" class="text-danger-500">*</span>
     </label>
 
-    <div class="group relative">
+    <!-- ── Custom dropdown (when options prop is provided) ── -->
+    <div
+      v-if="options !== null"
+      ref="containerRef"
+      class="relative"
+      @keydown="onKeydown"
+    >
+      <!-- Trigger -->
+      <button
+        ref="triggerRef"
+        type="button"
+        :disabled="disabled"
+        :aria-expanded="open"
+        aria-haspopup="listbox"
+        class="w-full flex items-center justify-between gap-2 rounded-xl border bg-white text-left font-medium tracking-tight transition-[border-color,box-shadow,background-color] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+        :class="[
+          size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-2.5 text-[15px]',
+          error
+            ? 'border-danger-300 bg-danger-50/50 focus-visible:ring-danger-500/25'
+            : open
+              ? 'border-primary-300/80 ring-2 ring-primary-500/20'
+              : 'border-gray-200 hover:border-gray-300/90',
+          displayLabel ? 'text-gray-900' : 'text-gray-400',
+        ]"
+        @click="toggle"
+        @focus="emit('focus', $event)"
+        @blur="!open && emit('blur', $event)"
+      >
+        <span class="truncate">{{ displayLabel || placeholder }}</span>
+        <svg
+          :class="[chevronSize, 'shrink-0 text-gray-400 transition-transform duration-200', open ? 'rotate-180' : '']"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <!-- Dropdown panel -->
+      <Transition name="dropdown">
+        <div
+          v-if="open"
+          role="listbox"
+          class="absolute z-50 mt-1.5 w-full rounded-xl border border-gray-200/80 bg-white py-1 shadow-[0_4px_16px_rgba(15,23,42,0.08),0_2px_4px_rgba(15,23,42,0.04)]"
+          style="max-height: 280px; overflow-y: auto;"
+        >
+          <button
+            v-for="option in options"
+            :key="option.value"
+            type="button"
+            role="option"
+            :aria-selected="String(option.value) === String(modelValue)"
+            class="w-full flex items-center justify-between gap-2 text-left font-medium tracking-tight transition-colors"
+            :class="[
+              size === 'sm' ? 'px-3 py-1.5 text-sm' : 'px-3.5 py-2 text-[14px]',
+              option.disabled
+                ? 'cursor-not-allowed text-gray-400'
+                : String(option.value) === String(modelValue)
+                  ? 'bg-gray-100/80 text-gray-900 cursor-pointer'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 cursor-pointer',
+            ]"
+            :disabled="option.disabled"
+            @click="selectOption(option)"
+          >
+            <span class="truncate">{{ option.label }}</span>
+            <svg
+              v-if="String(option.value) === String(modelValue)"
+              class="w-4 h-4 shrink-0 text-primary-700"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2.5"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+        </div>
+      </Transition>
+    </div>
+
+    <!-- ── Native select fallback (no options prop) ── -->
+    <div v-else class="relative">
       <select
         :value="modelValue === null || modelValue === undefined ? '' : modelValue"
         :disabled="disabled"
         :required="required"
         :class="selectClasses"
         v-bind="attrs"
-        @change="onChange"
+        @change="onNativeChange"
         @focus="emit('focus', $event)"
         @blur="emit('blur', $event)"
       >
         <slot />
       </select>
-      <span :class="chevronWrapClasses" aria-hidden="true">
-        <svg
-          :class="chevronSize"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </span>
+      <svg
+        :class="[chevronSize, 'pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400']"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
     </div>
 
     <p v-if="error" class="text-sm text-danger-600 flex items-center gap-1">
       <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       {{ error }}
     </p>
-
-    <p v-else-if="hint" class="text-sm text-gray-500">
-      {{ hint }}
-    </p>
+    <p v-else-if="hint" class="text-sm text-gray-500">{{ hint }}</p>
   </div>
 </template>
 
 <style scoped>
-/* Slightly nicer native option list where supported */
 select option {
   font-weight: 500;
   padding: 0.5rem 0.75rem;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>
