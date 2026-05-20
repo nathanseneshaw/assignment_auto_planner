@@ -89,14 +89,16 @@ function mapAssignmentRow(row, course) {
     title: row.assignment_name || 'Untitled',
     dueDate: dueDateFromDb(row.due_at),
     description: row.description != null ? String(row.description) : '',
+    importSource: src || null,
   }
 
-  // Like courses: route the external id into the LMS-specific field.
+  // Like courses: route the external id into the LMS-specific field for the
+  // two LMSes that still have UI affordances tied to it.
   if (src === 'canvas' && ext) {
-    return { ...base, canvasAssignmentId: ext, importSource: 'canvas' }
+    return { ...base, canvasAssignmentId: ext }
   }
   if (src === 'blackboard' && ext) {
-    return { ...base, blackboardId: ext, importSource: src }
+    return { ...base, blackboardId: ext }
   }
   return base
 }

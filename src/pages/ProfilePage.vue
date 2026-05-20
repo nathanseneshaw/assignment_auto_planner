@@ -6,6 +6,7 @@ import { Card, Button, Select } from '../components/ui'
 import { useAuthStore } from '../stores/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
 import IcsFeedsManager from '../components/IcsFeedsManager.vue'
+import SyllabusParser from '../components/SyllabusParser.vue'
 import { listSchools } from '../services/coursePlannerApi.js'
 
 const router = useRouter()
@@ -168,6 +169,7 @@ onMounted(loadSupportedSchools)
         (Canvas, Brightspace, Blackboard) expose a "Calendar feed" or "Subscribe" URL — paste it below.
       </p>
       <IcsFeedsManager />
+      <SyllabusParser class="mt-4" />
     </div>
 
     <!-- Session -->

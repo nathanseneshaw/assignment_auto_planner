@@ -14,60 +14,12 @@
  *   POST   /api/ics/sync        — fetch + parse + write for one feed (or all of the user's).
  */
 import { Router } from 'express'
-import { createClient } from '@supabase/supabase-js'
 import { fetchIcsFeed } from './ics-fetcher.js'
 import { parseAndExpand } from './ics-parser.js'
 import { writeOccurrences } from './ics-supabase-writer.js'
+import { requireUser } from './supabase-auth.js'
 
 const router = Router()
-
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
-
-function getEnv() {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error(
-      'Supabase env not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY on the server.'
-    )
-  }
-  return { url: SUPABASE_URL, anon: SUPABASE_ANON_KEY }
-}
-
-/**
- * Build a per-request Supabase client tied to the caller's JWT.
- * RLS then ensures the caller can only read/write their own rows.
- */
-function clientFor(req) {
-  const auth = req.headers.authorization || ''
-  if (!auth.toLowerCase().startsWith('bearer ')) return null
-  const { url, anon } = getEnv()
-  return createClient(url, anon, {
-    global: { headers: { Authorization: auth } },
-    auth: { persistSession: false, autoRefreshToken: false },
-    // Realtime is not used server-side; disabling it prevents the
-    // "Node.js 20 has no native WebSocket" warning from Supabase.
-    realtime: { transport: null },
-  })
-}
-
-/** Validates the JWT by calling getUser() and attaches { user, supabase } to req. */
-async function requireUser(req, res, next) {
-  try {
-    const supabase = clientFor(req)
-    if (!supabase) {
-      return res.status(401).json({ success: false, error: 'Missing Authorization bearer token' })
-    }
-    const { data, error } = await supabase.auth.getUser()
-    if (error || !data?.user) {
-      return res.status(401).json({ success: false, error: 'Invalid or expired token' })
-    }
-    req.supabase = supabase
-    req.user = data.user
-    next()
-  } catch (e) {
-    res.status(500).json({ success: false, error: e?.message || 'Auth check failed' })
-  }
-}
 
 /**
  * Coerce user input into a fetchable URL: rewrite `webcal://` (the iCalendar

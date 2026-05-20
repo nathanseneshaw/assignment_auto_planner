@@ -21,6 +21,7 @@ import express from 'express'
 import cors from 'cors'
 import icsRoutes from './ics-routes.js'
 import coursePlannerRoutes from './course-planner-routes.js'
+import syllabusRoutes from './syllabus-routes.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -66,6 +67,10 @@ app.use(express.json({ limit: '1mb' }))
 // ICS calendar feed sync — the sole assignment-ingest mechanism.
 app.use(icsRoutes)
 
+// Syllabus parser — upload a PDF/DOCX, Claude extracts the schedule, user
+// confirms in the UI, then the course + assignments land in Supabase.
+app.use(syllabusRoutes)
+
 // Course planner — public on-demand scrapers for Rice / TTU / TAMU / SMU.
 app.use(coursePlannerRoutes)
 
@@ -87,6 +92,8 @@ app.listen(PORT, HOST, () => {
   console.log('  POST   /api/ics/feeds                              — add an ICS feed URL')
   console.log('  DELETE /api/ics/feeds/:id                          — remove an ICS feed (assignments are kept)')
   console.log('  POST   /api/ics/sync                               — fetch + parse + upsert one or all ICS feeds')
+  console.log('  POST   /api/syllabus/parse                         — upload a syllabus (PDF/DOCX); returns extracted draft')
+  console.log('  POST   /api/syllabus/save                          — persist a reviewed syllabus draft as a course + assignments')
   console.log('  GET    /api/course-planner/schools                 — list supported universities')
   console.log('  GET    /api/course-planner/:school/terms           — list terms for a school')
   console.log('  GET    /api/course-planner/:school/subjects?term=  — list subjects for a term')
