@@ -155,25 +155,34 @@ async function runGuidedSearch({ termCode, cpValue }) {
     await page.selectOption('#combobox_term', termCode)
     await page.selectOption('#combobox_cp', cpValue)
 
-    // Fire the search; wait for the POST response, then a short settle for
-    // the page's success handler to swap #sr in place.
-    const searchPromise = page.waitForResponse(
-      (r) =>
-        r.url().includes('/clips/clip-cb11-hat.zog') &&
-        r.request().method() === 'POST' &&
-        r.status() === 200,
-      { timeout: 30000 }
-    )
+    // Fire the search. We accept any response status from the clips endpoint
+    // (reCAPTCHA may downgrade the request to a non-200 on low-score runs).
+    // The fallback waitForTimeout lets us read whatever #sr contains even if
+    // the network request never completes (bot-blocked).
+    const searchDone = Promise.race([
+      page.waitForResponse(
+        (r) =>
+          r.url().includes('/clips/clip-cb11-hat.zog') &&
+          r.request().method() === 'POST',
+        { timeout: 28000 }
+      ),
+      page.waitForTimeout(25000),
+    ]).catch(() => {})
+
     await page.evaluate(() => {
       if (typeof window.do_guided_search !== 'function') {
         throw new Error('do_guided_search not loaded')
       }
       window.do_guided_search()
     })
-    await searchPromise
-    await page.waitForTimeout(500)
+    await searchDone
+    // Short settle so jQuery's success handler can swap #sr content in.
+    await page.waitForTimeout(1000)
 
-    return await page.locator('#sr').innerHTML()
+    const srHtml = await page.locator('#sr').innerHTML()
+    const preview = srHtml.slice(0, 300).replace(/\s+/g, ' ')
+    console.log(`[utd] #sr preview (${srHtml.length} chars): ${preview}`)
+    return srHtml
   } finally {
     await context.close().catch(() => {})
   }
