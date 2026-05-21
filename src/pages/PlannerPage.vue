@@ -97,7 +97,7 @@ function onDragEnd() {
 }
 
 function onDragOverCell(event, day) {
-  if (!draggingItem.value || !day.inMonth) return
+  if (!draggingItem.value || day.inMonth === false) return
   event.preventDefault()
   event.dataTransfer.dropEffect = 'move'
   dragOverDateKey.value = day.dateKey
@@ -112,7 +112,7 @@ function onDragLeaveCell(event, day) {
 function onDropCell(event, day) {
   event.preventDefault()
   const item = draggingItem.value
-  if (!item || !day.inMonth) return
+  if (!item || day.inMonth === false) return
   const newDateKey = day.dateKey
   if (item.kind === 'task') {
     tasksStore.rescheduleTask(item.id, newDateKey)
@@ -512,12 +512,18 @@ function getCourseColor(courseId) {
         <div
           class="flex-1 border-2 border-t-0 rounded-b-xl p-1.5 sm:p-2 overflow-y-auto max-h-[480px] transition-colors"
           :class="[
-            day.isToday
+            day.isToday && dragOverDateKey !== day.dateKey
               ? 'border-primary-200/80 dark:border-primary-700/60 bg-primary-50/40 dark:bg-primary-900/20'
-              : day.isWeekend
+              : day.isWeekend && dragOverDateKey !== day.dateKey
                 ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/20'
-                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
+                : dragOverDateKey !== day.dateKey
+                  ? 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
+                  : '',
+            dragOverDateKey === day.dateKey ? 'border-primary-400 dark:border-primary-500 bg-primary-50/60 dark:bg-primary-900/30' : ''
           ]"
+          @dragover="onDragOverCell($event, day)"
+          @dragleave="onDragLeaveCell($event, day)"
+          @drop="onDropCell($event, day)"
         >
           <div v-if="day.items.length === 0" class="h-full min-h-[120px] flex items-center justify-center">
             <p class="text-[10px] sm:text-xs text-gray-400 text-center px-1">Nothing due</p>
@@ -527,33 +533,18 @@ function getCourseColor(courseId) {
             <div
               v-for="item in day.items"
               :key="item.id"
-              class="group p-2 sm:p-2.5 rounded-lg border-l-4 transition-all cursor-pointer hover:shadow-sm"
+              draggable="true"
+              class="group p-2 sm:p-2.5 rounded-lg border-l-4 transition-all cursor-grab active:cursor-grabbing hover:shadow-sm select-none"
               :class="[
                 getCourseColor(item.courseId).bg,
                 getCourseColor(item.courseId).border,
-                item.completed ? 'opacity-60' : ''
+                item.completed ? 'opacity-60' : '',
+                draggingItem?.id === item.id ? 'opacity-40 ring-1 ring-gray-400' : ''
               ]"
-              @click="onPlannerItemClick(item)"
+              @dragstart="onDragStart($event, item)"
+              @dragend="onDragEnd"
             >
               <div class="flex items-start gap-1.5 sm:gap-2">
-                <div
-                  class="flex-shrink-0 mt-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 transition-all flex items-center justify-center"
-                  :class="
-                    item.completed
-                      ? 'bg-primary-900 border-primary-900'
-                      : 'border-gray-400 group-hover:border-primary-700 bg-white dark:bg-gray-700'
-                  "
-                >
-                  <svg
-                    v-if="item.completed"
-                    class="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
                 <div class="flex-1 min-w-0">
                   <p
                     class="text-[10px] sm:text-xs font-medium leading-tight"
@@ -568,6 +559,25 @@ function getCourseColor(courseId) {
                     {{ item.courseName
                     }}<span v-if="item.kind === 'assignment'" class="text-gray-400"> · Assignment</span>
                   </p>
+                </div>
+                <div
+                  class="shrink-0 mt-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 transition-all flex items-center justify-center cursor-pointer hover:scale-110"
+                  :class="
+                    item.completed
+                      ? 'bg-primary-900 border-primary-900'
+                      : 'border-gray-400 group-hover:border-primary-700 bg-white dark:bg-gray-700'
+                  "
+                  @click.stop="onPlannerItemClick(item)"
+                >
+                  <svg
+                    v-if="item.completed"
+                    class="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                  </svg>
                 </div>
               </div>
             </div>
