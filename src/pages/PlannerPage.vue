@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useTasksStore } from '../stores/tasks'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
-import { Card, EmptyState } from '../components/ui'
+import { Card, EmptyState, Modal, Input, Dropdown, Button } from '../components/ui'
 
 const tasksStore = useTasksStore()
 const coursesStore = useCoursesStore()
@@ -57,7 +57,50 @@ const plannerItemsByDateKey = computed(() => {
   return map
 })
 
+// Assignment edit modal
+const showEditModal = ref(false)
+const editingAssignmentId = ref(null)
+const editFormData = ref({ title: '', description: '', courseId: '', dueDate: '' })
+
+const modalCourseOptions = computed(() => [
+  { value: '', label: 'Select a course' },
+  ...coursesStore.courses.map(c => ({ value: c.id, label: c.name })),
+])
+
+function openEditModal(assignmentId) {
+  const a = assignmentsStore.getAssignmentById(assignmentId)
+  if (!a) return
+  editingAssignmentId.value = assignmentId
+  editFormData.value = {
+    title: a.title,
+    description: a.description || '',
+    courseId: a.courseId || '',
+    dueDate: a.dueDate,
+  }
+  showEditModal.value = true
+}
+
+function saveEditedAssignment() {
+  if (!editFormData.value.title.trim() || !editFormData.value.dueDate) return
+  const course = coursesStore.getCourseById(editFormData.value.courseId)
+  assignmentsStore.updateAssignment(editingAssignmentId.value, {
+    title: editFormData.value.title.trim(),
+    description: editFormData.value.description.trim(),
+    courseId: editFormData.value.courseId,
+    courseName: course?.name || 'No Course',
+    dueDate: editFormData.value.dueDate,
+  })
+  showEditModal.value = false
+}
+
 function onPlannerItemClick(item) {
+  if (item.kind === 'assignment' && item.assignmentId) {
+    openEditModal(item.assignmentId)
+    return
+  }
+}
+
+function onPlannerCheckboxClick(item) {
   if (item.kind === 'task') {
     tasksStore.toggleTaskComplete(item.id)
     return
@@ -534,7 +577,7 @@ function getCourseColor(courseId) {
               v-for="item in day.items"
               :key="item.id"
               draggable="true"
-              class="group p-2 sm:p-2.5 rounded-lg border-l-4 transition-all cursor-grab active:cursor-grabbing hover:shadow-sm select-none"
+              class="group p-2 sm:p-2.5 rounded-lg border-l-4 transition-all hover:shadow-sm select-none"
               :class="[
                 getCourseColor(item.courseId).bg,
                 getCourseColor(item.courseId).border,
@@ -543,6 +586,7 @@ function getCourseColor(courseId) {
               ]"
               @dragstart="onDragStart($event, item)"
               @dragend="onDragEnd"
+              @click="onPlannerItemClick(item)"
             >
               <div class="flex items-start gap-1.5 sm:gap-2">
                 <div class="flex-1 min-w-0">
@@ -567,7 +611,7 @@ function getCourseColor(courseId) {
                       ? 'bg-primary-900 border-primary-900'
                       : 'border-gray-400 group-hover:border-primary-700 bg-white dark:bg-gray-700'
                   "
-                  @click.stop="onPlannerItemClick(item)"
+                  @click.stop="onPlannerCheckboxClick(item)"
                 >
                   <svg
                     v-if="item.completed"
@@ -647,7 +691,7 @@ function getCourseColor(courseId) {
                   v-else
                   :key="item.id"
                   draggable="true"
-                  class="group rounded-md border-l-[3px] px-1 py-1 sm:px-1.5 sm:py-1.5 cursor-grab active:cursor-grabbing transition-all hover:shadow-sm select-none"
+                  class="group rounded-md border-l-[3px] px-1 py-1 sm:px-1.5 sm:py-1.5 transition-all hover:shadow-sm select-none"
                   :class="[
                     getCourseColor(item.courseId).bg,
                     getCourseColor(item.courseId).border,
@@ -656,6 +700,7 @@ function getCourseColor(courseId) {
                   ]"
                   @dragstart="onDragStart($event, item)"
                   @dragend="onDragEnd"
+                  @click="onPlannerItemClick(item)"
                 >
                   <div class="flex items-start gap-1">
                     <p
@@ -670,7 +715,7 @@ function getCourseColor(courseId) {
                     <div
                       class="shrink-0 mt-0.5 w-3 h-3 rounded-full border border-gray-400 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
                       :class="item.completed ? 'bg-primary-900 border-primary-900' : 'bg-white dark:bg-gray-700'"
-                      @click.stop="onPlannerItemClick(item)"
+                      @click.stop="onPlannerCheckboxClick(item)"
                     >
                       <svg
                         v-if="item.completed"
@@ -724,4 +769,60 @@ function getCourseColor(courseId) {
       />
     </Card>
   </div>
+
+  <!-- Edit Assignment Modal -->
+  <Modal v-model="showEditModal" title="Edit Assignment" size="lg">
+    <form id="planner-edit-form" @submit.prevent="saveEditedAssignment" class="space-y-5">
+      <Input
+        v-model="editFormData.title"
+        label="Assignment Title"
+        placeholder="e.g., Research Essay on Climate Change"
+        required
+      />
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description</label>
+        <textarea
+          v-model="editFormData.description"
+          rows="4"
+          placeholder="Add any details about the assignment..."
+          class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+        ></textarea>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Dropdown v-model="editFormData.courseId" label="Course" :options="modalCourseOptions" />
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Due Date <span class="text-danger-500">*</span>
+          </label>
+          <input
+            v-model="editFormData.dueDate"
+            type="date"
+            required
+            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent scheme-light dark:scheme-dark"
+          />
+        </div>
+      </div>
+
+      <p class="text-sm text-gray-500">
+        Use the checkbox on each card to mark the assignment complete or active.
+      </p>
+    </form>
+
+    <template #footer>
+      <div class="flex gap-3 justify-end">
+        <Button type="button" variant="secondary" @click="showEditModal = false">Cancel</Button>
+        <Button
+          type="submit"
+          form="planner-edit-form"
+          variant="primary"
+          :disabled="!editFormData.title.trim() || !editFormData.dueDate"
+        >
+          Save Changes
+        </Button>
+      </div>
+    </template>
+  </Modal>
 </template>
