@@ -161,14 +161,6 @@ async function handleSyncAll() {
           </div>
         </div>
         <div class="flex flex-col gap-2 shrink-0">
-          <Button
-            size="sm"
-            variant="secondary"
-            :loading="feedsStore.syncing"
-            @click="handleSyncOne(feed)"
-          >
-            Sync
-          </Button>
           <Button size="sm" variant="ghost" @click="handleRemove(feed)">Remove</Button>
         </div>
       </li>

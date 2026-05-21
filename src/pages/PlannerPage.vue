@@ -81,6 +81,48 @@ const showPlannerEmptyState = computed(
 const viewMode = ref('week')
 const currentWeekStart = ref(getWeekStart(new Date()))
 
+// Drag-and-drop state for month grid
+const draggingItem = ref(null)
+const dragOverDateKey = ref(null)
+
+function onDragStart(event, item) {
+  draggingItem.value = item
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', item.id)
+}
+
+function onDragEnd() {
+  draggingItem.value = null
+  dragOverDateKey.value = null
+}
+
+function onDragOverCell(event, day) {
+  if (!draggingItem.value || !day.inMonth) return
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+  dragOverDateKey.value = day.dateKey
+}
+
+function onDragLeaveCell(event, day) {
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    if (dragOverDateKey.value === day.dateKey) dragOverDateKey.value = null
+  }
+}
+
+function onDropCell(event, day) {
+  event.preventDefault()
+  const item = draggingItem.value
+  if (!item || !day.inMonth) return
+  const newDateKey = day.dateKey
+  if (item.kind === 'task') {
+    tasksStore.rescheduleTask(item.id, newDateKey)
+  } else if (item.kind === 'assignment' && item.assignmentId) {
+    assignmentsStore.updateAssignment(item.assignmentId, { dueDate: newDateKey })
+  }
+  draggingItem.value = null
+  dragOverDateKey.value = null
+}
+
 function startOfMonthFromDate(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1)
 }
@@ -557,11 +599,15 @@ function getCourseColor(courseId) {
               class="min-h-[100px] sm:min-h-[140px] p-1 sm:p-2 flex flex-col gap-1 transition-colors"
               :class="[
                 !day.inMonth ? 'bg-gray-50/70 dark:bg-gray-800/40 text-gray-400' : '',
-                day.inMonth && day.isToday
+                day.inMonth && day.isToday && dragOverDateKey !== day.dateKey
                   ? 'bg-primary-50/50 dark:bg-primary-900/20 ring-1 ring-inset ring-primary-200/60 dark:ring-primary-700/40 z-1'
                   : '',
-                day.inMonth && day.isWeekend && !day.isToday ? 'bg-gray-50/40 dark:bg-gray-700/20' : ''
+                day.inMonth && day.isWeekend && !day.isToday && dragOverDateKey !== day.dateKey ? 'bg-gray-50/40 dark:bg-gray-700/20' : '',
+                day.inMonth && dragOverDateKey === day.dateKey ? 'bg-primary-100/60 dark:bg-primary-800/30 ring-2 ring-inset ring-primary-400 dark:ring-primary-500' : ''
               ]"
+              @dragover="onDragOverCell($event, day)"
+              @dragleave="onDragLeaveCell($event, day)"
+              @drop="onDropCell($event, day)"
             >
               <div class="flex items-center justify-between gap-1 shrink-0">
                 <span
@@ -590,18 +636,31 @@ function getCourseColor(courseId) {
                   v-for="item in day.items"
                   v-else
                   :key="item.id"
-                  class="group rounded-md border-l-[3px] px-1 py-1 sm:px-1.5 sm:py-1.5 cursor-pointer transition-all hover:shadow-sm"
+                  draggable="true"
+                  class="group rounded-md border-l-[3px] px-1 py-1 sm:px-1.5 sm:py-1.5 cursor-grab active:cursor-grabbing transition-all hover:shadow-sm select-none"
                   :class="[
                     getCourseColor(item.courseId).bg,
                     getCourseColor(item.courseId).border,
-                    item.completed ? 'opacity-60' : ''
+                    item.completed ? 'opacity-60' : '',
+                    draggingItem?.id === item.id ? 'opacity-40 ring-1 ring-gray-400' : ''
                   ]"
-                  @click="onPlannerItemClick(item)"
+                  @dragstart="onDragStart($event, item)"
+                  @dragend="onDragEnd"
                 >
                   <div class="flex items-start gap-1">
+                    <p
+                      class="flex-1 text-[9px] sm:text-[10px] font-medium leading-snug line-clamp-2 sm:line-clamp-3"
+                      :class="[
+                        getCourseColor(item.courseId).text,
+                        item.completed ? 'line-through' : ''
+                      ]"
+                    >
+                      {{ item.title }}
+                    </p>
                     <div
-                      class="flex-shrink-0 mt-0.5 w-3 h-3 rounded-full border border-gray-400 flex items-center justify-center"
+                      class="shrink-0 mt-0.5 w-3 h-3 rounded-full border border-gray-400 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
                       :class="item.completed ? 'bg-primary-900 border-primary-900' : 'bg-white dark:bg-gray-700'"
+                      @click.stop="onPlannerItemClick(item)"
                     >
                       <svg
                         v-if="item.completed"
@@ -613,15 +672,6 @@ function getCourseColor(courseId) {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
-                    <p
-                      class="text-[9px] sm:text-[10px] font-medium leading-snug line-clamp-2 sm:line-clamp-3"
-                      :class="[
-                        getCourseColor(item.courseId).text,
-                        item.completed ? 'line-through' : ''
-                      ]"
-                    >
-                      {{ item.title }}
-                    </p>
                   </div>
                 </div>
               </div>
