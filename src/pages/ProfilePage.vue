@@ -204,7 +204,7 @@ onMounted(loadSupportedSchools)
         (Canvas, Brightspace, Blackboard) expose a "Calendar feed" or "Subscribe" URL — paste it below.
       </p>
       <IcsFeedsManager />
-      <SyllabusParser class="mt-2" />
+      <SyllabusParser class="mt-10" />
     </div>
 
     <!-- Session -->
