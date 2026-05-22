@@ -2,6 +2,8 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
+import '@fontsource-variable/geist'
+import '@fontsource-variable/geist-mono'
 import './style.css'
 import { useAuthStore } from './stores/auth'
 

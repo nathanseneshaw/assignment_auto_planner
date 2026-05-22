@@ -11,14 +11,14 @@ const icons = {
 }
 
 const colors = {
-  info: 'bg-primary-50 border-primary-200/80 text-primary-900',
+  info: 'bg-accent-50 border-accent-200/80 text-accent-900',
   success: 'bg-emerald-50 border-emerald-200/80 text-emerald-900',
   warning: 'bg-warning-50 border-warning-200/80 text-warning-900',
   error: 'bg-danger-50 border-danger-200/80 text-danger-900'
 }
 
 const iconColors = {
-  info: 'text-primary-600',
+  info: 'text-accent-600',
   success: 'text-emerald-600',
   warning: 'text-warning-600',
   error: 'text-danger-600'

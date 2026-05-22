@@ -144,7 +144,7 @@ function assignmentImportLabel(assignment) {
 
 function badgeColorsForAssignment(assignment) {
   if (assignment.courseId) return getCourseColor(assignment.courseId)
-  return { bg: 'bg-slate-100', text: 'text-slate-800' }
+  return { bg: 'bg-stone-100', text: 'text-stone-800' }
 }
 
 function resetForm() {

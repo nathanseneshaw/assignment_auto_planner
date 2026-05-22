@@ -47,11 +47,11 @@ const selectClasses = computed(() => {
 
   return [
       'w-full rounded-2xl border bg-white text-gray-900 font-medium tracking-tight antialiased',
-      'shadow-[0_1px_2px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]',
+      'shadow-[0_1px_2px_rgba(28,25,23,0.04),0_1px_3px_rgba(28,25,23,0.06)]',
       'transition-[border-color,box-shadow] duration-200 ease-out',
       'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 focus-visible:ring-offset-0',
-      'hover:border-gray-300 hover:shadow-[0_2px_6px_-2px_rgba(15,23,42,0.07),0_1px_2px_rgba(15,23,42,0.05)]',
-      'active:shadow-[0_1px_2px_rgba(15,23,42,0.05)]',
+      'hover:border-gray-300 hover:shadow-[0_2px_6px_-2px_rgba(28,25,23,0.07),0_1px_2px_rgba(28,25,23,0.05)]',
+      'active:shadow-[0_1px_2px_rgba(28,25,23,0.05)]',
       'appearance-none cursor-pointer',
       'disabled:cursor-not-allowed disabled:border-gray-200/70 disabled:bg-gray-50 disabled:text-gray-500 disabled:shadow-none disabled:hover:border-gray-200/70 disabled:hover:shadow-none',
       props.error

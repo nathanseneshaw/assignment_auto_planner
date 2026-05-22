@@ -1,0 +1,16 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.assignmentplanner.app
+productName: Assignment Planner
+files:
+  - filter:
+      - dist/**/*
+      - electron/**/*
+win:
+  target: nsis
+mac:
+  target: dmg
+linux:
+  target: AppImage
+electronVersion: 34.5.8
