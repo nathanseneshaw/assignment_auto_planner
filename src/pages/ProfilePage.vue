@@ -134,7 +134,7 @@ onMounted(loadSupportedSchools)
       <div class="flex flex-col sm:flex-row sm:items-start gap-6 sm:gap-8">
         <div class="flex-shrink-0 flex sm:block items-center gap-4 sm:gap-0">
           <div
-            class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary-900 flex items-center justify-center text-white text-xl sm:text-2xl font-bold shadow-md shadow-primary-900/15 ring-4 ring-gray-100"
+            class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary-900 flex items-center justify-center text-white text-xl sm:text-2xl font-bold shadow-md shadow-primary-900/15 ring-4 ring-gray-100 dark:ring-gray-800"
             aria-hidden="true"
           >
             {{ getInitials(accountDisplayName) }}
