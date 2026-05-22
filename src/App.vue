@@ -25,13 +25,17 @@ useSupabaseStoreSync()
 useIcsAutoSync()
 
 function applyTheme(dark) {
-  document.documentElement.classList.toggle('dark', !!dark)
+  const isPublicPage = route.meta.authPage || route.meta.landingPage
+  document.documentElement.classList.toggle('dark', !!dark && !isPublicPage)
 }
 
 // Apply persisted theme immediately before first render
 applyTheme(profileStore.profile.darkMode)
 
 watch(() => profileStore.profile.darkMode, applyTheme)
+
+// Re-evaluate theme on every navigation (e.g. sign-out lands on /login → strip dark)
+watch(() => route.meta, () => applyTheme(profileStore.profile.darkMode))
 
 onMounted(async () => {
   if (isSupabaseConfigured && authStore.user) {

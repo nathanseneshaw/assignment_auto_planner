@@ -40,7 +40,7 @@ async function onSubmit() {
 
 <template>
   <div
-    class="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(71,85,105,0.06),transparent_50%),#fafafa]"
+    class="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(16,185,129,0.08),transparent_50%),#fafaf9]"
   >
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
@@ -61,7 +61,7 @@ async function onSubmit() {
             />
           </svg>
         </div>
-        <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Sign in</h1>
+        <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Sign in</h1>
         <p class="text-gray-500 text-sm mt-1">Assignment Auto-Planner</p>
       </div>
 

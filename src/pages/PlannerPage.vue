@@ -633,7 +633,7 @@ function getCourseColor(courseId) {
     <!-- Month grid -->
     <div
       v-show="viewMode === 'month'"
-      class="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden overflow-x-auto"
+      class="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-800 shadow-[0_1px_2px_rgba(28,25,23,0.04)] overflow-hidden overflow-x-auto"
     >
       <div class="min-w-[640px] sm:min-w-0">
         <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 bg-gray-50/90 dark:bg-gray-700/60">

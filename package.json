@@ -22,6 +22,8 @@
     "electron:preview": "cross-env ELECTRON_DEV=false electron ."
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.2.9",
+    "@fontsource-variable/geist-mono": "^5.2.8",
     "@supabase/supabase-js": "^2.105.3",
     "@vueuse/core": "^14.2.1",
     "archiver": "^7.0.1",

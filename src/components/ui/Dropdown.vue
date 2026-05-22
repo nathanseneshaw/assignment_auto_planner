@@ -56,12 +56,12 @@ const triggerClasses = computed(() => {
       : 'pl-4 pr-14 py-2.5 text-[15px]'
   return [
     'w-full rounded-2xl border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium tracking-tight antialiased text-left',
-    'shadow-[0_1px_2px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]',
+    'shadow-[0_1px_2px_rgba(28,25,23,0.04),0_1px_3px_rgba(28,25,23,0.06)]',
     'transition-[border-color,box-shadow] duration-200 ease-out',
     'focus:outline-none cursor-pointer',
     open.value
       ? 'border-primary-400/75 dark:border-primary-600/75 ring-2 ring-primary-500/25'
-      : 'border-gray-200/90 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-[0_2px_6px_-2px_rgba(15,23,42,0.07),0_1px_2px_rgba(15,23,42,0.05)]',
+      : 'border-gray-200/90 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-[0_2px_6px_-2px_rgba(28,25,23,0.07),0_1px_2px_rgba(28,25,23,0.05)]',
     size,
   ]
 })
@@ -121,7 +121,7 @@ const chevronSize = computed(() => (props.size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h
       >
         <div
           v-if="open"
-          class="absolute left-0 right-0 mt-1.5 z-50 rounded-xl border border-gray-200/80 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow-[0_4px_20px_rgba(15,23,42,0.10),0_1px_4px_rgba(15,23,42,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
+          class="absolute left-0 right-0 mt-1.5 z-50 rounded-xl border border-gray-200/80 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow-[0_4px_20px_rgba(28,25,23,0.10),0_1px_4px_rgba(28,25,23,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
         >
           <button
             v-for="opt in options"

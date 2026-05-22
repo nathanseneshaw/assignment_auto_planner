@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Button } from '../components/ui'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
@@ -18,9 +18,9 @@ const features = [
     icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   },
   {
-    title: 'Bring in Canvas & Blackboard',
-    body: 'Connect your LMS to pull courses and assignments so you spend less time copying due dates by hand.',
-    icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12',
+    title: 'Sync from any calendar',
+    body: 'Paste an iCal link from Canvas, Blackboard, or Google Calendar and your due dates flow in automatically—no manual copying.',
+    icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
   },
   {
     title: 'Plan the week ahead',
@@ -28,11 +28,63 @@ const features = [
     icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
   },
 ]
+
+// Anonymized sample testimonials — monograms are academic-field tags, not real
+// names. Swap in real student quotes when available.
+const testimonials = [
+  {
+    quote: 'I used to keep due dates in three different places. Now everything lands on one timeline and I plan my week instead of reacting to it.',
+    role: 'CS sophomore',
+    monogram: 'CS',
+  },
+  {
+    quote: 'Pasting my calendar link once meant I stopped copying deadlines by hand. The week view shows me exactly when crunch time is coming.',
+    role: 'Pre-med student',
+    monogram: 'PM',
+  },
+  {
+    quote: 'Between work and classes I needed something calm, not another noisy app. Breaking big assignments into scheduled tasks keeps me ahead.',
+    role: 'Part-time grad student',
+    monogram: 'GR',
+  },
+]
+
+const faqs = [
+  {
+    q: 'How much does it cost?',
+    a: 'Assignment Auto-Planner is free for students. Create an account to sync your courses, or explore the sample data first to see how it works.',
+  },
+  {
+    q: 'What can I connect for automatic due dates?',
+    a: 'Any calendar that gives you an iCal (ICS) link—including Canvas, Blackboard, and Google Calendar. Paste the link once and new assignments sync in automatically.',
+  },
+  {
+    q: 'Do I need to install anything?',
+    a: 'No—it runs right in your browser. There’s also an optional desktop app if you prefer a dedicated window.',
+  },
+  {
+    q: 'Can I try it without creating an account?',
+    a: 'Yes. The app loads with sample courses and assignments so you can explore the dashboard and planner. Add your own once you create a free account.',
+  },
+  {
+    q: 'Is my data private?',
+    a: 'Your courses, assignments, and calendar links are tied to your own account and aren’t shared with other students. Feeds are read-only links you can remove anytime.',
+  },
+  {
+    q: 'How does weekly planning work?',
+    a: 'Break big assignments into smaller tasks and drop them onto the days you’ll work on them. The planner shows your whole week at a glance so you can spot overload early.',
+  },
+]
+
+const openFaq = ref(0)
+function toggleFaq(i) {
+  openFaq.value = openFaq.value === i ? -1 : i
+}
 </script>
 
 <template>
   <div
-    class="min-h-screen bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(71,85,105,0.08),transparent_50%),#fafafa] text-gray-900"
+    class="min-h-screen scroll-smooth bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(16,185,129,0.08),transparent_50%),#fafaf9] text-gray-900"
   >
     <header
       class="sticky top-0 z-20 border-b border-gray-200/70 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70"
@@ -58,6 +110,12 @@ const features = [
           </div>
           <span class="text-[15px] font-semibold tracking-tight text-gray-900 truncate">Assignment Auto-Planner</span>
         </RouterLink>
+
+        <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
+          <a href="#features" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Features</a>
+          <a href="#testimonials" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Reviews</a>
+          <a href="#faq" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">FAQ</a>
+        </nav>
 
         <nav class="flex items-center flex-wrap justify-end gap-2">
           <template v-if="isSupabaseConfigured && authStore.isAuthenticated">
@@ -97,8 +155,8 @@ const features = [
             <span class="text-primary-800">Plan assignments</span> with clarity.
           </h1>
           <p class="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed max-w-2xl">
-            AutoPlanner pulls your coursework into a simple workspace—deadlines, weekly planning, and LMS sync so you
-            always know what to do next.
+            AutoPlanner pulls your coursework into one calm workspace—deadlines, weekly planning, and calendar
+            sync so you always know what to do next.
           </p>
 
           <div class="mt-10 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
@@ -135,38 +193,69 @@ const features = [
         </div>
 
         <div
-          class="mt-16 sm:mt-20 rounded-3xl border border-gray-200/80 bg-white/90 shadow-xl shadow-gray-900/[0.06] overflow-hidden"
+          class="mt-16 sm:mt-20 rounded-3xl border border-gray-200/80 bg-white shadow-xl shadow-gray-900/[0.06] overflow-hidden"
         >
+          <!-- Abstract illustration of the planner's week view — not a literal screenshot. -->
           <div
-            class="aspect-[16/9] sm:aspect-[2/1] bg-gradient-to-br from-gray-100 via-white to-primary-50 flex items-center justify-center p-8 sm:p-12"
+            class="aspect-[4/3] sm:aspect-[16/9] bg-gradient-to-br from-gray-50 via-white to-primary-100/50 p-4 sm:p-6"
           >
-            <div class="text-center max-w-md">
-              <div
-                class="w-14 h-14 mx-auto rounded-2xl bg-primary-900 flex items-center justify-center shadow-lg shadow-primary-900/20 mb-5"
-              >
-                <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                  />
-                </svg>
+            <div
+              class="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/80 shadow-sm"
+            >
+              <div class="flex h-9 shrink-0 items-center gap-1.5 border-b border-gray-200/70 px-4">
+                <span class="h-2.5 w-2.5 rounded-full bg-gray-200"></span>
+                <span class="h-2.5 w-2.5 rounded-full bg-gray-200"></span>
+                <span class="h-2.5 w-2.5 rounded-full bg-gray-200"></span>
+                <span class="ml-3 h-2 w-28 rounded-full bg-gray-100"></span>
+                <span class="ml-auto h-5 w-14 rounded-md bg-primary-100"></span>
               </div>
-              <p class="text-sm font-semibold text-primary-900 uppercase tracking-wide">Inside the app</p>
-              <p class="mt-2 text-gray-600">
-                Dashboard, assignments list, weekly planner, and profile integrations—everything after you sign in.
-              </p>
+              <div class="flex min-h-0 flex-1 gap-2 p-3 sm:gap-3 sm:p-4">
+                <div class="flex flex-1 flex-col gap-2">
+                  <span class="h-2 w-2/3 rounded-full bg-gray-200"></span>
+                  <div class="space-y-1 rounded-lg bg-primary-100 p-1.5">
+                    <span class="block h-1.5 w-3/4 rounded-full bg-primary-300/70"></span>
+                    <span class="block h-1.5 w-1/2 rounded-full bg-primary-300/40"></span>
+                  </div>
+                  <div class="h-6 rounded-lg bg-gray-100"></div>
+                </div>
+                <div class="flex flex-1 flex-col gap-2">
+                  <span class="h-2 w-1/2 rounded-full bg-gray-200"></span>
+                  <div class="h-8 rounded-lg bg-gray-100"></div>
+                  <div class="space-y-1 rounded-lg bg-primary-100 p-1.5">
+                    <span class="block h-1.5 w-2/3 rounded-full bg-primary-300/70"></span>
+                  </div>
+                </div>
+                <div class="flex flex-1 flex-col gap-2">
+                  <span class="h-2 w-3/4 rounded-full bg-gray-200"></span>
+                  <div class="space-y-1 rounded-lg bg-primary-200/60 p-1.5">
+                    <span class="block h-1.5 w-3/4 rounded-full bg-primary-400/50"></span>
+                    <span class="block h-1.5 w-2/3 rounded-full bg-primary-400/30"></span>
+                  </div>
+                </div>
+                <div class="hidden flex-1 flex-col gap-2 sm:flex">
+                  <span class="h-2 w-1/2 rounded-full bg-gray-200"></span>
+                  <div class="h-6 rounded-lg bg-gray-100"></div>
+                  <div class="space-y-1 rounded-lg bg-primary-100 p-1.5">
+                    <span class="block h-1.5 w-3/4 rounded-full bg-primary-300/70"></span>
+                    <span class="block h-1.5 w-1/2 rounded-full bg-primary-300/40"></span>
+                  </div>
+                </div>
+                <div class="hidden flex-1 flex-col gap-2 sm:flex">
+                  <span class="h-2 w-2/3 rounded-full bg-gray-200"></span>
+                  <div class="h-10 rounded-lg bg-gray-100"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="border-t border-gray-200/80 bg-white/50 py-16 sm:py-20">
+      <section id="features" class="scroll-mt-20 border-t border-gray-200/80 bg-white/50 py-16 sm:py-20">
         <div class="max-w-6xl mx-auto px-4 sm:px-6">
           <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Why students use it</h2>
           <p class="mt-2 text-gray-600 max-w-2xl">
-            Fewer surprises, clearer priorities—whether you’re on Canvas, Blackboard, or flying solo with manual
-            courses.
+            Fewer surprises, clearer priorities—whether your deadlines come from Canvas, Blackboard, Google
+            Calendar, or courses you add by hand.
           </p>
 
           <ul class="mt-12 grid gap-6 sm:grid-cols-3">
@@ -182,6 +271,80 @@ const features = [
               </div>
               <h3 class="text-lg font-semibold text-gray-900">{{ item.title }}</h3>
               <p class="mt-2 text-sm text-gray-600 leading-relaxed">{{ item.body }}</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="testimonials" class="scroll-mt-20 border-t border-gray-200/80 py-16 sm:py-20">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6">
+          <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Built around real student weeks</h2>
+          <p class="mt-2 text-gray-600 max-w-2xl">
+            Less last-minute panic, more steady progress. Here’s the kind of semester it’s made for.
+          </p>
+
+          <ul class="mt-12 grid gap-6 sm:grid-cols-3">
+            <li
+              v-for="t in testimonials"
+              :key="t.role"
+              class="flex flex-col rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm shadow-gray-900/[0.03]"
+            >
+              <svg class="w-7 h-7 text-primary-200" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M9.983 3v7.391c0 5.704-3.731 9.57-8.983 10.609l-.995-2.151c2.432-.917 3.995-3.638 3.995-5.849H.001V3h9.982zm14.017 0v7.391c0 5.704-3.748 9.57-9 10.609l-.996-2.151c2.433-.917 3.996-3.638 3.996-5.849h-3.983V3h9.983z"
+                />
+              </svg>
+              <p class="mt-4 flex-1 text-gray-700 leading-relaxed">{{ t.quote }}</p>
+              <div class="mt-6 flex items-center gap-3">
+                <span
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-800"
+                  aria-hidden="true"
+                >{{ t.monogram }}</span>
+                <span class="text-sm font-medium text-gray-500">{{ t.role }}</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="faq" class="scroll-mt-20 border-t border-gray-200/80 bg-white/50 py-16 sm:py-20">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6">
+          <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Frequently asked questions</h2>
+          <p class="mt-2 text-gray-600">Everything you need to know before you dive in.</p>
+
+          <ul class="mt-10 space-y-3">
+            <li
+              v-for="(item, i) in faqs"
+              :key="item.q"
+              class="rounded-2xl border border-gray-200/80 bg-white shadow-sm shadow-gray-900/[0.03]"
+            >
+              <button
+                type="button"
+                class="flex w-full items-center justify-between gap-4 px-5 py-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 rounded-2xl"
+                :aria-expanded="openFaq === i"
+                @click="toggleFaq(i)"
+              >
+                <span class="text-base font-semibold text-gray-900">{{ item.q }}</span>
+                <svg
+                  class="h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200"
+                  :class="{ 'rotate-180': openFaq === i }"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div
+                class="grid transition-[grid-template-rows] duration-200 ease-out"
+                :class="openFaq === i ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+              >
+                <div class="min-h-0 overflow-hidden">
+                  <p class="px-5 pb-5 text-gray-600 leading-relaxed">{{ item.a }}</p>
+                </div>
+              </div>
             </li>
           </ul>
         </div>
@@ -239,8 +402,17 @@ const features = [
         </div>
       </section>
 
-      <footer class="border-t border-gray-200/80 py-8 text-center text-sm text-gray-500">
-        <p>© {{ new Date().getFullYear() }} Assignment Auto-Planner</p>
+      <footer class="border-t border-gray-200/80 py-10">
+        <div
+          class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500"
+        >
+          <p>© {{ new Date().getFullYear() }} Assignment Auto-Planner</p>
+          <nav class="flex items-center gap-5">
+            <a href="#features" class="hover:text-gray-900 transition-colors">Features</a>
+            <a href="#testimonials" class="hover:text-gray-900 transition-colors">Reviews</a>
+            <a href="#faq" class="hover:text-gray-900 transition-colors">FAQ</a>
+          </nav>
+        </div>
       </footer>
     </main>
   </div>

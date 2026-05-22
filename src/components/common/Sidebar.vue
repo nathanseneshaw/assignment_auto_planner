@@ -46,12 +46,6 @@ const navItems = [
     icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
     description: 'Week & month'
   },
-  { 
-    name: 'Courses', 
-    path: '/course', 
-    icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
-    description: 'Manage courses'
-  },
 ]
 
 const isActive = (path) => {
@@ -68,7 +62,7 @@ const isActive = (path) => {
     <Transition name="fade">
       <div 
         v-if="mobileOpen"
-        class="fixed inset-0 bg-zinc-950/20 backdrop-blur-[2px] z-40 lg:hidden"
+        class="fixed inset-0 bg-stone-950/30 backdrop-blur-[2px] z-40 lg:hidden"
         @click="emit('closeMobile')"
       ></div>
     </Transition>
@@ -76,7 +70,7 @@ const isActive = (path) => {
 
   <!-- Sidebar -->
   <aside
-    class="fixed top-0 left-0 z-50 h-screen bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/80 dark:border-gray-700/80 flex flex-col transition-all duration-300 ease-in-out shadow-[1px_0_24px_rgba(15,23,42,0.04)]"
+    class="fixed top-0 left-0 z-50 h-screen bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/80 dark:border-gray-700/80 flex flex-col transition-all duration-300 ease-in-out shadow-[1px_0_24px_rgba(28,25,23,0.05)]"
     :class="[
       open ? 'lg:w-64' : 'lg:w-20',
       mobileOpen ? 'w-72 translate-x-0' : '-translate-x-full lg:translate-x-0'

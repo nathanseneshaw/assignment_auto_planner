@@ -27,9 +27,9 @@ const stats = computed(() => [
     value: assignmentsStore.upcomingAssignments.length,
     subtitle: 'assignments',
     icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
-    bgColor: 'bg-sky-50 dark:bg-sky-900/30',
-    iconBg: 'bg-sky-100 dark:bg-sky-900/50',
-    textColor: 'text-sky-700 dark:text-sky-400'
+    bgColor: 'bg-accent-50 dark:bg-accent-900/30',
+    iconBg: 'bg-accent-100 dark:bg-accent-900/40',
+    textColor: 'text-accent-700 dark:text-accent-300'
   },
   {
     label: 'Overdue',
@@ -39,15 +39,6 @@ const stats = computed(() => [
     bgColor: tasksStore.overdueTasks.length > 0 ? 'bg-danger-50 dark:bg-danger-900/30' : 'bg-gray-50 dark:bg-gray-700/50',
     iconBg: tasksStore.overdueTasks.length > 0 ? 'bg-danger-100 dark:bg-danger-900/50' : 'bg-gray-100 dark:bg-gray-700',
     textColor: tasksStore.overdueTasks.length > 0 ? 'text-danger-600 dark:text-danger-400' : 'text-gray-600 dark:text-gray-400'
-  },
-  {
-    label: 'Courses',
-    value: coursesStore.courses.length,
-    subtitle: 'active',
-    icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
-    bgColor: 'bg-warning-50 dark:bg-warning-900/30',
-    iconBg: 'bg-warning-100 dark:bg-warning-900/50',
-    textColor: 'text-warning-600 dark:text-warning-400'
   },
 ])
 
@@ -103,13 +94,13 @@ function getCourseColor(courseId) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-8">
     <!-- Welcome Section -->
-    <Card padding="lg" class="relative overflow-hidden border-gray-200/70 !shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-4px_rgba(15,23,42,0.06)]">
+    <Card padding="lg" class="relative overflow-hidden border-gray-200/70 !shadow-[0_1px_2px_rgba(28,25,23,0.04),0_8px_24px_-4px_rgba(28,25,23,0.06)]">
       <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary-700 via-primary-900 to-primary-800 rounded-l-2xl" aria-hidden="true" />
       <div class="relative pl-4 sm:pl-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
         <div>
-          <h2 class="text-2xl sm:text-[1.65rem] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Welcome back</h2>
+          <h2 class="text-[1.75rem] sm:text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Welcome back</h2>
           <p class="mt-2 text-[15px] text-gray-500 dark:text-gray-400 max-w-md leading-relaxed">
             {{ tasksStore.todaysTasks.length > 0 
               ? `You have ${tasksStore.todaysTasks.filter(t => !t.completed).length} tasks left today — steady progress wins.`
@@ -131,7 +122,7 @@ function getCourseColor(courseId) {
     </Card>
 
     <!-- Stats Grid -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
       <Card 
         v-for="stat in stats" 
         :key="stat.label"
@@ -254,7 +245,7 @@ function getCourseColor(courseId) {
           <div 
             v-for="assignment in upcomingDeadlines" 
             :key="assignment.id"
-            class="p-3 rounded-xl border border-gray-100/90 dark:border-gray-700/60 hover:border-gray-200/90 dark:hover:border-gray-600/60 hover:shadow-[0_2px_8px_rgba(15,23,42,0.05)] transition-all"
+            class="p-3 rounded-xl border border-gray-100/90 dark:border-gray-700/60 hover:border-gray-200/90 dark:hover:border-gray-600/60 hover:shadow-[0_2px_8px_rgba(28,25,23,0.05)] transition-all"
           >
             <div class="flex items-start justify-between gap-3 mb-2">
               <div class="flex-1 min-w-0">
@@ -274,49 +265,5 @@ function getCourseColor(courseId) {
       </Card>
     </div>
 
-    <!-- Quick Actions -->
-    <Card>
-      <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight mb-4">Quick actions</h3>
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <button
-          type="button"
-          @click="router.push({ path: '/assignments', query: { action: 'add' } })"
-          class="group p-4 rounded-2xl border border-dashed border-gray-200/90 dark:border-gray-700/60 hover:border-primary-300/60 dark:hover:border-primary-700/60 hover:bg-gray-50/80 dark:hover:bg-gray-700/40 transition-all"
-        >
-          <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-gray-100/80 dark:bg-gray-700/80 group-hover:bg-white dark:group-hover:bg-gray-600 group-hover:ring-1 group-hover:ring-gray-200/80 dark:group-hover:ring-gray-500/60 flex items-center justify-center transition-all">
-            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-900 dark:group-hover:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-          </div>
-          <p class="text-[13px] font-semibold text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-100">Add assignment</p>
-        </button>
-
-        <button
-          type="button"
-          @click="router.push({ path: '/course', query: { action: 'add' } })"
-          class="group p-4 rounded-2xl border border-dashed border-gray-200/90 dark:border-gray-700/60 hover:border-primary-300/60 dark:hover:border-primary-700/60 hover:bg-gray-50/80 dark:hover:bg-gray-700/40 transition-all"
-        >
-          <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-gray-100/80 dark:bg-gray-700/80 group-hover:bg-white dark:group-hover:bg-gray-600 group-hover:ring-1 group-hover:ring-gray-200/80 dark:group-hover:ring-gray-500/60 flex items-center justify-center transition-all">
-            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-900 dark:group-hover:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-          </div>
-          <p class="text-[13px] font-semibold text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-100">Add course</p>
-        </button>
-
-        <button
-          type="button"
-          @click="router.push('/planner')"
-          class="group p-4 rounded-2xl border border-dashed border-gray-200/90 dark:border-gray-700/60 hover:border-primary-300/60 dark:hover:border-primary-700/60 hover:bg-gray-50/80 dark:hover:bg-gray-700/40 transition-all"
-        >
-          <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-gray-100/80 dark:bg-gray-700/80 group-hover:bg-white dark:group-hover:bg-gray-600 group-hover:ring-1 group-hover:ring-gray-200/80 dark:group-hover:ring-gray-500/60 flex items-center justify-center transition-all">
-            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-primary-900 dark:group-hover:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <p class="text-[13px] font-semibold text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-100">View planner</p>
-        </button>
-      </div>
-    </Card>
   </div>
 </template>

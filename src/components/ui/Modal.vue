@@ -71,13 +71,13 @@ onUnmounted(() => {
       >
         <!-- Backdrop -->
         <div 
-          class="absolute inset-0 bg-zinc-950/40 backdrop-blur-[3px]"
+          class="absolute inset-0 bg-stone-950/50 backdrop-blur-[3px]"
           @click="close"
         ></div>
         
         <!-- Modal Content -->
         <div 
-          class="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(15,23,42,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full overflow-hidden"
+          class="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(28,25,23,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full overflow-hidden"
           :class="sizeClasses[size]"
           @click.stop
         >
