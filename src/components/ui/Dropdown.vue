@@ -55,7 +55,7 @@ const triggerClasses = computed(() => {
       ? 'pl-3 pr-12 py-2 text-sm'
       : 'pl-4 pr-14 py-2.5 text-[15px]'
   return [
-    'w-full rounded-2xl border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium tracking-tight antialiased text-left',
+    'w-full rounded-2xl border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-medium tracking-tight antialiased text-left truncate',
     'shadow-[0_1px_2px_rgba(28,25,23,0.04),0_1px_3px_rgba(28,25,23,0.06)]',
     'transition-[border-color,box-shadow] duration-200 ease-out',
     'focus:outline-none cursor-pointer',
