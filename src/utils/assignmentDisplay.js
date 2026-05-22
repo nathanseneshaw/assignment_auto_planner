@@ -20,6 +20,10 @@ export function importSourceLabel(importSource) {
       return 'Blackboard'
     case 'canvas':
       return 'Canvas'
+    case 'ics':
+      return 'Calendar feed'
+    case 'syllabus':
+      return 'Syllabus'
     default:
       return ''
   }

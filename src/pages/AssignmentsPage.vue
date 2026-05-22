@@ -24,7 +24,7 @@ const searchQuery = ref('')
 
 const courseFilterOptions = computed(() => [
   { value: 'all', label: 'All Courses' },
-  ...coursesStore.courses.map(c => ({ value: c.id, label: c.name })),
+  ...coursesStore.courses.map((c) => ({ value: c.id, label: c.name })),
 ])
 
 const completionFilterOptions = [
@@ -35,7 +35,7 @@ const completionFilterOptions = [
 
 const modalCourseOptions = computed(() => [
   { value: '', label: 'Select a course' },
-  ...coursesStore.courses.map(c => ({ value: c.id, label: c.name })),
+  ...coursesStore.courses.map((c) => ({ value: c.id, label: c.name })),
 ])
 
 const formData = ref({

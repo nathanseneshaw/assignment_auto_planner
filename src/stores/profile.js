@@ -12,6 +12,7 @@ export const useProfileStore = defineStore('profile', () => {
     email: '',
     avatar: null,
     darkMode: false,
+    school: '',
   })
 
   function updateProfile(data) {

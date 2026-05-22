@@ -1,11 +1,13 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProfileStore } from '../stores/profile'
-import { Card, Button } from '../components/ui'
+import { Card, Button, Select } from '../components/ui'
 import { useAuthStore } from '../stores/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
 import IcsFeedsManager from '../components/features/IcsFeedsManager.vue'
+import SyllabusParser from '../components/SyllabusParser.vue'
+import { listSchools } from '../services/coursePlannerApi.js'
 
 const router = useRouter()
 
@@ -39,6 +41,36 @@ function getInitials(name) {
   return n.split(/\s+/).map((part) => part[0]).join('').toUpperCase().slice(0, 2)
 }
 
+// Course Planner school selection — gates the new "/course-planner" page.
+const supportedSchools = ref([])
+const schoolsLoading = ref(false)
+const schoolsError = ref('')
+const selectedSchool = computed({
+  get: () => profileStore.profile.school || '',
+  set: (v) => profileStore.updateProfile({ school: v }),
+})
+
+async function loadSupportedSchools() {
+  schoolsLoading.value = true
+  schoolsError.value = ''
+  try {
+    supportedSchools.value = await listSchools()
+  } catch (e) {
+    schoolsError.value = e?.message || 'Failed to load supported schools.'
+  } finally {
+    schoolsLoading.value = false
+  }
+}
+
+const schoolOptions = computed(() =>
+  [{ value: '', label: 'Not set — pick later' }].concat(
+    supportedSchools.value.map((s) => ({
+      value: s.code,
+      label: s.name,
+    }))
+  )
+)
+
 const signingOut = ref(false)
 
 async function signOutAccount() {
@@ -50,6 +82,8 @@ async function signOutAccount() {
     signingOut.value = false
   }
 }
+
+onMounted(loadSupportedSchools)
 </script>
 
 <template>
@@ -137,6 +171,30 @@ async function signOutAccount() {
       </div>
     </Card>
 
+    <!-- Course Planner — which university's catalog to search by default -->
+    <Card>
+      <div class="space-y-4">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Your university</h2>
+          <p class="text-gray-500 text-sm mt-1">
+            Selects which university's live course catalog the Course Planner searches.
+          </p>
+        </div>
+        <Select
+          v-model="selectedSchool"
+          label="University"
+          :options="schoolOptions"
+          :disabled="schoolsLoading || supportedSchools.length === 0"
+          :hint="schoolsLoading ? 'Loading…' : schoolsError || ''"
+          :error="schoolsError"
+        />
+        <p class="text-xs text-gray-500">
+          Schools marked "limited enrollment data" expose only open / closed status,
+          not exact seat counts.
+        </p>
+      </div>
+    </Card>
+
     <!-- Calendar feeds (ICS) — replaces the old LMS scraper integrations -->
     <div>
       <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Assignment imports</h2>
@@ -145,6 +203,7 @@ async function signOutAccount() {
         (Canvas, Brightspace, Blackboard) expose a "Calendar feed" or "Subscribe" URL — paste it below.
       </p>
       <IcsFeedsManager />
+      <SyllabusParser class="mt-4" />
     </div>
 
     <!-- Session -->

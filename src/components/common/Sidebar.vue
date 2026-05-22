@@ -46,13 +46,22 @@ const navItems = [
     icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
     description: 'Week & month'
   },
+  {
+    name: 'Course Planner',
+    path: '/course-planner',
+    icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
+    description: 'Find & schedule courses'
+  },
 ]
 
 const isActive = (path) => {
   if (path === '/dashboard') {
     return route.path === '/dashboard'
   }
-  return route.path.startsWith(path)
+  // `/course-planner` must not also light up `/course` — require either an
+  // exact match or that the next character is a path separator.
+  if (route.path === path) return true
+  return route.path.startsWith(path + '/')
 }
 </script>
 

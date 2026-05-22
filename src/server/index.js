@@ -20,6 +20,8 @@ import './load-env.js'
 import express from 'express'
 import cors from 'cors'
 import icsRoutes from './ics-routes.js'
+import coursePlannerRoutes from './course-planner-routes.js'
+import syllabusRoutes from './syllabus-routes.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -83,6 +85,13 @@ app.use((req, res, next) => {
 // ICS calendar feed sync — the sole assignment-ingest mechanism.
 app.use(icsRoutes)
 
+// Syllabus parser — upload a PDF/DOCX, Claude extracts the schedule, user
+// confirms in the UI, then the course + assignments land in Supabase.
+app.use(syllabusRoutes)
+
+// Course planner — public on-demand scrapers for Rice / TTU / TAMU / SMU.
+app.use(coursePlannerRoutes)
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
@@ -98,11 +107,17 @@ if (!process.env.VERCEL) {
   app.listen(PORT, HOST, () => {
     console.log(`API server listening on http://${HOST}:${PORT}`)
     console.log('Endpoints:')
-    console.log('  GET    /api/ics/feeds       — list ICS feeds for the signed-in user')
-    console.log('  POST   /api/ics/feeds       — add an ICS feed URL')
-    console.log('  DELETE /api/ics/feeds/:id   — remove an ICS feed (assignments are kept)')
-    console.log('  POST   /api/ics/sync        — fetch + parse + upsert one or all ICS feeds')
-    console.log('  GET    /api/health          — health probe')
+    console.log('  GET    /api/ics/feeds                              — list ICS feeds for the signed-in user')
+    console.log('  POST   /api/ics/feeds                              — add an ICS feed URL')
+    console.log('  DELETE /api/ics/feeds/:id                          — remove an ICS feed (assignments are kept)')
+    console.log('  POST   /api/ics/sync                               — fetch + parse + upsert one or all ICS feeds')
+    console.log('  POST   /api/syllabus/parse                         — upload a syllabus (PDF/DOCX); returns extracted draft')
+    console.log('  POST   /api/syllabus/save                          — persist a reviewed syllabus draft as a course + assignments')
+    console.log('  GET    /api/course-planner/schools                 — list supported universities')
+    console.log('  GET    /api/course-planner/:school/terms           — list terms for a school')
+    console.log('  GET    /api/course-planner/:school/subjects?term=  — list subjects for a term')
+    console.log('  GET    /api/course-planner/:school/sections?term=&subject=  — sections for a subject')
+    console.log('  GET    /api/health                                 — health probe')
   })
 }
 
@@ -111,7 +126,6 @@ if (!process.env.VERCEL) {
 // state — exit and let the process manager restart cleanly.
 process.on('unhandledRejection', (reason) => {
   console.error('[unhandledRejection]', reason)
-})
 process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err)
   process.exit(1)
