@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from '../lib/supabase'
 import IcsFeedsManager from '../components/features/IcsFeedsManager.vue'
 import SyllabusParser from '../components/SyllabusParser.vue'
 import { listSchools } from '../services/coursePlannerApi.js'
+import { COURSE_PLANNER } from '../config/featureFlags.js'
 
 const router = useRouter()
 
@@ -172,7 +173,7 @@ onMounted(loadSupportedSchools)
     </Card>
 
     <!-- Course Planner — which university's catalog to search by default -->
-    <Card>
+    <Card v-if="COURSE_PLANNER">
       <div class="space-y-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900">Your university</h2>
