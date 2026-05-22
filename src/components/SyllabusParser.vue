@@ -36,6 +36,12 @@ function pickFile() {
   fileInputEl.value?.click()
 }
 
+function clearFile() {
+  file.value = null
+  fileError.value = ''
+  if (fileInputEl.value) fileInputEl.value.value = ''
+}
+
 function onFileChange(event) {
   const picked = event.target.files?.[0] || null
   fileError.value = ''
@@ -217,7 +223,19 @@ function handleModalClose() {
           <Button variant="secondary" :disabled="parsing" @click="pickFile">
             Choose file…
           </Button>
-          <span v-if="file" class="text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs">{{ file.name }}</span>
+          <span v-if="file" class="inline-flex items-center gap-1.5 max-w-xs min-w-0">
+            <span class="text-sm text-gray-700 dark:text-gray-200 truncate">{{ file.name }}</span>
+            <button
+              type="button"
+              :disabled="parsing"
+              class="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:pointer-events-none"
+              @click="clearFile"
+            >
+              <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+                <path d="M1 1l8 8M9 1l-8 8" />
+              </svg>
+            </button>
+          </span>
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">PDF or DOCX, up to 5 MB</span>
         </div>
         <p v-if="fileError" class="mt-2 text-sm text-danger-600">{{ fileError }}</p>
