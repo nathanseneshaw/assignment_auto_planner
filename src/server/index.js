@@ -126,6 +126,8 @@ if (!process.env.VERCEL) {
 // state — exit and let the process manager restart cleanly.
 process.on('unhandledRejection', (reason) => {
   console.error('[unhandledRejection]', reason)
+})
+
 process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err)
   process.exit(1)

@@ -1,0 +1,37 @@
+# Dependencies — installed fresh inside the image via `npm ci`.
+node_modules
+**/node_modules
+
+# Build outputs / artifacts.
+dist
+release
+*.log
+
+# Secrets & local env — never bake these into the image.
+.env
+.env.*
+**/.env
+**/.env.*
+**/env.generated.js
+
+# Platform / VCS / editor metadata.
+.git
+.gitignore
+.vercel
+**/.vercel
+.vscode
+.idea
+
+# Frontend / desktop / tooling not used by the API image.
+electron
+scripts
+public
+index.html
+vite.config.*
+tailwind.config.*
+postcss.config.*
+*.md
+
+# Docker meta.
+Dockerfile
+.dockerignore
