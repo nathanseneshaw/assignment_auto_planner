@@ -4,6 +4,7 @@ import { useTasksStore } from '../stores/tasks'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
 import { Card, EmptyState, Modal, Input, Dropdown, Button } from '../components/ui'
+import TaskFormModal from '../components/features/TaskFormModal.vue'
 
 const tasksStore = useTasksStore()
 const coursesStore = useCoursesStore()
@@ -62,6 +63,10 @@ const showEditModal = ref(false)
 const editingAssignmentId = ref(null)
 const editFormData = ref({ title: '', description: '', courseId: '', dueDate: '' })
 
+// Task edit modal
+const showTaskEditModal = ref(false)
+const editingTask = ref(null)
+
 const modalCourseOptions = computed(() => [
   { value: '', label: 'Select a course' },
   ...coursesStore.courses.map(c => ({ value: c.id, label: c.name })),
@@ -78,6 +83,30 @@ function openEditModal(assignmentId) {
     dueDate: a.dueDate,
   }
   showEditModal.value = true
+}
+
+function openTaskEditModal(taskId) {
+  const t = tasksStore.tasks.find(t => t.id === taskId)
+  if (!t) return
+  editingTask.value = t
+  showTaskEditModal.value = true
+}
+
+function saveEditedTask(data) {
+  if (!editingTask.value) return
+  const assignment = data.assignmentId
+    ? assignmentsStore.getAssignmentById(data.assignmentId)
+    : null
+  tasksStore.updateTask(editingTask.value.id, {
+    title: data.title,
+    scheduledDate: data.scheduledDate,
+    priorityLevel: data.priorityLevel,
+    priority: data.priority,
+    assignmentId: data.assignmentId || null,
+    assignmentTitle: assignment?.title || null,
+    courseId: data.courseId || null,
+    courseName: data.courseName || null,
+  })
 }
 
 function saveEditedAssignment() {
@@ -97,6 +126,9 @@ function onPlannerItemClick(item) {
   if (item.kind === 'assignment' && item.assignmentId) {
     openEditModal(item.assignmentId)
     return
+  }
+  if (item.kind === 'task') {
+    openTaskEditModal(item.id)
   }
 }
 
@@ -346,7 +378,12 @@ function getCourseColor(courseId) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div>
+    <!-- Single root ELEMENT required by <Transition mode="out-in"> in App.vue.
+         A fragment root (multiple roots, or even a stray comment beside the root)
+         stalls the leave transition so the next page never mounts. This regressed
+         when the drag-and-drop work moved the edit modals out of this <div>. -->
+    <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col gap-4">
       <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -770,6 +807,9 @@ function getCourseColor(courseId) {
     </Card>
   </div>
 
+  <!-- Edit Task Modal -->
+  <TaskFormModal v-model="showTaskEditModal" :task="editingTask" @save="saveEditedTask" />
+
   <!-- Edit Assignment Modal -->
   <Modal v-model="showEditModal" title="Edit Assignment" size="lg">
     <form id="planner-edit-form" @submit.prevent="saveEditedAssignment" class="space-y-5">
@@ -825,4 +865,5 @@ function getCourseColor(courseId) {
       </div>
     </template>
   </Modal>
+  </div>
 </template>
