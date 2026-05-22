@@ -16,7 +16,6 @@ import * as rice from './course-planner/rice-scraper.js'
 import * as ttu from './course-planner/ttu-scraper.js'
 import * as tamu from './course-planner/tamu-scraper.js'
 import * as smu from './course-planner/smu-scraper.js'
-import * as utd from './course-planner/utd.js'
 import * as tamuc from './course-planner/tamuc-scraper.js'
 
 const router = Router()
@@ -47,13 +46,6 @@ const SCHOOLS = {
     // Quick Reference Schedule has no seat data at all.
     enrollmentDataAvailable: false,
     scraper: smu,
-  },
-  utd: {
-    code: 'utd',
-    name: 'University of Texas at Dallas',
-    // CourseBook exposes fill percentage, not raw seat counts.
-    enrollmentDataAvailable: false,
-    scraper: utd,
   },
   tamuc: {
     code: 'tamuc',

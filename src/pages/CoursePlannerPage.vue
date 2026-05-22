@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useCoursePlannerStore } from '../stores/coursePlanner'
 import { useProfileStore } from '../stores/profile'
-import { Card, Button, Select, Input, Badge, EmptyState } from '../components/ui'
+import { Card, Button, Select, Input, Badge, EmptyState, Modal } from '../components/ui'
 import { listSchools } from '../services/coursePlannerApi.js'
 
 const planner = useCoursePlannerStore()
@@ -96,35 +96,115 @@ const hourMarkers = computed(() => {
 // Extra padding below the final hour so the last label (centered on the edge) isn't clipped.
 const gridHeightPx = computed(() => (HOUR_END - HOUR_START) * ROW_HEIGHT_PX * 2 + 12)
 
-/** Returns array of { section, meeting, day, topPx, heightPx, color } per day. */
-const calendarBlocks = computed(() => {
+// Neutral slate so "Work" blocks read as a different category from the
+// pastel-colored course blocks.
+const WORK_COLOR = { bg: 'bg-slate-200/80', text: 'text-slate-700', border: 'border-l-slate-500' }
+
+/** Position + size a block within the visible grid, clamping to the 7am–10pm window. */
+function makeBlock(b) {
+  const startMin = toMinutes(b.startTime)
+  const endMin = toMinutes(b.endTime)
+  const gridTop = HOUR_START * 60
+  const gridBot = HOUR_END * 60
+  const start = Math.max(startMin, gridTop)
+  const end = Math.min(endMin, gridBot)
+  const topPx = ((start - gridTop) / 30) * ROW_HEIGHT_PX
+  const heightPx = Math.max(((end - start) / 30) * ROW_HEIGHT_PX, 22)
+  return { ...b, startMin, endMin, topPx, heightPx, leftPct: 0, widthPct: 100 }
+}
+
+/**
+ * Assign side-by-side columns to overlapping blocks within one day so they
+ * don't stack on top of each other. Mutates each block's leftPct/widthPct.
+ */
+function layoutColumn(blocks) {
+  if (blocks.length < 2) return blocks
+  blocks.sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin)
+  let cluster = []
+  let clusterEnd = -1
+  const flush = () => {
+    if (!cluster.length) return
+    const colEnds = []
+    for (const blk of cluster) {
+      let col = colEnds.findIndex((endMin) => endMin <= blk.startMin)
+      if (col === -1) {
+        col = colEnds.length
+        colEnds.push(blk.endMin)
+      } else {
+        colEnds[col] = blk.endMin
+      }
+      blk._col = col
+    }
+    const n = colEnds.length
+    for (const blk of cluster) {
+      blk.widthPct = 100 / n
+      blk.leftPct = (blk._col * 100) / n
+    }
+    cluster = []
+    clusterEnd = -1
+  }
+  for (const blk of blocks) {
+    if (cluster.length && blk.startMin >= clusterEnd) flush()
+    cluster.push(blk)
+    clusterEnd = Math.max(clusterEnd, blk.endMin)
+  }
+  flush()
+  return blocks
+}
+
+/** Course meetings + work shifts, grouped by day with overlap layout applied. */
+const dayBlocks = computed(() => {
   const byDay = Object.fromEntries(DAYS.map((d) => [d.code, []]))
+
   for (const section of planner.savedSections) {
     for (const m of section.meetings || []) {
       if (!m.startTime || !m.endTime) continue
-      const startMin = toMinutes(m.startTime)
-      const endMin = toMinutes(m.endTime)
-      const top = ((startMin - HOUR_START * 60) / 30) * ROW_HEIGHT_PX
-      const height = Math.max(((endMin - startMin) / 30) * ROW_HEIGHT_PX, 22)
+      const base = makeBlock({
+        kind: 'course',
+        key: `c-${section.crn}`,
+        startTime: m.startTime,
+        endTime: m.endTime,
+        section,
+        meeting: m,
+        color: colorFor(section),
+      })
       for (const d of m.days || []) {
-        if (!byDay[d]) continue
-        byDay[d].push({
-          section,
-          meeting: m,
-          day: d,
-          topPx: top,
-          heightPx: height,
-          color: colorFor(section),
-        })
+        if (byDay[d]) byDay[d].push({ ...base, key: `${base.key}-${d}` })
       }
     }
   }
+
+  for (const shift of planner.workShifts) {
+    if (!shift.startTime || !shift.endTime) continue
+    const base = makeBlock({
+      kind: 'work',
+      key: `w-${shift.id}`,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      color: WORK_COLOR,
+    })
+    for (const d of shift.days || []) {
+      if (byDay[d]) byDay[d].push({ ...base, key: `${base.key}-${d}` })
+    }
+  }
+
+  for (const d of DAYS) layoutColumn(byDay[d.code])
   return byDay
 })
 
 const unscheduledSaved = computed(() =>
   planner.savedSections.filter((s) => !s.meetings.some((m) => m.startTime && m.endTime && m.days.length))
 )
+
+// One-line summary under the "Your week" heading.
+const weekSummary = computed(() => {
+  const c = planner.savedSections.length
+  const w = planner.workShifts.length
+  const parts = []
+  if (c) parts.push(`${c} ${c === 1 ? 'course' : 'courses'}`)
+  if (w) parts.push(`${w} work ${w === 1 ? 'shift' : 'shifts'}`)
+  return parts.join(' · ')
+})
 
 // --- Helpers ---
 
@@ -158,14 +238,14 @@ function formatClock(hhmm) {
 }
 
 const PALETTE = [
-  { bg: 'bg-blue-100', text: 'text-blue-900', ring: 'ring-blue-300' },
-  { bg: 'bg-emerald-100', text: 'text-emerald-900', ring: 'ring-emerald-300' },
-  { bg: 'bg-amber-100', text: 'text-amber-900', ring: 'ring-amber-300' },
-  { bg: 'bg-violet-100', text: 'text-violet-900', ring: 'ring-violet-300' },
-  { bg: 'bg-rose-100', text: 'text-rose-900', ring: 'ring-rose-300' },
-  { bg: 'bg-teal-100', text: 'text-teal-900', ring: 'ring-teal-300' },
-  { bg: 'bg-orange-100', text: 'text-orange-900', ring: 'ring-orange-300' },
-  { bg: 'bg-cyan-100', text: 'text-cyan-900', ring: 'ring-cyan-300' },
+  { bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-l-blue-400' },
+  { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-l-emerald-400' },
+  { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-l-amber-400' },
+  { bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-l-violet-400' },
+  { bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-l-rose-400' },
+  { bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-l-teal-400' },
+  { bg: 'bg-orange-50', text: 'text-orange-800', border: 'border-l-orange-400' },
+  { bg: 'bg-cyan-50', text: 'text-cyan-800', border: 'border-l-cyan-400' },
 ]
 
 function colorFor(section) {
@@ -190,6 +270,68 @@ function onTermChange(code) {
 function onSubjectChange(code) {
   const subject = planner.subjects.find((s) => s.code === code)
   planner.setSubject(code, subject?.label || '')
+}
+
+// --- Work schedule modal ---
+// The modal edits a local draft of the weekly shifts; nothing touches the
+// store (or the calendar) until the user hits Save.
+const workModalOpen = ref(false)
+const workDraft = ref([])
+
+function newShift() {
+  return {
+    id: `work-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    days: [],
+    startTime: '09:00',
+    endTime: '17:00',
+  }
+}
+
+function openWorkModal() {
+  workDraft.value = planner.workShifts.map((s) => ({
+    id: s.id,
+    days: [...(s.days || [])],
+    startTime: s.startTime || '',
+    endTime: s.endTime || '',
+  }))
+  if (!workDraft.value.length) workDraft.value.push(newShift())
+  workModalOpen.value = true
+}
+
+function addDraftShift() {
+  workDraft.value.push(newShift())
+}
+
+function removeDraftShift(idx) {
+  workDraft.value.splice(idx, 1)
+}
+
+function toggleDraftDay(shift, dayCode) {
+  const i = shift.days.indexOf(dayCode)
+  if (i === -1) shift.days.push(dayCode)
+  else shift.days.splice(i, 1)
+}
+
+function shiftError(s) {
+  if (!s.days.length) return 'Pick at least one day.'
+  if (!s.startTime || !s.endTime) return 'Set a start and end time.'
+  if (toMinutes(s.endTime) <= toMinutes(s.startTime)) return 'End time must be after the start time.'
+  return ''
+}
+
+const workDraftValid = computed(() => workDraft.value.every((s) => !shiftError(s)))
+
+function saveWork() {
+  if (!workDraftValid.value) return
+  planner.setWorkShifts(
+    workDraft.value.map((s) => ({
+      id: s.id,
+      days: [...s.days],
+      startTime: s.startTime,
+      endTime: s.endTime,
+    }))
+  )
+  workModalOpen.value = false
 }
 </script>
 
@@ -334,63 +476,87 @@ function onSubjectChange(code) {
         </div>
 
         <!-- RIGHT: weekly grid -->
-        <Card class="lg:col-span-3 min-w-0">
-          <div class="flex items-baseline justify-between mb-3">
-            <h2 class="text-lg font-semibold text-gray-900">Your week</h2>
-            <p v-if="planner.savedSections.length === 0" class="text-xs text-gray-500">
-              Add sections to build your schedule.
-            </p>
+        <Card class="lg:col-span-3 min-w-0 overflow-hidden" padding="none">
+          <!-- Card header -->
+          <div class="px-5 py-4 flex items-center justify-between gap-3 border-b border-gray-100">
+            <div class="min-w-0">
+              <h2 class="text-[15px] font-semibold text-gray-900 tracking-tight leading-tight">Your week</h2>
+            </div>
+            <Button variant="secondary" size="sm" class="shrink-0" @click="openWorkModal">
+              <svg class="w-4 h-4 mr-1.5 -ml-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              {{ planner.workShifts.length ? 'Edit work hours' : 'Add work hours' }}
+            </Button>
           </div>
+
           <div class="overflow-x-auto">
-            <div class="grid grid-cols-[3rem_repeat(7,minmax(6rem,1fr))] min-w-180 border-l border-t border-gray-200 rounded-md overflow-hidden">
-              <!-- Time gutter header -->
-              <div class="border-r border-b border-gray-200 bg-gray-50"></div>
-              <!-- Day headers -->
+            <div class="grid grid-cols-[3rem_repeat(7,minmax(5.5rem,1fr))] min-w-[46rem]">
+              <!-- Day header row -->
+              <div class="bg-white border-b border-b-gray-200 border-r border-r-gray-100 h-9"></div>
               <div
                 v-for="d in DAYS"
                 :key="d.code"
-                class="border-r border-b border-gray-200 bg-gray-50 px-2 py-1.5 text-xs font-semibold text-gray-700 text-center"
+                class="flex items-center justify-center h-9 border-b border-b-gray-200 border-r border-r-gray-100 px-2 text-[11px] font-semibold tracking-widest uppercase"
+                :class="(d.code === 'S' || d.code === 'U') ? 'bg-gray-50/70 text-gray-400' : 'bg-white text-gray-500'"
               >
                 {{ d.label }}
               </div>
-              <!-- Time gutter + day columns -->
-              <div class="border-r border-gray-200 relative" :style="{ height: gridHeightPx + 'px' }">
+
+              <!-- Time gutter -->
+              <div class="relative border-t border-r border-gray-100" :style="{ height: gridHeightPx + 'px' }">
                 <div
                   v-for="h in hourMarkers"
                   :key="h.hour"
-                  class="absolute left-0 right-0 text-[10px] text-gray-400 px-1 -translate-y-1/2"
-                  :style="{ top: h.topPx + 'px' }"
+                  class="absolute right-1.5 text-[10px] text-gray-400 leading-none font-medium tabular-nums"
+                  :class="h.hour === HOUR_START ? 'top-1' : '-translate-y-1/2'"
+                  :style="h.hour === HOUR_START ? {} : { top: h.topPx + 'px' }"
                 >
                   {{ h.label }}
                 </div>
               </div>
+
+              <!-- Day columns -->
               <div
                 v-for="d in DAYS"
                 :key="d.code"
-                class="border-r border-gray-200 relative"
+                class="border-t border-r border-gray-100 relative"
+                :class="(d.code === 'S' || d.code === 'U') ? 'bg-gray-50/70' : 'bg-white'"
                 :style="{ height: gridHeightPx + 'px' }"
               >
-                <!-- Hour-line grid -->
+                <!-- Hour lines -->
                 <div
                   v-for="h in hourMarkers"
                   :key="h.hour"
                   class="absolute left-0 right-0 border-t border-gray-100"
                   :style="{ top: h.topPx + 'px' }"
                 />
-                <!-- Section blocks -->
+                <!-- Half-hour lines -->
                 <div
-                  v-for="(block, idx) in calendarBlocks[d.code]"
-                  :key="`${block.section.crn}-${idx}`"
-                  class="absolute left-1 right-1 rounded-md p-1.5 text-[11px] font-medium ring-1 overflow-hidden shadow-sm"
-                  :class="[block.color.bg, block.color.text, block.color.ring]"
-                  :style="{ top: block.topPx + 'px', height: block.heightPx + 'px' }"
-                  :title="`${block.section.subjectCode} ${block.section.courseNumber} · ${block.section.title} · ${formatClock(block.meeting.startTime)}–${formatClock(block.meeting.endTime)}`"
+                  v-for="h in hourMarkers"
+                  :key="'hh-' + h.hour"
+                  class="absolute left-0 right-0 border-t border-dashed border-gray-100/80"
+                  :style="{ top: (h.topPx + ROW_HEIGHT_PX) + 'px' }"
+                />
+                <!-- Course + work blocks -->
+                <div
+                  v-for="block in dayBlocks[d.code]"
+                  :key="block.key"
+                  class="absolute rounded-md p-1.5 text-[11px] font-medium overflow-hidden border-l-4 shadow-sm"
+                  :class="[block.color.bg, block.color.text, block.color.border]"
+                  :style="{
+                    top: block.topPx + 'px',
+                    height: block.heightPx + 'px',
+                    left: `calc(${block.leftPct}% + 2px)`,
+                    width: `calc(${block.widthPct}% - 4px)`,
+                  }"
+                  :title="block.kind === 'work'
+                    ? `Work · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`
+                    : `${block.section.subjectCode} ${block.section.courseNumber} · ${block.section.title} · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`"
                 >
-                  <div class="font-bold leading-tight">
-                    {{ block.section.subjectCode }} {{ block.section.courseNumber }}
-                  </div>
-                  <div class="leading-tight truncate opacity-80">
-                    {{ formatClock(block.meeting.startTime) }}
+                  <div class="font-bold leading-tight truncate">
+                    <template v-if="block.kind === 'work'">Work</template>
+                    <template v-else>{{ block.section.subjectCode }} {{ block.section.courseNumber }}</template>
                   </div>
                 </div>
               </div>
@@ -398,9 +564,9 @@ function onSubjectChange(code) {
           </div>
 
           <!-- Unscheduled (TBA) saved sections -->
-          <div v-if="unscheduledSaved.length" class="mt-4 border-t border-gray-100 pt-3">
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-              Saved with no meeting time
+          <div v-if="unscheduledSaved.length" class="px-5 py-4 border-t border-gray-100">
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+              Saved · no meeting time
             </p>
             <ul class="space-y-1.5">
               <li
@@ -423,6 +589,103 @@ function onSubjectChange(code) {
           </div>
         </Card>
       </div>
+
+      <!-- Work schedule modal -->
+      <Modal v-model="workModalOpen" title="Weekly work schedule" size="lg">
+        <div class="space-y-4">
+          <p class="text-sm text-gray-500">
+            Add the shifts you work each week. They'll appear on your weekly grid as
+            <span class="font-medium text-gray-700">Work</span> blocks so you can plan classes around them.
+          </p>
+
+          <div
+            v-for="(shift, idx) in workDraft"
+            :key="shift.id"
+            class="rounded-xl border border-gray-200 p-4 space-y-3"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-gray-700">Shift {{ idx + 1 }}</span>
+              <button
+                type="button"
+                class="p-1 text-gray-400 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
+                title="Remove shift"
+                @click="removeDraftShift(idx)"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Day selector -->
+            <div class="flex flex-wrap gap-1.5">
+              <button
+                v-for="d in DAYS"
+                :key="d.code"
+                type="button"
+                class="px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors"
+                :class="shift.days.includes(d.code)
+                  ? 'bg-primary-900 text-white border-primary-900'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                @click="toggleDraftDay(shift, d.code)"
+              >
+                {{ d.label }}
+              </button>
+            </div>
+
+            <!-- Times -->
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium text-gray-600">Start</label>
+                <input
+                  v-model="shift.startTime"
+                  type="time"
+                  class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 hover:border-gray-300/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200"
+                />
+              </div>
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium text-gray-600">End</label>
+                <input
+                  v-model="shift.endTime"
+                  type="time"
+                  class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 hover:border-gray-300/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200"
+                />
+              </div>
+            </div>
+
+            <p v-if="shiftError(shift)" class="text-xs text-danger-600 flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {{ shiftError(shift) }}
+            </p>
+          </div>
+
+          <Button variant="outline" size="sm" block @click="addDraftShift">
+            + Add another shift
+          </Button>
+        </div>
+
+        <template #footer>
+          <div class="flex items-center justify-between gap-3">
+            <button
+              v-if="workDraft.length"
+              type="button"
+              class="text-sm font-medium text-danger-600 hover:underline"
+              @click="workDraft = []"
+            >
+              Clear all
+            </button>
+            <span v-else></span>
+            <div class="flex gap-3">
+              <Button variant="secondary" @click="workModalOpen = false">Cancel</Button>
+              <Button variant="primary" :disabled="!workDraftValid" @click="saveWork">
+                Save schedule
+              </Button>
+            </div>
+          </div>
+        </template>
+      </Modal>
     </template>
   </div>
 </template>

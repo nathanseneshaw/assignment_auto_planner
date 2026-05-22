@@ -20,6 +20,7 @@ import * as coursePlannerApi from '../services/coursePlannerApi.js'
 import { useProfileStore } from './profile.js'
 
 const STORAGE_KEY = 'coursePlanner:saved'
+const WORK_STORAGE_KEY = 'coursePlanner:work'
 
 export const useCoursePlannerStore = defineStore('coursePlanner', () => {
   const profileStore = useProfileStore()
@@ -44,6 +45,11 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     if (!schoolCode.value) return []
     return savedSectionsBySchool.value[schoolCode.value] || []
   })
+
+  // Persisted: weekly work shifts. Global (not per-school) — a job doesn't
+  // change when you switch which catalog you're browsing.
+  // Shape: [{ id, days: ['M','W'], startTime: '09:00', endTime: '17:00' }]
+  const workShifts = ref(loadWork())
 
   // --- Loaders ---
 
@@ -180,6 +186,34 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     }
   }
 
+  // --- Work shifts ---
+
+  /** Replace the whole weekly work schedule (the modal edits a draft, then commits it here). */
+  function setWorkShifts(shifts) {
+    workShifts.value = Array.isArray(shifts) ? shifts : []
+    persistWork()
+  }
+
+  function persistWork() {
+    try {
+      localStorage.setItem(WORK_STORAGE_KEY, JSON.stringify(workShifts.value))
+    } catch (e) {
+      console.warn('[coursePlanner] persist work failed:', e)
+    }
+  }
+
+  function loadWork() {
+    try {
+      const raw = localStorage.getItem(WORK_STORAGE_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch (e) {
+      console.warn('[coursePlanner] load work failed:', e)
+      return []
+    }
+  }
+
   return {
     schoolCode,
     terms,
@@ -201,5 +235,7 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     isSaved,
     addSection,
     removeSection,
+    workShifts,
+    setWorkShifts,
   }
 })
