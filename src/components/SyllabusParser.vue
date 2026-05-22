@@ -192,20 +192,20 @@ function handleModalClose() {
 <template>
   <Card padding="md">
     <div class="mb-4">
-      <h3 class="text-lg font-semibold text-gray-900">Syllabus parser</h3>
-      <p class="text-sm text-gray-500 mt-1">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Syllabus parser</h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
         Upload a course syllabus (PDF or DOCX). We'll use AI to pull out the course details and assignment due dates,
         let you review and edit them, then add everything to your assignments.
       </p>
     </div>
 
     <div class="space-y-4">
-      <div v-if="!authStore.user" class="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-xl p-3">
+      <div v-if="!authStore.user" class="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-xl p-3">
         Sign in to use the syllabus parser.
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1.5">Syllabus file</label>
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Syllabus file</label>
         <input
           ref="fileInputEl"
           type="file"
@@ -217,8 +217,8 @@ function handleModalClose() {
           <Button variant="secondary" :disabled="parsing" @click="pickFile">
             Choose file…
           </Button>
-          <span v-if="file" class="text-sm text-gray-700 truncate max-w-xs">{{ file.name }}</span>
-          <span v-else class="text-sm text-gray-400">PDF or DOCX, up to 5 MB</span>
+          <span v-if="file" class="text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs">{{ file.name }}</span>
+          <span v-else class="text-sm text-gray-400 dark:text-gray-500">PDF or DOCX, up to 5 MB</span>
         </div>
         <p v-if="fileError" class="mt-2 text-sm text-danger-600">{{ fileError }}</p>
       </div>
@@ -229,12 +229,12 @@ function handleModalClose() {
         </Button>
       </div>
 
-      <div v-if="parseError" class="text-sm text-danger-700 bg-danger-50 border border-danger-200 rounded-xl p-3">
+      <div v-if="parseError" class="text-sm text-danger-700 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/30 border border-danger-200 dark:border-danger-800/60 rounded-xl p-3">
         {{ parseError }}
       </div>
 
-      <div v-if="saveResult" class="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl p-3">
-        Imported <strong>{{ saveResult.courseName }}</strong> with {{ saveResult.assignmentsInserted }} assignment(s) — visible now on the Courses and Assignments pages.
+      <div v-if="saveResult" class="text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/60 rounded-xl p-3">
+        Imported <strong>{{ saveResult.courseName }}</strong> with {{ saveResult.assignmentsInserted }} assignment(s) — visible now on the Assignments page.
         <span v-if="saveResult.assignmentsSkipped > 0">
           ({{ saveResult.assignmentsSkipped }} row(s) without a due date were skipped.)
         </span>
@@ -251,13 +251,13 @@ function handleModalClose() {
     @close="handleModalClose"
   >
     <div v-if="draft" class="space-y-6">
-      <div v-if="parseMeta?.truncated" class="text-xs text-warning-800 bg-warning-50 border border-warning-200 rounded-xl p-3">
+      <div v-if="parseMeta?.truncated" class="text-xs text-warning-800 dark:text-warning-300 bg-warning-50 dark:bg-warning-900/30 border border-warning-200 dark:border-warning-800/60 rounded-xl p-3">
         This syllabus was long. We sent the first ~50 000 characters plus the last 5 000 to the parser, so a few
         middle items may be missing — add any missing rows below before saving.
       </div>
 
       <section>
-        <h4 class="text-sm font-semibold text-gray-900 mb-3">Course</h4>
+        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Course</h4>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Input v-model="draft.course.name" label="Course name" required />
           <Input v-model="draft.course.code" label="Course code (optional)" />
@@ -268,14 +268,14 @@ function handleModalClose() {
 
       <section>
         <div class="flex items-center justify-between mb-2">
-          <h4 class="text-sm font-semibold text-gray-900">Assignments ({{ draft.assignments.length }})</h4>
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Assignments ({{ draft.assignments.length }})</h4>
           <Button size="sm" variant="secondary" @click="addAssignmentRow">+ Add row</Button>
         </div>
-        <p class="text-xs text-gray-500 mb-3">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
           Assignments without a due date can't be saved — fill one in or remove the row.
         </p>
 
-        <div v-if="draft.assignments.length === 0" class="text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl p-4 text-center">
+        <div v-if="draft.assignments.length === 0" class="text-sm text-gray-500 dark:text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4 text-center">
           No assignments detected. Click "Add row" to enter them manually.
         </div>
 
@@ -283,17 +283,17 @@ function handleModalClose() {
           <li
             v-for="(a, idx) in draft.assignments"
             :key="idx"
-            class="border border-gray-200 rounded-xl p-3"
+            class="border border-gray-200 dark:border-gray-700 rounded-xl p-3"
           >
             <div class="grid grid-cols-1 md:grid-cols-[2fr,1fr,auto] gap-3 items-end">
               <Input v-model="a.name" label="Name" placeholder="Problem Set 3" />
               <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-gray-600">Due date</label>
+                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Due date</label>
                 <input
                   type="date"
                   :value="isoToDateInput(a.dueAt)"
-                  class="w-full px-4 py-2.5 rounded-xl border bg-white text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20"
-                  :class="a.dueAt ? 'border-gray-200' : 'border-danger-300 bg-danger-50/40'"
+                  class="w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 scheme-light dark:scheme-dark"
+                  :class="a.dueAt ? 'border-gray-200 dark:border-gray-700' : 'border-danger-300 bg-danger-50/40 dark:bg-danger-900/30'"
                   @input="onDueDateInput(idx, $event)"
                 />
               </div>
@@ -303,7 +303,7 @@ function handleModalClose() {
         </ul>
       </section>
 
-      <div v-if="saveError" class="text-sm text-danger-700 bg-danger-50 border border-danger-200 rounded-xl p-3">
+      <div v-if="saveError" class="text-sm text-danger-700 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/30 border border-danger-200 dark:border-danger-800/60 rounded-xl p-3">
         {{ saveError }}
       </div>
     </div>
