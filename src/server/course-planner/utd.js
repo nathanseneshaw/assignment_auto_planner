@@ -1,71 +1,23 @@
 /**
  * UT Dallas scraper — server-side, runs in Express for both web and Electron clients.
  *
- * Why a browser: CourseBook's search endpoint (POST /clips/clip-cb11-hat.zog)
- * is gated by reCAPTCHA v3. Plain HTTP gets HTTP 200 with empty body because
- * the request carries no token + scores zero. Playwright + the stealth plugin
- * mints a real token on page load, which gates subsequent search calls.
+ * NOTE: Browser-based section search (playwright-extra + puppeteer-extra-plugin-stealth)
+ * has been removed. CourseBook's search endpoint is reCAPTCHA v3 gated and cannot be
+ * reached without a headless browser. getSections() returns [] as a stub.
  *
- * Same contract as the other scrapers:
- *   getTerms()      -> [{ code, label }]
- *   getSubjects()   -> [{ code, label }]    (term-independent on UTD)
- *   getSections({ termCode, subjectCode, termLabel?, subjectLabel? }) -> [Section]
+ * Still functional:
+ *   getTerms()    -> [{ code, label }]
+ *   getSubjects() -> [{ code, label }]    (term-independent on UTD)
+ *   getSections() -> []                   (stubbed — browser automation removed)
  *
- * Caching is handled by the shared `cacheMemo` — 5 min for sections, 1 h for
- * the static term/subject dropdowns.
+ * Caching is handled by the shared `cacheMemo` — 1 h for the static term/subject dropdowns.
  */
 import * as cheerio from 'cheerio'
-import { chromium } from 'playwright-extra'
-import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import { cacheMemo } from './cache.js'
-
-chromium.use(StealthPlugin())
 
 const SCHOOL = 'utd'
 const BASE = 'https://coursebook.utdallas.edu'
 const GUIDED_URL = `${BASE}/guidedsearch`
-
-// ── Browser singleton ────────────────────────────────────────────────────────
-// One Chromium per process; pages are short-lived. Lazily started so dev
-// startup isn't blocked by a launch when nobody uses UTD.
-
-let _browser = null
-let _browserPromise = null
-
-async function getBrowser() {
-  if (_browser?.isConnected()) return _browser
-  if (_browserPromise) return _browserPromise
-  _browserPromise = chromium
-    .launch({
-      headless: true,
-      // Hide the "controlled by automation" banner so reCAPTCHA v3 doesn't
-      // immediately flag us. Stealth covers the rest.
-      args: ['--disable-blink-features=AutomationControlled'],
-    })
-    .then((b) => {
-      _browser = b
-      b.on('disconnected', () => {
-        _browser = null
-      })
-      return b
-    })
-    .finally(() => {
-      _browserPromise = null
-    })
-  return _browserPromise
-}
-
-async function newPage() {
-  const browser = await getBrowser()
-  const context = await browser.newContext({
-    userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-      '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    viewport: { width: 1366, height: 900 },
-    locale: 'en-US',
-  })
-  return { context, page: await context.newPage() }
-}
 
 // ── Terms + subjects: server-rendered dropdowns, plain fetch is fine ────────
 
@@ -123,69 +75,19 @@ async function findCpValue(subjectCode) {
   return match?.cpValue || `cp_${String(subjectCode).toLowerCase()}`
 }
 
-// ── Section search: requires the headless browser ────────────────────────────
+// ── Section search: stubbed (browser automation removed) ─────────────────────
+//
+// CourseBook's search endpoint is reCAPTCHA v3 gated. The playwright-extra /
+// puppeteer-extra-plugin-stealth packages that previously drove a headless
+// Chromium have been uninstalled. Returning an empty array keeps the rest of
+// the app from crashing.
 
-export async function getSections({ termCode, subjectCode, termLabel, subjectLabel }) {
-  const cacheKey = `utd:sections:${termCode}:${subjectCode}`
-  return cacheMemo(cacheKey, async () => {
-    const cpValue = await findCpValue(subjectCode)
-    const html = await runGuidedSearch({ termCode, cpValue })
-    if (!html) return []
-    return parseSectionsHtml(html, { termCode, termLabel, subjectCode, subjectLabel })
-  })
-}
-
-/** Drive the guided search form in a real Chromium page and return the
- *  inner HTML of the #sr div once results have loaded. */
-async function runGuidedSearch({ termCode, cpValue }) {
-  const { context, page } = await newPage()
-  try {
-    await page.goto(GUIDED_URL, { waitUntil: 'domcontentloaded', timeout: 30000 })
-
-    // Let reCAPTCHA v3 mint + verify its token. The /glips/captcha.zog POST
-    // is the signal that the token has been accepted server-side.
-    await Promise.race([
-      page.waitForResponse(
-        (r) => r.url().includes('/glips/captcha.zog') && r.status() === 200,
-        { timeout: 12000 }
-      ),
-      page.waitForTimeout(8000),
-    ]).catch(() => {})
-
-    await page.selectOption('#combobox_term', termCode)
-    await page.selectOption('#combobox_cp', cpValue)
-
-    // Fire the search. We accept any response status from the clips endpoint
-    // (reCAPTCHA may downgrade the request to a non-200 on low-score runs).
-    // The fallback waitForTimeout lets us read whatever #sr contains even if
-    // the network request never completes (bot-blocked).
-    const searchDone = Promise.race([
-      page.waitForResponse(
-        (r) =>
-          r.url().includes('/clips/clip-cb11-hat.zog') &&
-          r.request().method() === 'POST',
-        { timeout: 28000 }
-      ),
-      page.waitForTimeout(25000),
-    ]).catch(() => {})
-
-    await page.evaluate(() => {
-      if (typeof window.do_guided_search !== 'function') {
-        throw new Error('do_guided_search not loaded')
-      }
-      window.do_guided_search()
-    })
-    await searchDone
-    // Short settle so jQuery's success handler can swap #sr content in.
-    await page.waitForTimeout(1000)
-
-    const srHtml = await page.locator('#sr').innerHTML()
-    const preview = srHtml.slice(0, 300).replace(/\s+/g, ' ')
-    console.log(`[utd] #sr preview (${srHtml.length} chars): ${preview}`)
-    return srHtml
-  } finally {
-    await context.close().catch(() => {})
-  }
+export async function getSections({ termCode, subjectCode }) {
+  console.warn(
+    `[utd] getSections(${termCode}, ${subjectCode}) — UTD browser scraping is disabled ` +
+    '(playwright-extra / puppeteer-extra-plugin-stealth removed). Returning [].'
+  )
+  return []
 }
 
 // ── HTML parser ─────────────────────────────────────────────────────────────
@@ -332,10 +234,5 @@ function parseClassAddress(addr) {
   return { subject: m[1], number: m[2], section: m[3], term: m[4] }
 }
 
-/** Optional graceful shutdown for tests / process exit. */
-export async function close() {
-  if (_browser) {
-    await _browser.close().catch(() => {})
-    _browser = null
-  }
-}
+/** No-op — browser singleton was removed along with playwright-extra. */
+export async function close() {}

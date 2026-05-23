@@ -9,40 +9,91 @@
  *   2. POST /StudentRegistrationSsb/ssb/term/search   (sets selected term)
  *   3. GET  /StudentRegistrationSsb/ssb/searchResults/searchResults (the data)
  *
- * One CookieJar per (term) keeps the term selection isolated.
+ * Cookies are forwarded manually between steps using the Set-Cookie response
+ * header so no external cookie-jar library is required.
  */
-import { CookieJar } from 'tough-cookie'
-import makeFetchCookie from 'fetch-cookie'
 import { cacheMemo } from './cache.js'
 import { daysFromBooleans, parseCredits } from './util.js'
+
+/**
+ * Parse all Set-Cookie headers from a Response into a single Cookie string
+ * suitable for re-use in subsequent requests.
+ * @param {Response} res
+ * @returns {string}
+ */
+function extractCookies(res) {
+  const raw = res.headers.getSetCookie ? res.headers.getSetCookie() : []
+  // Each entry looks like "name=value; Path=/; HttpOnly" — keep only name=value.
+  return raw.map((c) => c.split(';')[0].trim()).join('; ')
+}
+
+/**
+ * Merge two cookie strings, preferring values from `next` on key collision.
+ * @param {string} existing
+ * @param {string} next
+ * @returns {string}
+ */
+function mergeCookies(existing, next) {
+  const map = new Map()
+  for (const part of [existing, next]) {
+    if (!part) continue
+    for (const pair of part.split(';')) {
+      const eq = pair.indexOf('=')
+      if (eq === -1) continue
+      const key = pair.slice(0, eq).trim()
+      const val = pair.slice(eq + 1).trim()
+      if (key) map.set(key, val)
+    }
+  }
+  return [...map.entries()].map(([k, v]) => `${k}=${v}`).join('; ')
+}
 
 const SCHOOL = 'ttu'
 const BASE = 'https://registration.texastech.edu'
 const UA = 'Mozilla/5.0 (compatible; AssignmentAutoPlanner/1.0)'
 const MEP = 'TTU'
 
-/** A per-term Banner session: visit registration, then bind the term. */
+/**
+ * A per-term Banner session: visit registration, then bind the term.
+ * Returns a fetch wrapper that automatically forwards the accumulated session
+ * cookies on every call (read-only after setup — cookies are not updated
+ * from subsequent responses, which is sufficient for Banner's read-only APIs).
+ */
 async function bannerSessionForTerm(termCode) {
-  const jar = new CookieJar()
-  const cFetch = makeFetchCookie(fetch, jar)
-  await cFetch(`${BASE}/StudentRegistrationSsb/ssb/registration?mepCode=${MEP}`, {
-    headers: { 'User-Agent': UA },
-  })
-  await cFetch(`${BASE}/StudentRegistrationSsb/ssb/term/search?mode=search`, {
-    method: 'POST',
-    headers: {
-      'User-Agent': UA,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      term: termCode,
-      studyPath: '',
-      studyPathText: '',
-      startDatepicker: '',
-      endDatepicker: '',
-    }).toString(),
-  })
-  return cFetch
+  // Step 1: seed JSESSIONID
+  const regRes = await fetch(
+    `${BASE}/StudentRegistrationSsb/ssb/registration?mepCode=${MEP}`,
+    { headers: { 'User-Agent': UA } }
+  )
+  let cookies = extractCookies(regRes)
+
+  // Step 2: bind the term (server records the selection against JSESSIONID)
+  const termRes = await fetch(
+    `${BASE}/StudentRegistrationSsb/ssb/term/search?mode=search`,
+    {
+      method: 'POST',
+      headers: {
+        'User-Agent': UA,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: cookies,
+      },
+      body: new URLSearchParams({
+        term: termCode,
+        studyPath: '',
+        studyPathText: '',
+        startDatepicker: '',
+        endDatepicker: '',
+      }).toString(),
+    }
+  )
+  cookies = mergeCookies(cookies, extractCookies(termRes))
+
+  // Return a thin wrapper that forwards the accumulated cookies
+  return (url, opts = {}) =>
+    fetch(url, {
+      ...opts,
+      headers: { 'User-Agent': UA, Cookie: cookies, ...(opts.headers || {}) },
+    })
 }
 
 /** Terms requires the JSESSIONID from the /registration GET — otherwise 500. */
@@ -50,14 +101,16 @@ export async function getTerms() {
   return cacheMemo(
     'ttu:terms',
     async () => {
-      const jar = new CookieJar()
-      const cFetch = makeFetchCookie(fetch, jar)
-      await cFetch(`${BASE}/StudentRegistrationSsb/ssb/registration?mepCode=${MEP}`, {
-        headers: { 'User-Agent': UA },
-      })
-      const res = await cFetch(
-        `${BASE}/StudentRegistrationSsb/ssb/classSearch/getTerms?searchTerm=&offset=1&max=200`,
+      // Step 1: seed JSESSIONID
+      const regRes = await fetch(
+        `${BASE}/StudentRegistrationSsb/ssb/registration?mepCode=${MEP}`,
         { headers: { 'User-Agent': UA } }
+      )
+      const cookies = extractCookies(regRes)
+
+      const res = await fetch(
+        `${BASE}/StudentRegistrationSsb/ssb/classSearch/getTerms?searchTerm=&offset=1&max=200`,
+        { headers: { 'User-Agent': UA, Cookie: cookies } }
       )
       const data = await res.json()
       return data.map((t) => ({ code: t.code, label: t.description }))
