@@ -109,10 +109,14 @@ export const useAuthStore = defineStore('auth', () => {
   /** Clear the current session (server- and client-side). */
   async function signOut() {
     if (!supabase) return
-    await supabase.auth.signOut()
+    // Clear local state immediately so the router guard sees unauthenticated
+    // before the async Supabase signOut response / onAuthStateChange fires.
+    session.value = null
+    user.value = null
     localStorage.removeItem('profile')
     localStorage.removeItem('coursePlanner:saved')
     localStorage.removeItem('coursePlanner:work')
+    await supabase.auth.signOut()
   }
 
   return {
