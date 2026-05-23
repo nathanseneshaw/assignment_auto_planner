@@ -12,6 +12,7 @@
  * universities.
  */
 import { Router } from 'express'
+import { rateLimit } from 'express-rate-limit'
 import * as rice from './course-planner/rice-scraper.js'
 import * as ttu from './course-planner/ttu-scraper.js'
 import * as tamu from './course-planner/tamu-scraper.js'
@@ -19,6 +20,19 @@ import * as smu from './course-planner/smu-scraper.js'
 import * as tamuc from './course-planner/tamuc-scraper.js'
 
 const router = Router()
+
+// 30 requests/min per IP. Generous enough for normal browsing (schools →
+// terms → subjects → sections = 4 req/click), tight enough to stop a loop
+// from hammering TAMU/Rice and getting the Render dyno IP banned.
+const coursePlannerLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests — please wait a moment and try again.' },
+})
+
+router.use('/api/course-planner', coursePlannerLimiter)
 
 const SCHOOLS = {
   rice: {

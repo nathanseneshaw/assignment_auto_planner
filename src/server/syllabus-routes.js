@@ -21,6 +21,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import crypto from 'node:crypto'
 import { requireUser } from './supabase-auth.js'
+import { syllabusParseRateLimit } from './rate-limit.js'
 import { extractText } from './syllabus-extract.js'
 import { extractSyllabus } from './syllabus-claude.js'
 
@@ -60,7 +61,7 @@ function clip(value, max) {
  * The file never touches disk and is not persisted in Supabase Storage; we
  * keep only the extracted JSON, which is much smaller and easier to redact.
  */
-router.post('/api/syllabus/parse', requireUser, (req, res, next) => {
+router.post('/api/syllabus/parse', requireUser, syllabusParseRateLimit, (req, res, next) => {
   upload.single('file')(req, res, (uploadErr) => {
     if (uploadErr) {
       if (uploadErr.code === 'LIMIT_FILE_SIZE') {

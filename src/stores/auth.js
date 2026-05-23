@@ -110,6 +110,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function signOut() {
     if (!supabase) return
     await supabase.auth.signOut()
+    localStorage.removeItem('profile')
+    localStorage.removeItem('coursePlanner:saved')
+    localStorage.removeItem('coursePlanner:work')
   }
 
   return {
