@@ -14,7 +14,7 @@ const registerToApp = { name: 'Register', query: { redirect: '/dashboard' } }
 const features = [
   {
     title: 'One timeline for everything',
-    body: 'See assignments, tasks, and deadlines in one calm dashboard—built for busy terms, not spreadsheet chaos.',
+    body: 'See assignments, tasks, and deadlines in one organized dashboard—built for busy terms, not scattered spreadsheets.',
     icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   },
   {
@@ -43,7 +43,7 @@ const testimonials = [
     monogram: 'PM',
   },
   {
-    quote: 'Between work and classes I needed something calm, not another noisy app. Breaking big assignments into scheduled tasks keeps me ahead.',
+    quote: 'Between work and classes I needed something structured, not another cluttered app. Breaking big assignments into scheduled tasks keeps me on track.',
     role: 'Part-time grad student',
     monogram: 'GR',
   },
@@ -52,27 +52,27 @@ const testimonials = [
 const faqs = [
   {
     q: 'How much does it cost?',
-    a: 'Assignment Auto-Planner is free for students. Create an account to sync your courses, or explore the sample data first to see how it works.',
+    a: 'Assignment Auto-Planner is completely free during the beta. Once the beta period ends, it will move to a subscription plan—but anyone who joins early will have plenty of notice before that happens.',
   },
   {
     q: 'What can I connect for automatic due dates?',
-    a: 'Any calendar that gives you an iCal (ICS) link—including Canvas, Blackboard, and Google Calendar. Paste the link once and new assignments sync in automatically.',
+    a: 'Any calendar that gives you an iCal (ICS) link—including Canvas, Blackboard, and Google Calendar. Paste the link once and new assignments sync in automatically. You can also upload a course syllabus (PDF or Word doc) and the app will extract your due dates for you.',
   },
   {
     q: 'Do I need to install anything?',
-    a: 'No—it runs right in your browser. There’s also an optional desktop app if you prefer a dedicated window.',
+    a: "Assignment Auto-Planner is available as a web app you can open in any browser, and as a native desktop app for Windows and Mac if you prefer a dedicated window. Both stay in sync with your account.",
   },
   {
     q: 'Can I try it without creating an account?',
-    a: 'Yes. The app loads with sample courses and assignments so you can explore the dashboard and planner. Add your own once you create a free account.',
+    a: "No—an account is required to use the app. Sign up for free and you'll have full access to your dashboard, calendar sync, and planner right away.",
   },
   {
     q: 'Is my data private?',
-    a: 'Your courses, assignments, and calendar links are tied to your own account and aren’t shared with other students. Feeds are read-only links you can remove anytime.',
+    a: "Your courses, assignments, and calendar links are tied to your own account and aren’t shared with other students. Feeds are read-only links you can remove anytime.",
   },
   {
     q: 'How does weekly planning work?',
-    a: 'Break big assignments into smaller tasks and drop them onto the days you’ll work on them. The planner shows your whole week at a glance so you can spot overload early.',
+    a: "The weekly planner gives you a full view of everything on your plate—assignments, tasks, and any personal work you have scheduled. See your entire week at a glance so you can plan ahead, balance your workload, and avoid last-minute surprises.",
   },
 ]
 
@@ -123,19 +123,6 @@ function toggleFaq(i) {
               <Button size="sm" type="button" @click="navigate">Go to app</Button>
             </RouterLink>
           </template>
-          <template v-else-if="isSupabaseConfigured">
-            <RouterLink :to="loginToApp" custom v-slot="{ navigate }">
-              <Button variant="ghost" size="sm" type="button" @click="navigate">Sign in</Button>
-            </RouterLink>
-            <RouterLink :to="registerToApp" custom v-slot="{ navigate }">
-              <Button size="sm" type="button" @click="navigate">Create account</Button>
-            </RouterLink>
-          </template>
-          <template v-else>
-            <RouterLink to="/dashboard" custom v-slot="{ navigate }">
-              <Button size="sm" type="button" @click="navigate">Open app</Button>
-            </RouterLink>
-          </template>
         </nav>
       </div>
     </header>
@@ -155,8 +142,8 @@ function toggleFaq(i) {
             <span class="text-primary-800">Plan assignments</span> with clarity.
           </h1>
           <p class="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed max-w-2xl">
-            AutoPlanner pulls your coursework into one calm workspace—deadlines, weekly planning, and calendar
-            sync so you always know what to do next.
+            AutoPlanner brings your coursework into one organized workspace—deadlines, weekly planning, and calendar
+            sync so you're always a step ahead.
           </p>
 
           <div class="mt-10 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
@@ -355,9 +342,9 @@ function toggleFaq(i) {
           <div
             class="text-center rounded-3xl bg-primary-900 text-white px-8 py-14 sm:py-16 shadow-xl shadow-primary-900/25"
           >
-            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Ready for a calmer semester?</h2>
+            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Your most organized semester starts here.</h2>
             <p class="mt-3 text-primary-200 max-w-xl mx-auto">
-              Sign in to reach your dashboard and start organizing courses, tasks, and due dates in one place.
+              Sign in to reach your dashboard and take control of your courses, tasks, and due dates—all in one place.
             </p>
             <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3">
               <template v-if="isSupabaseConfigured">
