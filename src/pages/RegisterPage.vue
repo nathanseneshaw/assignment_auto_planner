@@ -137,6 +137,12 @@ async function onSubmit() {
           </router-link>
         </p>
       </Card>
+
+      <p class="text-center text-sm text-gray-500 mt-5">
+        <router-link to="/" class="font-semibold text-primary-900 hover:text-primary-800">
+          ← Back to home
+        </router-link>
+      </p>
     </div>
   </div>
 </template>
