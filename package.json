@@ -21,7 +21,8 @@
     "server:test": "node --test ./src/server/tests/*.test.mjs",
     "render:build": "npm install",
     "electron:dev": "concurrently \"cross-env VITE_BUILD_TARGET=electron vite\" \"npm:server:dev\" \"wait-on http://localhost:5173 tcp:127.0.0.1:3001 && cross-env ELECTRON_DEV=true electron .\"",
-    "preelectron:build": "node electron/scripts/generate-server-env.js && node electron/scripts/copy-server-deps.js",
+    "icon:generate": "node electron/scripts/generate-icon.js",
+    "preelectron:build": "node electron/scripts/generate-server-env.js && node electron/scripts/copy-server-deps.js && node electron/scripts/generate-icon.js",
     "electron:build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron vite build && electron-builder",
     "electron:preview": "cross-env ELECTRON_DEV=false electron ."
   },
@@ -47,6 +48,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/postcss": "^4.2.4",
     "@vitejs/plugin-vue": "^5.1.4",
     "autoprefixer": "^10.5.0",

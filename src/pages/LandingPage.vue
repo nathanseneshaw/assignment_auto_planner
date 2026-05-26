@@ -91,23 +91,8 @@ function toggleFaq(i) {
     >
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
         <RouterLink to="/" class="flex items-center gap-3 group min-w-0">
-          <div
-            class="w-9 h-9 shrink-0 rounded-xl bg-primary-900 flex items-center justify-center ring-1 ring-black/5 shadow-sm shadow-primary-900/15"
-          >
-            <svg
-              class="w-[1.125rem] h-[1.125rem] text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-              />
-            </svg>
-          </div>
+          <!-- Landing is always in light mode (route meta.landingPage), so only the light variant is needed. -->
+          <img src="/autoplanner-icon-light.svg" alt="" class="w-9 h-9 shrink-0" />
           <span class="text-[15px] font-semibold tracking-tight text-gray-900 truncate">Assignment Auto-Planner</span>
         </RouterLink>
 
