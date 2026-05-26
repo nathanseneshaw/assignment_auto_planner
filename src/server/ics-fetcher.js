@@ -83,7 +83,7 @@ export async function fetchIcsFeed(url) {
         signal: ac.signal,
         headers: {
           Accept: 'text/calendar, text/plain;q=0.5, */*;q=0.1',
-          'User-Agent': 'AssignmentAutoPlanner/1.0 (+ICS sync)',
+          'User-Agent': 'Plannr/1.0 (+ICS sync)',
         },
       })
 

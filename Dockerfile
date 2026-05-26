@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Production image for the Assignment Planner Express API, deployed on Render.
+# Production image for the Plannr Express API, deployed on Render.
 #
 # The API server is self-contained under src/server and runs off the repo-root
 # dependencies (there is no src/server/package.json). The Vue frontend is built

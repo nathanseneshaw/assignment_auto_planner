@@ -64,7 +64,7 @@ async function handleSubmit() {
         <!-- Star Rating -->
         <div>
           <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2.5">
-            How would you rate AutoPlanner? <span class="text-danger-500">*</span>
+            How would you rate Plannr? <span class="text-danger-500">*</span>
           </label>
           <div class="flex flex-col items-center gap-2">
             <div class="flex gap-1">
@@ -132,7 +132,7 @@ async function handleSubmit() {
             Thanks for your feedback!
           </p>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            It helps us make AutoPlanner better.
+            It helps us make Plannr better.
           </p>
         </div>
       </div>

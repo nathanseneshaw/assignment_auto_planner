@@ -19,7 +19,7 @@ import { parseDays, normalizeTime, parseCredits } from './util.js'
 
 const SCHOOL = 'tamu'
 const BASE = 'https://howdyportal.tamu.edu'
-const UA = 'Mozilla/5.0 (compatible; AssignmentAutoPlanner/1.0)'
+const UA = 'Mozilla/5.0 (compatible; Plannr/1.0)'
 
 export async function getTerms() {
   return cacheMemo(

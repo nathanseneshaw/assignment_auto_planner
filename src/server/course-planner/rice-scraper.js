@@ -24,7 +24,7 @@ const SCHOOL = 'rice'
 const BASE = 'https://courses.rice.edu'
 const FORM_URL = `${BASE}/admweb/!swkenrc.main`
 const SCHED_URL = `${BASE}/courses/!SWKSCAT.cat`
-const UA = 'Mozilla/5.0 (compatible; AssignmentAutoPlanner/1.0)'
+const UA = 'Mozilla/5.0 (compatible; Plannr/1.0)'
 
 /** Fetch the enrollment form once + extract the as_fid token, terms, subjects. */
 async function loadForm() {

@@ -90,11 +90,11 @@ const isActive = (path) => {
     <div class="flex items-center justify-between h-14 px-3 sm:px-4 border-b border-gray-100 dark:border-gray-700/80 flex-shrink-0">
       <div class="flex items-center gap-3">
         <!-- Brand icon: swaps with theme. Both load but only one renders. -->
-        <img src="/autoplanner-icon-light.svg" alt="" class="w-9 h-9 block dark:hidden" />
-        <img src="/autoplanner-icon-dark.svg" alt="" class="w-9 h-9 hidden dark:block" />
+        <img src="/plannr-icon-light.svg" alt="" class="w-9 h-9 block dark:hidden" />
+        <img src="/plannr-icon-dark.svg" alt="" class="w-9 h-9 hidden dark:block" />
         <div v-if="open || mobileOpen" class="overflow-hidden min-w-0">
           <span class="text-[15px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight whitespace-nowrap">
-            AutoPlanner
+            Plannr
           </span>
           <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium truncate">Student planner</p>
         </div>

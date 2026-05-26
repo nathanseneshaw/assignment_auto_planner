@@ -26,7 +26,7 @@ async function loadForm() {
     'utd:form',
     async () => {
       const res = await fetch(GUIDED_URL, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AssignmentAutoPlanner/1.0)' },
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Plannr/1.0)' },
       })
       const html = await res.text()
       const $ = cheerio.load(html)

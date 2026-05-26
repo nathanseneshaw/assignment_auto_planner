@@ -50,7 +50,7 @@ function mergeCookies(existing, next) {
 
 const SCHOOL = 'ttu'
 const BASE = 'https://registration.texastech.edu'
-const UA = 'Mozilla/5.0 (compatible; AssignmentAutoPlanner/1.0)'
+const UA = 'Mozilla/5.0 (compatible; Plannr/1.0)'
 const MEP = 'TTU'
 
 /**

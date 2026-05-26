@@ -19,7 +19,7 @@ import { parseCredits, normalizeTime } from './util.js'
 
 const SCHOOL = 'tamuc'
 const BASE = 'https://appsprod.tamuc.edu/Schedule/Schedule.aspx'
-const UA = 'Mozilla/5.0 (compatible; AssignmentAutoPlanner/1.0)'
+const UA = 'Mozilla/5.0 (compatible; Plannr/1.0)'
 
 async function fetchHtml(url) {
   const res = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'follow' })

@@ -18,7 +18,7 @@ import { Resvg } from '@resvg/resvg-js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = join(__dirname, '..', '..')
 
-const sourcePath = join(projectRoot, 'public', 'autoplanner-icon-light.svg')
+const sourcePath = join(projectRoot, 'public', 'plannr-icon-light.svg')
 const outPath = join(projectRoot, 'electron', 'icon.png')
 
 const svg = readFileSync(sourcePath)

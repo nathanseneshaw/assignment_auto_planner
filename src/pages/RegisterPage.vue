@@ -54,9 +54,9 @@ async function onSubmit() {
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
         <!-- Auth pages always render in light mode (see App.vue applyTheme), so only the light variant is needed. -->
-        <img src="/autoplanner-icon-light.svg" alt="" class="inline-block w-11 h-11 mb-4" />
+        <img src="/plannr-icon-light.svg" alt="" class="inline-block w-11 h-11 mb-4" />
         <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Create account</h1>
-        <p class="text-gray-500 text-sm mt-1">Assignment Auto-Planner</p>
+        <p class="text-gray-500 text-sm mt-1">Plannr</p>
       </div>
 
       <Card class="p-6 sm:p-8 shadow-lg shadow-gray-900/5 border border-gray-200/80">

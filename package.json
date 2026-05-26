@@ -1,5 +1,5 @@
 {
-  "name": "assignment-auto-planner",
+  "name": "plannr",
   "private": true,
   "version": "1.0.0",
   "description": "Plan your coursework by subscribing to your school's iCalendar (ICS) feeds.",
@@ -63,8 +63,8 @@
     "wait-on": "^8.0.5"
   },
   "build": {
-    "appId": "com.assignmentplanner.app",
-    "productName": "Assignment Planner",
+    "appId": "com.plannr.app",
+    "productName": "Plannr",
     "copyright": "Copyright © 2026 Nathan",
     "forceCodeSigning": false,
     "artifactName": "${productName}-${version}-${arch}.${ext}",
@@ -85,7 +85,7 @@
           "!package-lock.json",
           "!tests/**",
           "!*.test.*",
-          "!node_modules/assignment-auto-planner/**/*",
+          "!node_modules/plannr/**/*",
           "!node_modules/.package-lock.json"
         ]
       }

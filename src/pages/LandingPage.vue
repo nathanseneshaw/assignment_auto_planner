@@ -52,7 +52,7 @@ const testimonials = [
 const faqs = [
   {
     q: 'How much does it cost?',
-    a: 'Assignment Auto-Planner is completely free during the beta. Once the beta period ends, it will move to a subscription plan, but anyone who joins early will have plenty of notice before that happens.',
+    a: 'Plannr is completely free during the beta. Once the beta period ends, it will move to a subscription plan, but anyone who joins early will have plenty of notice before that happens.',
   },
   {
     q: 'What can I connect for automatic due dates?',
@@ -60,7 +60,7 @@ const faqs = [
   },
   {
     q: 'Do I need to install anything?',
-    a: "Assignment Auto-Planner is available as a web app you can open in any browser, and as a native desktop app for Windows and Mac if you prefer a dedicated window. Both stay in sync with your account.",
+    a: "Plannr is available as a web app you can open in any browser, and as a native desktop app for Windows and Mac if you prefer a dedicated window. Both stay in sync with your account.",
   },
   {
     q: 'Can I try it without creating an account?',
@@ -92,8 +92,8 @@ function toggleFaq(i) {
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
         <RouterLink to="/" class="flex items-center gap-3 group min-w-0">
           <!-- Landing is always in light mode (route meta.landingPage), so only the light variant is needed. -->
-          <img src="/autoplanner-icon-light.svg" alt="" class="w-9 h-9 shrink-0" />
-          <span class="text-[15px] font-semibold tracking-tight text-gray-900 truncate">Assignment Auto-Planner</span>
+          <img src="/plannr-icon-light.svg" alt="" class="w-9 h-9 shrink-0" />
+          <span class="text-[15px] font-semibold tracking-tight text-gray-900 truncate">Plannr</span>
         </RouterLink>
 
         <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
@@ -127,7 +127,7 @@ function toggleFaq(i) {
             <span class="text-primary-800">Plan assignments</span> with clarity.
           </h1>
           <p class="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed max-w-2xl">
-            AutoPlanner brings your coursework into one organized workspace: deadlines, weekly planning, and calendar
+            Plannr brings your coursework into one organized workspace: deadlines, weekly planning, and calendar
             sync so you're always a step ahead.
           </p>
 
@@ -378,7 +378,7 @@ function toggleFaq(i) {
         <div
           class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500"
         >
-          <p>© {{ new Date().getFullYear() }} Assignment Auto-Planner</p>
+          <p>© {{ new Date().getFullYear() }} Plannr</p>
           <nav class="flex items-center gap-5">
             <a href="#features" class="hover:text-gray-900 transition-colors">Features</a>
             <a href="#testimonials" class="hover:text-gray-900 transition-colors">Reviews</a>

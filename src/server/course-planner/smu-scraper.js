@@ -19,7 +19,7 @@ import { parseDays, normalizeTime, parseCredits } from './util.js'
 
 const SCHOOL = 'smu'
 const BASE = 'https://www.smu.edu'
-const UA = 'Mozilla/5.0 (compatible; AssignmentAutoPlanner/1.0)'
+const UA = 'Mozilla/5.0 (compatible; Plannr/1.0)'
 const SEASON_PAGES = [
   { season: 'Fall', path: '/enrollment-services/registrar/fall', seasonDigit: '7' },
   { season: 'Spring', path: '/enrollment-services/registrar/spring', seasonDigit: '2' },

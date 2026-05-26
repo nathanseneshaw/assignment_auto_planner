@@ -119,7 +119,7 @@ function showErrorWindow(message) {
     resizable: false,
     minimizable: false,
     maximizable: false,
-    title: 'Assignment Planner — startup error',
+    title: 'Plannr — startup error',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

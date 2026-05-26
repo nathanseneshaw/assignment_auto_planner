@@ -112,7 +112,7 @@ const router = createRouter({
  */
 router.beforeEach((to, from, next) => {
   // Browser tab title — set on every nav, not just initial mount.
-  document.title = `${to.meta.title} | Assignment Auto-Planner`
+  document.title = `${to.meta.title} | Plannr`
 
   const authStore = useAuthStore()
 
