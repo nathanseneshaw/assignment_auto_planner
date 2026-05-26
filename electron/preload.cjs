@@ -1,10 +1,9 @@
 const { contextBridge } = require('electron')
 
 // `window.electronAPI` is the renderer's only handle to anything privileged.
-// Currently just an `isElectron` sentinel for capability detection — UTD
-// scraping has moved server-side (Playwright + stealth in the Express
-// process), so there's no longer an IPC bridge.
+// Currently just an `isElectron` sentinel for capability detection — the API
+// itself lives on Render (see VITE_API_BASE in the electron:build script),
+// so there's no IPC bridge for backend calls.
 contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
-  apiPort: 3001,
 })

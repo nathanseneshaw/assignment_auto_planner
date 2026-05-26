@@ -1,11 +1,16 @@
 import { app, BrowserWindow, Menu, session } from 'electron'
 import path from 'path'
 import { fileURLToPath, URL } from 'url'
-import { startServer, stopServer } from './server-process.js'
-import logger, { getLogPath } from './logger.js'
+import logger from './logger.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = process.env.ELECTRON_DEV === 'true'
+
+// Render-hosted API the desktop renderer talks to. Must stay in sync with
+// VITE_API_BASE in package.json's electron:build script — `installCsp` uses
+// it for connect-src and `installOriginRewrite` uses it to know which
+// requests need the Origin header stripped.
+const API_ORIGIN = 'https://assignment-auto-planner-server.onrender.com'
 
 // Windows taskbar groups by AUMID and picks the icon associated with it.
 // Without this, dev builds inherit electron.exe's icon. Must match build.appId.
@@ -21,7 +26,7 @@ process.on('unhandledRejection', (reason) => {
 })
 
 function installCsp() {
-  const baseConnect = "'self' http://127.0.0.1:3001 https://*.supabase.co wss://*.supabase.co"
+  const baseConnect = `'self' ${API_ORIGIN} https://*.supabase.co wss://*.supabase.co`
   const devConnect = `${baseConnect} http://localhost:5173 ws://localhost:5173`
   const scriptSrc = isDev ? "'self' 'unsafe-eval'" : "'self'"
   const connectSrc = isDev ? devConnect : baseConnect
@@ -51,10 +56,32 @@ function installCsp() {
   })
 }
 
+// Renderer pages load from file:// (or http://localhost:5173 in dev), so
+// fetches to the Render API arrive with an Origin the server allowlist
+// doesn't know about. Strip the header for our API host so the server's
+// "no Origin = allow (curl-style client)" branch handles desktop requests.
+// Auth still requires a Supabase JWT, so this isn't an authorization bypass.
+function installOriginRewrite() {
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    try {
+      const u = new URL(details.url)
+      if (`${u.protocol}//${u.host}` === API_ORIGIN) {
+        const headers = { ...details.requestHeaders }
+        delete headers['Origin']
+        delete headers['origin']
+        return callback({ requestHeaders: headers })
+      }
+    } catch {
+      // fall through — malformed URL won't match our origin anyway
+    }
+    callback({ requestHeaders: details.requestHeaders })
+  })
+}
+
 // Allowed renderer origins. In dev the renderer is served by Vite on :5173;
 // in production it loads from file://. Anything else is rejected so a
 // successful XSS cannot navigate to attacker-controlled content while still
-// holding the preload's `electronAPI` and the loopback connect-src grant.
+// holding the preload's `electronAPI` and the API origin's connect-src grant.
 function isAllowedNavigation(targetUrl) {
   try {
     const u = new URL(targetUrl)
@@ -117,49 +144,11 @@ function createWindow() {
   }
 }
 
-function showErrorWindow(message) {
-  logger.error('showing startup error window:', message)
-  const win = new BrowserWindow({
-    width: 640,
-    height: 420,
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    title: 'Plannr — startup error',
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false,
-      webviewTag: false,
-    },
-  })
-  installNavigationGuards(win)
-  win.setMenuBarVisibility(false)
-  win.loadFile(path.join(__dirname, 'error-window.html'))
-  win.webContents.once('did-finish-load', () => {
-    const payload = JSON.stringify({ message: String(message), logPath: getLogPath() })
-    win.webContents.executeJavaScript(`window.errorInfo = ${payload}; void 0;`).catch(() => {})
-  })
-}
-
-app.whenReady().then(async () => {
-  // Supabase anon creds for the embedded server are baked into the bundle at
-  // build time (see electron/scripts/generate-server-env.js → src/server/env.generated.js).
-  // No runtime env file to load.
+app.whenReady().then(() => {
   installCsp()
+  installOriginRewrite()
 
   Menu.setApplicationMenu(null)
-
-  try {
-    await startServer()
-  } catch (err) {
-    logger.error('Failed to start embedded server:', err)
-    const msg = err && err.stack ? err.stack : (err && err.message) || String(err)
-    showErrorWindow(msg)
-    return
-  }
 
   createWindow()
   app.on('activate', () => {
@@ -167,11 +156,6 @@ app.whenReady().then(async () => {
   })
 })
 
-app.on('before-quit', () => {
-  stopServer()
-})
-
 app.on('window-all-closed', () => {
-  stopServer()
   if (process.platform !== 'darwin') app.quit()
 })

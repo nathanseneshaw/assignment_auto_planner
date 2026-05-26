@@ -1,6 +1,6 @@
 {
-  "name": "assignment-planner-embedded-server",
+  "name": "plannr-server",
   "private": true,
   "type": "module",
-  "//": "Minimal manifest whose ONLY job is to declare type:module so Node loads the .js files as ESM when the packaged Electron app spawns this folder out of resources/server/. Dependencies are listed in the ROOT package.json; electron/scripts/copy-server-deps.js populates src/server/node_modules/ at build time. Do not add a `dependencies` block here."
+  "//": "Minimal manifest whose only job is to declare type:module so Node loads the .js files as ESM. Dependencies are listed in the root package.json (Render's Dockerfile copies that one in and runs `npm ci` against it). Do not add a `dependencies` block here."
 }

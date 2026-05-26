@@ -11,6 +11,11 @@ const showSkipSignIn = computed(() => !isSupabaseConfigured)
 const loginToApp = { name: 'Login', query: { redirect: '/dashboard' } }
 const registerToApp = { name: 'Register', query: { redirect: '/dashboard' } }
 
+// TODO: replace '#' with the actual hosted installer URL (Supabase Storage,
+// S3, R2, GitHub release asset, etc.) once the file is uploaded somewhere
+// publicly downloadable.
+const installerUrl = 'https://av8yap9rvpfzcjiv.private.blob.vercel-storage.com/Plannr-1.0.0-x64.exe?vercel-blob-delegation=eyJzdG9yZUlkIjoic3RvcmVfQVY4WWFwOXJWcGZ6Q2ppViIsIm93bmVySWQiOiJ0ZWFtXzNDZmxKV1JSRVJweEE5RzgxcEpzYlg1WCIsInBhdGhuYW1lIjoiKiIsIm9wZXJhdGlvbnMiOlsiZ2V0IiwiaGVhZCJdLCJ2YWxpZFVudGlsIjoxNzc5ODc4ODc1MjIwLCJpYXQiOjE3Nzk4MzU2NzUzODF9._5to3yNqi6qdSkLe9MJOCfVbhhIWgCIap_tIyl6kFL4&vercel-blob-signature=0BcyAPGHxLF-HT01jJw-YNKy9jH3MsAI5kCIgMdUYyM'
+
 const features = [
   {
     title: 'One timeline for everything',
@@ -99,6 +104,7 @@ function toggleFaq(i) {
         <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
           <a href="#features" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Features</a>
           <a href="#testimonials" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Reviews</a>
+          <a href="#download" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Download</a>
           <a href="#faq" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">FAQ</a>
         </nav>
 
@@ -279,6 +285,60 @@ function toggleFaq(i) {
         </div>
       </section>
 
+      <section id="download" class="scroll-mt-20 border-t border-gray-200/80 py-16 sm:py-20">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6">
+          <div class="text-center">
+            <p
+              class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary-700 bg-primary-100/80 px-3 py-1 rounded-full border border-primary-200/60 mb-6"
+            >
+              Desktop app
+            </p>
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+              Take Plannr off the browser tab
+            </h2>
+            <p class="mt-3 text-gray-600 max-w-xl mx-auto">
+              Install the desktop app to keep your planner one click away — independent of your browser and always at hand during study sessions.
+            </p>
+          </div>
+
+          <div class="mt-10 max-w-md mx-auto">
+            <a
+              :href="installerUrl"
+              download
+              class="flex items-center gap-4 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-900/[0.03] hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+            >
+              <svg
+                class="w-10 h-10 shrink-0 text-primary-700"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.351" />
+              </svg>
+              <div class="flex-1 text-left">
+                <p class="text-base font-semibold text-gray-900">Download for Windows</p>
+                <p class="mt-0.5 text-sm text-gray-500">.exe installer · 64-bit</p>
+              </div>
+              <svg
+                class="w-5 h-5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </a>
+          </div>
+
+          <p class="mt-6 text-center text-sm text-gray-500">
+            Mac and Linux builds aren’t available yet. In the meantime, use the
+            <RouterLink :to="loginToApp" class="text-primary-700 hover:underline">web app</RouterLink>.
+          </p>
+        </div>
+      </section>
+
       <section id="faq" class="scroll-mt-20 border-t border-gray-200/80 bg-white/50 py-16 sm:py-20">
         <div class="max-w-3xl mx-auto px-4 sm:px-6">
           <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Frequently asked questions</h2>
@@ -382,6 +442,7 @@ function toggleFaq(i) {
           <nav class="flex items-center gap-5">
             <a href="#features" class="hover:text-gray-900 transition-colors">Features</a>
             <a href="#testimonials" class="hover:text-gray-900 transition-colors">Reviews</a>
+            <a href="#download" class="hover:text-gray-900 transition-colors">Download</a>
             <a href="#faq" class="hover:text-gray-900 transition-colors">FAQ</a>
           </nav>
         </div>
