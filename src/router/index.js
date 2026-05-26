@@ -9,18 +9,41 @@
  *
  * When Supabase is not configured the guard is a no-op so the app remains
  * usable in pure local-storage / demo mode.
+ *
+ * Electron variant: the marketing landing page is web-only. In the Electron
+ * build `IS_ELECTRON_BUILD` is a literal `true`, so Rollup eliminates the
+ * Landing route definition (and the LandingPage.vue dynamic import along with
+ * it). `/` then resolves to a redirect into the auth flow.
  */
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
+import { IS_ELECTRON_BUILD } from '../lib/platform'
+
+// Electron has no marketing page: `/` is an auth-aware entry point. The
+// redirect function decides the destination on the first hop — unauthenticated
+// users go straight to /login (the explicit guarantee asked for here), while
+// signed-in users go straight to /dashboard without flashing through /login.
+// Safe to call useAuthStore() here because Pinia is installed before the
+// router in main.js, and authStore.init() is awaited before mount.
+const rootRoute = IS_ELECTRON_BUILD
+  ? {
+      path: '/',
+      redirect: () => {
+        const authStore = useAuthStore()
+        return authStore.isAuthenticated ? '/dashboard' : '/login'
+      },
+      meta: { title: 'Sign in' },
+    }
+  : {
+      path: '/',
+      name: 'Landing',
+      component: () => import('../pages/LandingPage.vue'),
+      meta: { title: 'Welcome', landingPage: true },
+    }
 
 const routes = [
-  {
-    path: '/',
-    name: 'Landing',
-    component: () => import('../pages/LandingPage.vue'),
-    meta: { title: 'Welcome', landingPage: true },
-  },
+  rootRoute,
   {
     path: '/login',
     name: 'Login',
@@ -71,8 +94,15 @@ const routes = [
   },
 ]
 
+// Electron loads the renderer from a `file://` URL where `createWebHistory()`
+// breaks: the initial pathname is the full filesystem path (not `/`), so
+// routes don't match; and `pushState('/tasks')` produces `file:///tasks`,
+// which Chromium treats as a different document and can wipe in-memory state
+// (Pinia/auth) mid-navigation — that's why "click any button → kicked to /login"
+// was happening. Hash mode keeps the document path stable and routes purely
+// from the `#fragment`, which is the standard Electron + Vue Router fix.
 const router = createRouter({
-  history: createWebHistory(),
+  history: IS_ELECTRON_BUILD ? createWebHashHistory() : createWebHistory(),
   routes,
 })
 

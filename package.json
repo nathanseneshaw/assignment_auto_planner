@@ -20,9 +20,9 @@
     "server:dev": "node --watch src/server/index.js",
     "server:test": "node --test ./src/server/tests/*.test.mjs",
     "render:build": "npm install",
-    "electron:dev": "concurrently \"vite\" \"npm:server:dev\" \"wait-on http://localhost:5173 tcp:127.0.0.1:3001 && cross-env ELECTRON_DEV=true electron .\"",
+    "electron:dev": "concurrently \"cross-env VITE_BUILD_TARGET=electron vite\" \"npm:server:dev\" \"wait-on http://localhost:5173 tcp:127.0.0.1:3001 && cross-env ELECTRON_DEV=true electron .\"",
     "preelectron:build": "node electron/scripts/generate-server-env.js && node electron/scripts/copy-server-deps.js",
-    "electron:build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false vite build && electron-builder",
+    "electron:build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron vite build && electron-builder",
     "electron:preview": "cross-env ELECTRON_DEV=false electron ."
   },
   "dependencies": {
@@ -66,6 +66,7 @@
     "copyright": "Copyright © 2026 Nathan",
     "forceCodeSigning": false,
     "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "icon": "electron/icon.png",
     "files": [
       "dist/**/*",
       "electron/**/*"
@@ -77,6 +78,9 @@
         "filter": [
           "**/*",
           "!.env*",
+          "!.vercel/**",
+          "!.gitignore",
+          "!package-lock.json",
           "!tests/**",
           "!*.test.*",
           "!node_modules/assignment-auto-planner/**/*",

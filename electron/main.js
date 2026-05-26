@@ -1,6 +1,6 @@
 import { app, BrowserWindow, session } from 'electron'
 import path from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, URL } from 'url'
 import { startServer, stopServer } from './server-process.js'
 import logger, { getLogPath } from './logger.js'
 
@@ -28,6 +28,11 @@ function installCsp() {
     "font-src 'self' data:",
     `connect-src ${connectSrc}`,
     "frame-ancestors 'none'",
+    // Hardening: deny plugins/embeds, prevent <base> retargeting after XSS,
+    // and block form posts to off-origin endpoints.
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
   ].join('; ')
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -37,6 +42,41 @@ function installCsp() {
         'Content-Security-Policy': [policy],
       },
     })
+  })
+}
+
+// Allowed renderer origins. In dev the renderer is served by Vite on :5173;
+// in production it loads from file://. Anything else is rejected so a
+// successful XSS cannot navigate to attacker-controlled content while still
+// holding the preload's `electronAPI` and the loopback connect-src grant.
+function isAllowedNavigation(targetUrl) {
+  try {
+    const u = new URL(targetUrl)
+    if (isDev) {
+      return (
+        (u.protocol === 'http:' && u.hostname === 'localhost' && u.port === '5173') ||
+        u.protocol === 'file:'
+      )
+    }
+    return u.protocol === 'file:'
+  } catch {
+    return false
+  }
+}
+
+function installNavigationGuards(win) {
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', (event, targetUrl) => {
+    if (!isAllowedNavigation(targetUrl)) {
+      logger.warn('blocked will-navigate to', targetUrl)
+      event.preventDefault()
+    }
+  })
+  win.webContents.on('will-redirect', (event, targetUrl) => {
+    if (!isAllowedNavigation(targetUrl)) {
+      logger.warn('blocked will-redirect to', targetUrl)
+      event.preventDefault()
+    }
   })
 }
 
@@ -54,8 +94,11 @@ function createWindow() {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      webviewTag: false,
     },
   })
+
+  installNavigationGuards(win)
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
@@ -79,8 +122,10 @@ function showErrorWindow(message) {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      webviewTag: false,
     },
   })
+  installNavigationGuards(win)
   win.setMenuBarVisibility(false)
   win.loadFile(path.join(__dirname, 'error-window.html'))
   win.webContents.once('did-finish-load', () => {

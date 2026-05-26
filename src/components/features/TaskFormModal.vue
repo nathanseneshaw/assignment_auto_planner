@@ -84,13 +84,13 @@ watch(() => props.modelValue, (open) => {
   titleError.value = ''
   if (props.task) {
     title.value = props.task.title || ''
-    scheduledDate.value = props.task.scheduledDate || localDateKey()
+    scheduledDate.value = props.task.scheduledDate || ''
     priorityLevel.value = props.task.priorityLevel || 'normal'
     courseId.value = props.task.courseId || ''
     assignmentId.value = props.task.assignmentId || ''
   } else {
     title.value = ''
-    scheduledDate.value = localDateKey()
+    scheduledDate.value = ''
     priorityLevel.value = 'normal'
     courseId.value = ''
     assignmentId.value = ''
@@ -111,8 +111,6 @@ function handleSubmit() {
     titleError.value = 'Task title is required'
     return
   }
-  if (!scheduledDate.value) return
-
   const assignment = assignmentId.value
     ? assignmentsStore.getAssignmentById(assignmentId.value)
     : null
@@ -149,12 +147,11 @@ function handleSubmit() {
       <!-- Scheduled Date -->
       <div>
         <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-          Scheduled Date <span class="text-danger-500">*</span>
+          Scheduled Date <span class="text-gray-400 font-normal text-xs">(optional)</span>
         </label>
         <input
           v-model="scheduledDate"
           type="date"
-          required
           class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200 scheme-light dark:scheme-dark"
         />
       </div>
@@ -196,7 +193,7 @@ function handleSubmit() {
           type="submit"
           form="task-form"
           variant="primary"
-          :disabled="!title.trim() || !scheduledDate"
+          :disabled="!title.trim()"
         >
           {{ isEditing ? 'Save Changes' : 'Add Task' }}
         </Button>

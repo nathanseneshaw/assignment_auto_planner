@@ -56,7 +56,12 @@ const filteredTasks = computed(() => {
   }
 
   return list.sort((a, b) => {
-    if (a.scheduledDate !== b.scheduledDate) return a.scheduledDate.localeCompare(b.scheduledDate)
+    const dateA = a.scheduledDate || ''
+    const dateB = b.scheduledDate || ''
+    if (!dateA && !dateB) return (a.priority ?? 3) - (b.priority ?? 3)
+    if (!dateA) return 1
+    if (!dateB) return -1
+    if (dateA !== dateB) return dateA.localeCompare(dateB)
     return (a.priority ?? 3) - (b.priority ?? 3)
   })
 })
@@ -64,13 +69,20 @@ const filteredTasks = computed(() => {
 const groupedByDate = computed(() => {
   const groups = {}
   filteredTasks.value.forEach(task => {
-    if (!groups[task.scheduledDate]) groups[task.scheduledDate] = []
-    groups[task.scheduledDate].push(task)
+    const key = task.scheduledDate || ''
+    if (!groups[key]) groups[key] = []
+    groups[key].push(task)
   })
   return groups
 })
 
-const sortedDates = computed(() => Object.keys(groupedByDate.value).sort())
+const sortedDates = computed(() =>
+  Object.keys(groupedByDate.value).sort((a, b) => {
+    if (!a) return 1
+    if (!b) return -1
+    return a.localeCompare(b)
+  })
+)
 
 function openAddModal() {
   editingTask.value = null
@@ -105,7 +117,7 @@ function confirmDelete() {
 }
 
 function formatDateHeading(dateStr) {
-  if (!dateStr) return ''
+  if (!dateStr) return 'Unscheduled'
   const today = localDateKey()
   const tomorrowDate = new Date()
   tomorrowDate.setDate(tomorrowDate.getDate() + 1)
@@ -119,7 +131,7 @@ function formatDateHeading(dateStr) {
 }
 
 function isOverdue(task) {
-  return !task.completed && task.scheduledDate < localDateKey()
+  return !task.completed && !!task.scheduledDate && task.scheduledDate < localDateKey()
 }
 
 function getCourseColor(task) {
@@ -231,7 +243,7 @@ const PRIORITY_BADGE = {
         <div class="flex items-center gap-3 mb-3">
           <h3
             class="text-sm font-semibold uppercase tracking-wide"
-            :class="date < localDateKey() ? 'text-danger-600' : 'text-gray-500'"
+            :class="date && date < localDateKey() ? 'text-danger-600' : 'text-gray-500'"
           >
             {{ formatDateHeading(date) }}
           </h3>
@@ -279,13 +291,12 @@ const PRIORITY_BADGE = {
               </p>
 
               <div class="flex flex-wrap items-center gap-2 mt-1.5">
-                <!-- Priority badge (urgent/high only) -->
+                <!-- Priority badge (always shown) -->
                 <span
-                  v-if="task.priorityLevel && PRIORITY_BADGE[task.priorityLevel]"
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium"
-                  :class="PRIORITY_BADGE[task.priorityLevel].classes"
+                  :class="(PRIORITY_BADGE[task.priorityLevel] || PRIORITY_BADGE.normal).classes"
                 >
-                  {{ PRIORITY_BADGE[task.priorityLevel].label }}
+                  {{ (PRIORITY_BADGE[task.priorityLevel] || PRIORITY_BADGE.normal).label }}
                 </span>
 
                 <!-- Course badge -->

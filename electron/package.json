@@ -1,4 +1,4 @@
 {
-  "type": "commonjs",
-  "//": "Forces .js files in this directory to be loaded as CommonJS, overriding the root package.json's \"type\": \"module\". The Electron 34 / Node 20 ESM loader has a known bug (electron#40719) that crashes during the main process bootstrap on certain CJS transitive deps; staying on CJS here sidesteps it. ESM scrapers in this folder use .mjs explicitly."
+  "type": "module",
+  "//": "Inherits ESM mode from the root package.json. The earlier comment here cited electron#40719 as a reason to stay on CJS — but the actual files in this folder (main.js, server-process.js, logger.js, scripts/*.js) all use ESM `import` syntax, so CJS was already in conflict with the source and prevented Electron from booting at all. If #40719-style symptoms reappear (main-process crashes on CJS transitive deps), the fallback is to rename these files to .cjs and convert their syntax back to require()."
 }

@@ -27,12 +27,22 @@ const TARGET_MODULES = path.join(ROOT, 'src', 'server', 'node_modules')
 // The packages `src/server/**/*.js` actually imports at runtime.
 // Keep this in sync with the imports in `src/server/`.
 const SERVER_RUNTIME_DEPS = [
+  // Core server
   '@supabase/supabase-js',
   'cors',
   'express',
   'express-rate-limit',
-  'node-ical',
   'ws',
+  // ICS ingest
+  'node-ical',
+  // Syllabus parser
+  '@anthropic-ai/sdk',
+  'mammoth',
+  'multer',
+  'pdf-parse',
+  // Course planner scrapers
+  'cheerio',
+  'xlsx',
 ]
 
 function readPackageJson(packageDir) {

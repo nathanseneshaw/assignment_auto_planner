@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Card, Input, Button } from '../components/ui'
 import { useAuthStore } from '../stores/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
+import { isElectron } from '../lib/platform'
 
 const route = useRoute()
 const router = useRouter()
@@ -138,7 +139,7 @@ async function onSubmit() {
         </p>
       </Card>
 
-      <p class="text-center text-sm text-gray-500 mt-5">
+      <p v-if="!isElectron" class="text-center text-sm text-gray-500 mt-5">
         <router-link to="/" class="font-semibold text-primary-900 hover:text-primary-800">
           ← Back to home
         </router-link>

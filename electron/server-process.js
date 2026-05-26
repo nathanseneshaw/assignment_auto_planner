@@ -100,6 +100,11 @@ export async function startServer() {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
       PORT: String(SERVER_PORT),
+      // Bind loopback only. Without this, src/server/index.js defaults HOST to
+      // 0.0.0.0 and the desktop user's API would be reachable from anyone on
+      // the same LAN (coffee-shop Wi-Fi etc.). The renderer connects via
+      // 127.0.0.1:3001 anyway.
+      HOST: '127.0.0.1',
       // Intentionally NOT setting NODE_ENV=production: the embedded server is
       // a loopback-only sidecar to the desktop app, not an internet-facing
       // deployment. The src/server/index.js CORS-allowlist boot guard treats

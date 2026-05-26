@@ -14,12 +14,12 @@ const registerToApp = { name: 'Register', query: { redirect: '/dashboard' } }
 const features = [
   {
     title: 'One timeline for everything',
-    body: 'See assignments, tasks, and deadlines in one organized dashboard—built for busy terms, not scattered spreadsheets.',
+    body: 'See assignments, tasks, and deadlines in one organized dashboard, built for busy terms, not scattered spreadsheets.',
     icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   },
   {
     title: 'Sync from any calendar',
-    body: 'Paste an iCal link from Canvas, Blackboard, or Google Calendar and your due dates flow in automatically—no manual copying.',
+    body: 'Paste an iCal link from Canvas, Blackboard, or Google Calendar and your due dates flow in automatically. No manual copying.',
     icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
   },
   {
@@ -52,11 +52,11 @@ const testimonials = [
 const faqs = [
   {
     q: 'How much does it cost?',
-    a: 'Assignment Auto-Planner is completely free during the beta. Once the beta period ends, it will move to a subscription plan—but anyone who joins early will have plenty of notice before that happens.',
+    a: 'Assignment Auto-Planner is completely free during the beta. Once the beta period ends, it will move to a subscription plan, but anyone who joins early will have plenty of notice before that happens.',
   },
   {
     q: 'What can I connect for automatic due dates?',
-    a: 'Any calendar that gives you an iCal (ICS) link—including Canvas, Blackboard, and Google Calendar. Paste the link once and new assignments sync in automatically. You can also upload a course syllabus (PDF or Word doc) and the app will extract your due dates for you.',
+    a: 'Any calendar that gives you an iCal (ICS) link, including Canvas, Blackboard, and Google Calendar. Paste the link once and new assignments sync in automatically. You can also upload a course syllabus (PDF or Word doc) and the app will extract your due dates for you.',
   },
   {
     q: 'Do I need to install anything?',
@@ -64,7 +64,7 @@ const faqs = [
   },
   {
     q: 'Can I try it without creating an account?',
-    a: "No—an account is required to use the app. Sign up for free and you'll have full access to your dashboard, calendar sync, and planner right away.",
+    a: "No, an account is required to use the app. Sign up for free and you'll have full access to your dashboard, calendar sync, and planner right away.",
   },
   {
     q: 'Is my data private?',
@@ -72,7 +72,7 @@ const faqs = [
   },
   {
     q: 'How does weekly planning work?',
-    a: "The weekly planner gives you a full view of everything on your plate—assignments, tasks, and any personal work you have scheduled. See your entire week at a glance so you can plan ahead, balance your workload, and avoid last-minute surprises.",
+    a: "The weekly planner gives you a full view of everything on your plate: assignments, tasks, and any personal work you have scheduled. See your entire week at a glance so you can plan ahead, balance your workload, and avoid last-minute surprises.",
   },
 ]
 
@@ -142,7 +142,7 @@ function toggleFaq(i) {
             <span class="text-primary-800">Plan assignments</span> with clarity.
           </h1>
           <p class="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed max-w-2xl">
-            AutoPlanner brings your coursework into one organized workspace—deadlines, weekly planning, and calendar
+            AutoPlanner brings your coursework into one organized workspace: deadlines, weekly planning, and calendar
             sync so you're always a step ahead.
           </p>
 
@@ -174,7 +174,7 @@ function toggleFaq(i) {
           </div>
 
           <p v-if="showSkipSignIn" class="mt-6 text-sm text-gray-500">
-            Auth isn’t configured yet—use <strong class="font-medium text-gray-700">Open the app</strong> to try the
+            Auth isn’t configured yet. Use <strong class="font-medium text-gray-700">Open the app</strong> to try the
             planner locally.
           </p>
         </div>
@@ -241,8 +241,8 @@ function toggleFaq(i) {
         <div class="max-w-6xl mx-auto px-4 sm:px-6">
           <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Why students use it</h2>
           <p class="mt-2 text-gray-600 max-w-2xl">
-            Fewer surprises, clearer priorities—whether your deadlines come from Canvas, Blackboard, Google
-            Calendar, or courses you add by hand.
+            Fewer surprises, clearer priorities. Works with Canvas, Blackboard, Google Calendar, or courses you add
+            by hand.
           </p>
 
           <ul class="mt-12 grid gap-6 sm:grid-cols-3">
@@ -344,7 +344,7 @@ function toggleFaq(i) {
           >
             <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Your most organized semester starts here.</h2>
             <p class="mt-3 text-primary-200 max-w-xl mx-auto">
-              Sign in to reach your dashboard and take control of your courses, tasks, and due dates—all in one place.
+              Sign in to reach your dashboard and take control of your courses, tasks, and due dates, all in one place.
             </p>
             <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3">
               <template v-if="isSupabaseConfigured">

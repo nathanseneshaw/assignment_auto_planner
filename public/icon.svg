@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#0a5b46"/>
+      <stop offset="100%" stop-color="#053e30"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded-square background (macOS Big Sur+ proportions: ~22% corner radius) -->
+  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+
+  <!-- Soft top highlight band, gives the icon depth without a hard gloss -->
+  <rect width="1024" height="512" rx="224" ry="224" fill="#ffffff" opacity="0.035"/>
+
+  <!-- Clipboard paper -->
+  <rect x="240" y="296" width="544" height="600" rx="52" ry="52" fill="#ffffff"/>
+
+  <!-- Binder clip at the top of the clipboard -->
+  <rect x="400" y="232" width="224" height="128" rx="36" ry="36" fill="#053e30"/>
+  <rect x="436" y="268" width="152" height="56"  rx="14" ry="14" fill="#ffffff"/>
+
+  <!-- Bold checkmark in brand green (primary-900) -->
+  <path d="M 352 588 L 476 712 L 696 476"
+        fill="none"
+        stroke="#064e3b"
+        stroke-width="84"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>
