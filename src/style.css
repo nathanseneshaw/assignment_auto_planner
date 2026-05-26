@@ -3,18 +3,6 @@
 /* Use .dark class (on <html>) instead of prefers-color-scheme media query */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Dark-mode palette shift: redefine the darkest grays as cool emerald-tinted
-   darks so surfaces (cards, borders, hover states) sit naturally on the new
-   #0b1410 background — which matches the dark icon's fill. Anything using
-   `dark:bg-gray-{700,800,900}` or `dark:border-gray-{700,800,900}` picks these
-   up automatically via the CSS variables Tailwind emits. Light mode is
-   untouched because these only resolve inside the `.dark` scope. */
-.dark {
-  --color-gray-700: #1d3128; /* borders, hover surfaces */
-  --color-gray-800: #13211b; /* cards, raised surfaces */
-  --color-gray-900: #0b1410; /* body / page background */
-}
-
 @theme {
   /* Primary — emerald: the brand across buttons, active states & highlights */
   --color-primary-50: #ecfdf5;
