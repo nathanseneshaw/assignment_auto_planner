@@ -87,6 +87,10 @@ function createWindow() {
     height: 820,
     minWidth: 900,
     minHeight: 600,
+    // Runtime taskbar/window icon. `build.icon` in package.json only sets the
+    // packaged-app icon resource; during `electron:dev` the BrowserWindow
+    // needs this explicit option or it falls back to the default Electron icon.
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
