@@ -68,7 +68,7 @@
     "copyright": "Copyright © 2026 Nathan",
     "forceCodeSigning": false,
     "artifactName": "${productName}-${version}-${arch}.${ext}",
-    "icon": "electron/icon.png",
+    "icon": "electron/icon.ico",
     "files": [
       "dist/**/*",
       "electron/**/*"
@@ -94,8 +94,7 @@
       "output": "release"
     },
     "win": {
-      "target": "nsis",
-      "signAndEditExecutable": false
+      "target": "nsis"
     },
     "mac": {
       "target": "dmg"

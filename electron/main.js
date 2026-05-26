@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow, Menu, session } from 'electron'
 import path from 'path'
 import { fileURLToPath, URL } from 'url'
 import { startServer, stopServer } from './server-process.js'
@@ -6,6 +6,12 @@ import logger, { getLogPath } from './logger.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = process.env.ELECTRON_DEV === 'true'
+
+// Windows taskbar groups by AUMID and picks the icon associated with it.
+// Without this, dev builds inherit electron.exe's icon. Must match build.appId.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.plannr.app')
+}
 
 process.on('uncaughtException', (err) => {
   logger.error('uncaughtException:', err)
@@ -143,6 +149,8 @@ app.whenReady().then(async () => {
   // build time (see electron/scripts/generate-server-env.js → src/server/env.generated.js).
   // No runtime env file to load.
   installCsp()
+
+  Menu.setApplicationMenu(null)
 
   try {
     await startServer()
