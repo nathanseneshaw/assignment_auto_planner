@@ -7,9 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = process.env.ELECTRON_DEV === 'true'
 
 // Render-hosted API the desktop renderer talks to. Must stay in sync with
-// VITE_API_BASE in package.json's electron:build script — `installCsp` uses
-// it for connect-src and `installOriginRewrite` uses it to know which
-// requests need the Origin header stripped.
+// VITE_API_BASE in package.json's electron:build script — used for the CSP
+// connect-src allowlist and to scope the response-header CORS bypass below.
 const API_ORIGIN = 'https://assignment-auto-planner-server.onrender.com'
 
 // Windows taskbar groups by AUMID and picks the icon associated with it.
@@ -25,13 +24,13 @@ process.on('unhandledRejection', (reason) => {
   logger.error('unhandledRejection:', reason)
 })
 
-function installCsp() {
+function buildCspPolicy() {
   const baseConnect = `'self' ${API_ORIGIN} https://*.supabase.co wss://*.supabase.co`
   const devConnect = `${baseConnect} http://localhost:5173 ws://localhost:5173`
   const scriptSrc = isDev ? "'self' 'unsafe-eval'" : "'self'"
   const connectSrc = isDev ? devConnect : baseConnect
 
-  const policy = [
+  return [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
@@ -45,36 +44,54 @@ function installCsp() {
     "base-uri 'none'",
     "form-action 'none'",
   ].join('; ')
-
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [policy],
-      },
-    })
-  })
 }
 
-// Renderer pages load from file:// (or http://localhost:5173 in dev), so
-// fetches to the Render API arrive with an Origin the server allowlist
-// doesn't know about. Strip the header for our API host so the server's
-// "no Origin = allow (curl-style client)" branch handles desktop requests.
-// Auth still requires a Supabase JWT, so this isn't an authorization bypass.
-function installOriginRewrite() {
-  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+const CSP_POLICY = buildCspPolicy()
+
+// Single `onHeadersReceived` listener — Electron only fires the most-recently
+// registered one, so CSP injection and the API CORS bypass have to share it.
+// Two reasons we override the response Access-Control-Allow-Origin header
+// instead of doing anything on the request side:
+//
+//   1. The renderer loads from http://localhost:5173 (dev) or file:// (prod).
+//      Neither is in Render's CORS allowlist for the web frontend, and the
+//      file:// case can't be safely allowed at all.
+//   2. Since Chromium 79 (OOR-CORS, "Network Service CORS"), Chromium's CORS
+//      validator compares the response ACAO against the renderer's *real*
+//      committed origin, not whatever an onBeforeSendHeaders hook writes
+//      into the request. Rewriting Origin client-side is a no-op for CORS.
+//
+// Returning ACAO: * here is safe for our use case because we authenticate
+// with `Authorization: Bearer <jwt>` (not cookies), so the credentialed-
+// request restriction on wildcard origins doesn't apply.
+function installResponseHooks() {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...details.responseHeaders }
+    responseHeaders['Content-Security-Policy'] = [CSP_POLICY]
+
     try {
       const u = new URL(details.url)
       if (`${u.protocol}//${u.host}` === API_ORIGIN) {
-        const headers = { ...details.requestHeaders }
-        delete headers['Origin']
-        delete headers['origin']
-        return callback({ requestHeaders: headers })
+        for (const key of Object.keys(responseHeaders)) {
+          const k = key.toLowerCase()
+          if (
+            k === 'access-control-allow-origin' ||
+            k === 'access-control-allow-methods' ||
+            k === 'access-control-allow-headers' ||
+            k === 'access-control-allow-credentials'
+          ) {
+            delete responseHeaders[key]
+          }
+        }
+        responseHeaders['Access-Control-Allow-Origin'] = ['*']
+        responseHeaders['Access-Control-Allow-Methods'] = ['GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD']
+        responseHeaders['Access-Control-Allow-Headers'] = ['Content-Type, Authorization']
       }
     } catch {
-      // fall through — malformed URL won't match our origin anyway
+      // Non-URL response (rare); leave headers as-is beyond the CSP injection.
     }
-    callback({ requestHeaders: details.requestHeaders })
+
+    callback({ responseHeaders })
   })
 }
 
@@ -145,8 +162,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  installCsp()
-  installOriginRewrite()
+  installResponseHooks()
 
   Menu.setApplicationMenu(null)
 

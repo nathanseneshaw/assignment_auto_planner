@@ -32,6 +32,12 @@ const HOST = process.env.HOST || '0.0.0.0'
  * the single-origin `FRONTEND_URL` convenience var. Empty list = allow any
  * origin (intended for local development; tighten in production).
  */
+// Stable identifier the Plannr desktop app uses as its Origin. Set in
+// electron/main.js via a webRequest.onBeforeSendHeaders rewrite. Allowing it
+// here lets the desktop renderer share this Render backend with the Vercel
+// web frontend without requiring a per-environment ALLOWED_ORIGINS update.
+const DESKTOP_ORIGIN = 'https://plannr-desktop.app'
+
 function parseAllowedOrigins() {
   const fromAllowList = String(process.env.ALLOWED_ORIGINS || '')
     .split(',')
@@ -40,6 +46,7 @@ function parseAllowedOrigins() {
   const front = String(process.env.FRONTEND_URL || '').trim()
   const set = new Set(fromAllowList)
   if (front) set.add(front)
+  set.add(DESKTOP_ORIGIN)
   return [...set]
 }
 
