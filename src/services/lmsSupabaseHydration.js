@@ -11,6 +11,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
 import { useTasksStore } from '../stores/tasks'
+import { mapDbTaskRow, mergeTaskLists } from './taskSyncCore'
 
 /** Color palette assigned round-robin so hydration is deterministic per-position. */
 const courseColors = [
@@ -169,33 +170,19 @@ export async function hydrateLmsStoresFromSupabase() {
   assignmentsStore.replaceFromHydration(assignments)
 
   // Only update tasks when the query succeeded — a failed query must not wipe
-  // the local store. Also preserve any tasks that are still being saved to
-  // Supabase (supabaseTaskId is null) to avoid a race where ICS sync fires
-  // before the async insert has completed.
+  // the local store. The merge dedups by id and preserves any local task whose
+  // insert hasn't landed in this snapshot yet (in-flight or failed), so neither
+  // a query failure nor a create/sync race can drop tasks.
   if (!tErr) {
     const dbTasks = (taskRows || []).map((row) => {
       const assignment = assignments.find(a => a.id === row.assignment_id)
-      return {
-        id: row.id,
-        supabaseTaskId: row.id,
-        createdAt: row.created_at || new Date().toISOString(),
-        title: row.title || 'Untitled task',
-        scheduledDate: row.scheduled_date,
-        priority: row.priority ?? 0,
-        completed: row.completed ?? false,
-        assignmentId: assignment?.id || row.assignment_id || null,
-        courseId: row.course_id || assignment?.courseId || null,
-        courseName: assignment?.courseName || courseById[row.course_id]?.name || null,
-      }
+      return mapDbTaskRow(row, { assignment, courseName: courseById[row.course_id]?.name })
     })
 
-    // Keep local tasks whose Supabase insert is still in-flight (no supabaseTaskId yet,
-    // or supabaseTaskId not yet reflected in this DB snapshot).
-    const dbTaskIds = new Set(dbTasks.map(t => t.supabaseTaskId))
-    const pendingLocalTasks = tasksStore.tasks.filter(
-      t => !t.supabaseTaskId || !dbTaskIds.has(t.supabaseTaskId)
-    )
+    tasksStore.hydrateFromSupabase(mergeTaskLists(dbTasks, tasksStore.tasks))
 
-    tasksStore.hydrateFromSupabase([...dbTasks, ...pendingLocalTasks])
+    // Self-heal: re-attempt any task whose insert never confirmed. Idempotent
+    // upsert keyed on id, so retries can't duplicate. Fire-and-forget.
+    void tasksStore.retryPendingPersists()
   }
 }

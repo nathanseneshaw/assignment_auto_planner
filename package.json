@@ -19,6 +19,7 @@
     "server": "node src/server/index.js",
     "server:dev": "node --watch src/server/index.js",
     "server:test": "node --test ./src/server/tests/*.test.mjs",
+    "test:client": "node --test ./src/services/tests/*.test.mjs",
     "render:build": "npm install",
     "electron:dev": "concurrently \"cross-env VITE_BUILD_TARGET=electron vite\" \"wait-on http://localhost:5173 && cross-env ELECTRON_DEV=true electron .\"",
     "icon:generate": "node electron/scripts/generate-icon.js",

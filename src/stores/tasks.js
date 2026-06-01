@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAssignmentsStore } from './assignments'
 import { persistTaskToSupabase, deleteTaskFromSupabase } from '../services/taskSync'
+import { useToast } from '../composables/useToast'
 
 export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref([])
@@ -41,8 +42,31 @@ export const useTasksStore = defineStore('tasks', () => {
   })
 
   /**
+   * Persist a task and stamp the confirmed Supabase id back onto the local row.
+   * Idempotent (upsert keyed on the task's own id), so it's safe to call on
+   * create, update, and retry. `silent` suppresses the failure toast for
+   * background retries. Returns true when the row is confirmed in Supabase.
+   */
+  async function persistAndStamp(task, { silent = false } = {}) {
+    const result = await persistTaskToSupabase(task)
+    if (result.status === 'ok') {
+      const idx = tasks.value.findIndex(t => t.id === task.id)
+      if (idx !== -1 && tasks.value[idx].supabaseTaskId !== result.id) {
+        tasks.value[idx] = { ...tasks.value[idx], supabaseTaskId: result.id }
+      }
+      return true
+    }
+    if (result.status === 'error' && !silent) {
+      useToast().error("Couldn't save your task — we'll retry automatically.")
+    }
+    return false // 'skipped' (local-only mode) or 'error'
+  }
+
+  /**
    * Add a task. Priority defaults to (current length + 1) so new tasks land
-   * at the bottom of the day's list until the user reorders them.
+   * at the bottom of the day's list until the user reorders them. The local
+   * `id` is also used as the Supabase primary key so the insert is idempotent
+   * and can't duplicate on a concurrent hydration.
    */
   function addTask(task) {
     const newTask = {
@@ -50,25 +74,19 @@ export const useTasksStore = defineStore('tasks', () => {
       createdAt: new Date().toISOString(),
       completed: false,
       priority: tasks.value.length + 1,
+      priorityLevel: 'normal',
       supabaseTaskId: null,
       ...task,
     }
     tasks.value.push(newTask)
-
-    void (async () => {
-      const sid = await persistTaskToSupabase(newTask)
-      if (sid) {
-        const idx = tasks.value.findIndex(t => t.id === newTask.id)
-        if (idx !== -1) tasks.value[idx] = { ...tasks.value[idx], supabaseTaskId: sid }
-      }
-    })()
-
+    void persistAndStamp(newTask)
     return newTask
   }
 
   /**
    * Patch a task. If `completed` changed, roll the parent assignment's
-   * progress percentage so its UI updates in lockstep.
+   * progress percentage so its UI updates in lockstep. Always persists (upsert
+   * is idempotent) so edits made before the initial insert confirms aren't lost.
    */
   function updateTask(id, updates) {
     const index = tasks.value.findIndex(t => t.id === id)
@@ -76,21 +94,30 @@ export const useTasksStore = defineStore('tasks', () => {
     tasks.value[index] = { ...tasks.value[index], ...updates }
 
     if (updates.completed !== undefined) {
-      const task = tasks.value[index]
-      useAssignmentsStore().updateProgress(task.assignmentId)
+      useAssignmentsStore().updateProgress(tasks.value[index].assignmentId)
     }
 
-    const task = tasks.value[index]
-    if (task.supabaseTaskId) {
-      void persistTaskToSupabase(task)
-    }
+    void persistAndStamp(tasks.value[index])
   }
 
   function deleteTask(id) {
     const task = tasks.value.find(t => t.id === id)
     tasks.value = tasks.value.filter(t => t.id !== id)
-    if (task?.supabaseTaskId) {
-      void deleteTaskFromSupabase(task.supabaseTaskId)
+    // id === the DB primary key, so delete by it whether or not the insert was
+    // confirmed (covers a row that persisted but never got stamped locally).
+    const dbId = task?.supabaseTaskId || task?.id
+    if (dbId) void deleteTaskFromSupabase(dbId)
+  }
+
+  /**
+   * Re-attempt any tasks whose insert never confirmed (offline at create time,
+   * or a transient error). Called after hydration; idempotent upsert keyed on
+   * id means this can't create duplicates. Silent — it's a background self-heal.
+   */
+  async function retryPendingPersists() {
+    const pendingNow = tasks.value.filter(t => !t.supabaseTaskId)
+    for (const t of pendingNow) {
+      await persistAndStamp(t, { silent: true })
     }
   }
 
@@ -133,6 +160,7 @@ export const useTasksStore = defineStore('tasks', () => {
     addTask,
     updateTask,
     deleteTask,
+    retryPendingPersists,
     clearAll,
     hydrateFromSupabase,
     getTasksByAssignment,
