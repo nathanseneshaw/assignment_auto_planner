@@ -6,6 +6,7 @@ import { useAssignmentsStore } from '../../stores/assignments'
 import { useProfileStore } from '../../stores/profile'
 import { useAuthStore } from '../../stores/auth'
 import { isSupabaseConfigured } from '../../lib/supabase'
+import UpdateButton from './UpdateButton.vue'
 
 defineProps({
   sidebarOpen: Boolean
@@ -228,6 +229,9 @@ function goToTask(task) {
       </div>
 
       <div class="flex items-center gap-2 lg:gap-4">
+        <!-- Desktop auto-update (Electron only; hidden until an update exists) -->
+        <UpdateButton />
+
         <!-- Search -->
         <div class="relative">
           <button
