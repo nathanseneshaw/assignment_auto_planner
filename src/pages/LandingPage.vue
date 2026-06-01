@@ -11,8 +11,8 @@ const showSkipSignIn = computed(() => !isSupabaseConfigured)
 const loginToApp = { name: 'Login', query: { redirect: '/dashboard' } }
 const registerToApp = { name: 'Register', query: { redirect: '/dashboard' } }
 
-// Public Vercel Blob URL for the Windows installer — permanent, no expiry/token.
-const installerUrl = 'https://vulxandurwzn2oir.public.blob.vercel-storage.com/Plannr-1.0.0-x64.exe'
+// Always serves the installer from the newest published GitHub Release.
+const installerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/releases/latest/download/Plannr-1.0.0-x64.exe'
 
 const features = [
   {
