@@ -24,6 +24,8 @@
     "icon:generate": "node electron/scripts/generate-icon.js",
     "preelectron:build": "node electron/scripts/generate-icon.js",
     "electron:build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && electron-builder",
+    "preelectron:publish": "node electron/scripts/generate-icon.js",
+    "electron:publish": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && electron-builder --publish always",
     "electron:preview": "cross-env ELECTRON_DEV=false electron ."
   },
   "dependencies": {
@@ -34,6 +36,7 @@
     "@vueuse/core": "^14.2.1",
     "cheerio": "^1.0.0",
     "cors": "^2.8.5",
+    "electron-updater": "^6.8.3",
     "express": "^4.21.0",
     "express-rate-limit": "^7.5.1",
     "mammoth": "^1.8.0",
@@ -69,6 +72,13 @@
     "forceCodeSigning": false,
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "icon": "electron/icon.ico",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "nathanseneshaw",
+        "repo": "assignment_auto_planner"
+      }
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*"

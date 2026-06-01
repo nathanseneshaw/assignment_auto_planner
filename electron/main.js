@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, session } from 'electron'
 import path from 'path'
 import { fileURLToPath, URL } from 'url'
 import logger from './logger.js'
+import { initAutoUpdater } from './updater.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDev = process.env.ELECTRON_DEV === 'true'
@@ -170,6 +171,10 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  // Check GitHub Releases for a newer version and update in the background.
+  // No-op in dev / unpacked builds (see updater.js).
+  initAutoUpdater()
 })
 
 app.on('window-all-closed', () => {
