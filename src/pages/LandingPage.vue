@@ -32,25 +32,6 @@ const features = [
   },
 ]
 
-// Anonymized sample testimonials — monograms are academic-field tags, not real
-// names. Swap in real student quotes when available.
-const testimonials = [
-  {
-    quote: 'I used to keep due dates in three different places. Now everything lands on one timeline and I plan my week instead of reacting to it.',
-    role: 'CS sophomore',
-    monogram: 'CS',
-  },
-  {
-    quote: 'Pasting my calendar link once meant I stopped copying deadlines by hand. The week view shows me exactly when crunch time is coming.',
-    role: 'Pre-med student',
-    monogram: 'PM',
-  },
-  {
-    quote: 'Between work and classes I needed something structured, not another cluttered app. Breaking big assignments into scheduled tasks keeps me on track.',
-    role: 'Part-time grad student',
-    monogram: 'GR',
-  },
-]
 
 const faqs = [
   {
@@ -101,8 +82,7 @@ function toggleFaq(i) {
 
         <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
           <a href="#features" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Features</a>
-          <a href="#testimonials" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Reviews</a>
-          <a href="#download" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Download</a>
+<a href="#download" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Download</a>
           <a href="#faq" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">FAQ</a>
         </nav>
 
@@ -247,37 +227,6 @@ function toggleFaq(i) {
               </div>
               <h3 class="text-lg font-semibold text-gray-900">{{ item.title }}</h3>
               <p class="mt-2 text-sm text-gray-600 leading-relaxed">{{ item.body }}</p>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <section id="testimonials" class="scroll-mt-20 border-t border-gray-200/80 py-16 sm:py-20">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6">
-          <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Built around real student weeks</h2>
-          <p class="mt-2 text-gray-600 max-w-2xl">
-            Less last-minute panic, more steady progress. Here’s the kind of semester it’s made for.
-          </p>
-
-          <ul class="mt-12 grid gap-6 sm:grid-cols-3">
-            <li
-              v-for="t in testimonials"
-              :key="t.role"
-              class="flex flex-col rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm shadow-gray-900/[0.03]"
-            >
-              <svg class="w-7 h-7 text-primary-200" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M9.983 3v7.391c0 5.704-3.731 9.57-8.983 10.609l-.995-2.151c2.432-.917 3.995-3.638 3.995-5.849H.001V3h9.982zm14.017 0v7.391c0 5.704-3.748 9.57-9 10.609l-.996-2.151c2.433-.917 3.996-3.638 3.996-5.849h-3.983V3h9.983z"
-                />
-              </svg>
-              <p class="mt-4 flex-1 text-gray-700 leading-relaxed">{{ t.quote }}</p>
-              <div class="mt-6 flex items-center gap-3">
-                <span
-                  class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-800"
-                  aria-hidden="true"
-                >{{ t.monogram }}</span>
-                <span class="text-sm font-medium text-gray-500">{{ t.role }}</span>
-              </div>
             </li>
           </ul>
         </div>
