@@ -165,24 +165,37 @@ export async function hydrateLmsStoresFromSupabase() {
     mapAssignmentRow(row, courseById[row.course_id])
   )
 
-  // Map Supabase task rows → Pinia task shape.
-  const tasks = (taskRows || []).map((row) => {
-    const assignment = assignments.find(a => a.id === row.assignment_id)
-    return {
-      id: row.id,
-      supabaseTaskId: row.id,
-      createdAt: row.created_at || new Date().toISOString(),
-      title: row.title || 'Untitled task',
-      scheduledDate: row.scheduled_date,
-      priority: row.priority ?? 0,
-      completed: row.completed ?? false,
-      assignmentId: assignment?.id || row.assignment_id || null,
-      courseId: row.course_id || assignment?.courseId || null,
-      courseName: assignment?.courseName || courseById[row.course_id]?.name || null,
-    }
-  })
-
   coursesStore.replaceFromHydration(courses)
   assignmentsStore.replaceFromHydration(assignments)
-  tasksStore.hydrateFromSupabase(tasks)
+
+  // Only update tasks when the query succeeded — a failed query must not wipe
+  // the local store. Also preserve any tasks that are still being saved to
+  // Supabase (supabaseTaskId is null) to avoid a race where ICS sync fires
+  // before the async insert has completed.
+  if (!tErr) {
+    const dbTasks = (taskRows || []).map((row) => {
+      const assignment = assignments.find(a => a.id === row.assignment_id)
+      return {
+        id: row.id,
+        supabaseTaskId: row.id,
+        createdAt: row.created_at || new Date().toISOString(),
+        title: row.title || 'Untitled task',
+        scheduledDate: row.scheduled_date,
+        priority: row.priority ?? 0,
+        completed: row.completed ?? false,
+        assignmentId: assignment?.id || row.assignment_id || null,
+        courseId: row.course_id || assignment?.courseId || null,
+        courseName: assignment?.courseName || courseById[row.course_id]?.name || null,
+      }
+    })
+
+    // Keep local tasks whose Supabase insert is still in-flight (no supabaseTaskId yet,
+    // or supabaseTaskId not yet reflected in this DB snapshot).
+    const dbTaskIds = new Set(dbTasks.map(t => t.supabaseTaskId))
+    const pendingLocalTasks = tasksStore.tasks.filter(
+      t => !t.supabaseTaskId || !dbTaskIds.has(t.supabaseTaskId)
+    )
+
+    tasksStore.hydrateFromSupabase([...dbTasks, ...pendingLocalTasks])
+  }
 }
