@@ -12,7 +12,8 @@ const loginToApp = { name: 'Login', query: { redirect: '/dashboard' } }
 const registerToApp = { name: 'Register', query: { redirect: '/dashboard' } }
 
 // Always serves the installer from the newest published GitHub Release.
-const installerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/releases/latest/download/Plannr-1.0.0-x64.exe'
+// Filename is version-less (see build.artifactName) so this link never changes.
+const installerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/releases/latest/download/Plannr-x64.exe'
 
 const features = [
   {

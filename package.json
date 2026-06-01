@@ -70,7 +70,7 @@
     "productName": "Plannr",
     "copyright": "Copyright © 2026 Nathan",
     "forceCodeSigning": false,
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "artifactName": "${productName}-${arch}.${ext}",
     "icon": "electron/icon.ico",
     "publish": [
       {
