@@ -11,10 +11,8 @@ const showSkipSignIn = computed(() => !isSupabaseConfigured)
 const loginToApp = { name: 'Login', query: { redirect: '/dashboard' } }
 const registerToApp = { name: 'Register', query: { redirect: '/dashboard' } }
 
-// TODO: replace '#' with the actual hosted installer URL (Supabase Storage,
-// S3, R2, GitHub release asset, etc.) once the file is uploaded somewhere
-// publicly downloadable.
-const installerUrl = 'https://av8yap9rvpfzcjiv.private.blob.vercel-storage.com/Plannr-1.0.0-x64.exe?vercel-blob-delegation=eyJzdG9yZUlkIjoic3RvcmVfQVY4WWFwOXJWcGZ6Q2ppViIsIm93bmVySWQiOiJ0ZWFtXzNDZmxKV1JSRVJweEE5RzgxcEpzYlg1WCIsInBhdGhuYW1lIjoiKiIsIm9wZXJhdGlvbnMiOlsiZ2V0IiwiaGVhZCJdLCJ2YWxpZFVudGlsIjoxNzc5ODc4ODc1MjIwLCJpYXQiOjE3Nzk4MzU2NzUzODF9._5to3yNqi6qdSkLe9MJOCfVbhhIWgCIap_tIyl6kFL4&vercel-blob-signature=0BcyAPGHxLF-HT01jJw-YNKy9jH3MsAI5kCIgMdUYyM'
+// Public Vercel Blob URL for the Windows installer — permanent, no expiry/token.
+const installerUrl = 'https://vulxandurwzn2oir.public.blob.vercel-storage.com/Plannr-1.0.0-x64.exe'
 
 const features = [
   {
