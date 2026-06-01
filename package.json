@@ -78,7 +78,8 @@
       {
         "provider": "github",
         "owner": "nathanseneshaw",
-        "repo": "assignment_auto_planner"
+        "repo": "assignment_auto_planner",
+        "releaseType": "release"
       }
     ],
     "files": [
