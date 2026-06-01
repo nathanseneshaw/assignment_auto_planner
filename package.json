@@ -23,9 +23,9 @@
     "electron:dev": "concurrently \"cross-env VITE_BUILD_TARGET=electron vite\" \"wait-on http://localhost:5173 && cross-env ELECTRON_DEV=true electron .\"",
     "icon:generate": "node electron/scripts/generate-icon.js",
     "preelectron:build": "node electron/scripts/generate-icon.js",
-    "electron:build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && electron-builder",
+    "electron:build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && electron-builder --publish never",
     "preelectron:publish": "node electron/scripts/generate-icon.js",
-    "electron:publish": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && electron-builder --publish always",
+    "electron:publish": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && dotenv -e .env.local electron-builder --publish always",
     "electron:preview": "cross-env ELECTRON_DEV=false electron ."
   },
   "dependencies": {
@@ -57,6 +57,7 @@
     "autoprefixer": "^10.5.0",
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
+    "dotenv-cli": "^11.0.0",
     "electron": "^34.5.8",
     "electron-builder": "^25.1.8",
     "postcss": "^8.5.10",
