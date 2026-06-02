@@ -1,32 +1,20 @@
-// Auto-update wiring for the packaged desktop app, driven by an in-app button.
+// Auto-update wiring for the packaged desktop app.
 //
-// How it works end to end:
-//   1. `electron-builder` is run with the GitHub `publish` config (see
-//      package.json build.publish). At build time it bakes an `app-update.yml`
-//      into the app's resources and, when published, uploads three things to a
-//      GitHub Release: the installer (Plannr-x64.exe), its `.blockmap` (enables
-//      small differential downloads), and `latest.yml` (the manifest describing
-//      the newest version + file hashes).
-//   2. The renderer's update button calls `updates.check()` on mount. We ask
-//      GitHub for the latest release's `latest.yml` and compare its version to
-//      this build's version. If newer, we emit `update-available` and the button
-//      appears.
-//   3. The user clicks → `updates.download()` pulls the installer in the
-//      background (we forward progress). When it finishes we emit
-//      `update-downloaded`; the renderer then calls `updates.install()`, which
-//      runs `quitAndInstall()` to relaunch into the new version.
+// Checking is driven by the MAIN process (this file) on launch and on an
+// interval, so updates are detected regardless of whether the user has signed
+// in or which screen they're on. When an update is found we alert immediately
+// with a native dialog (works even on the login screen / before sign-in) and
+// also broadcast the state to the renderer so the in-app "Update Available"
+// button stays in sync for users who happen to be in the app.
 //
-// `autoDownload` is off so nothing downloads until the user clicks the button.
-// electron-updater ships as CommonJS, so under our ESM ("type":"module") setup
-// we default-import and destructure rather than `import { autoUpdater }`.
+// electron-updater ships as CommonJS, so under our ESM setup we default-import
+// and destructure rather than `import { autoUpdater }`.
 import electronUpdater from 'electron-updater'
-import { app, ipcMain, BrowserWindow } from 'electron'
+import { app, ipcMain, dialog, BrowserWindow } from 'electron'
 import logger from './logger.js'
 
 const { autoUpdater } = electronUpdater
 
-// Adapter so electron-updater's verbose internal logs land in our main.log
-// (it expects info/warn/error/debug).
 const updaterLogger = {
   info: (m) => logger.info('autoUpdater:', m),
   warn: (m) => logger.warn('autoUpdater:', m),
@@ -34,9 +22,12 @@ const updaterLogger = {
   debug: (m) => logger.info('autoUpdater:', m),
 }
 
-// Last status we broadcast, so a renderer that mounts *after* an event fired can
-// catch up via updates:getState instead of missing it.
+// How often to re-check while the app stays open.
+const CHECK_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
+
 let lastState = { status: 'idle' }
+let dialogOpen = false // never stack native dialogs
+let promptedVersion = null // alert about a given version only once per run
 
 function broadcast(payload) {
   lastState = payload
@@ -47,76 +38,119 @@ function broadcast(payload) {
   }
 }
 
-let initialized = false
+function startDownload() {
+  broadcast({ status: 'downloading', percent: 0 })
+  autoUpdater.downloadUpdate().catch((e) => {
+    logger.error('autoUpdater: downloadUpdate failed', e)
+    broadcast({ status: 'error', message: String(e?.message || e) })
+  })
+}
+
+async function alertUpdateAvailable(version) {
+  if (dialogOpen) return
+  dialogOpen = true
+  try {
+    const { response } = await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Download now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Update available',
+      message: `Plannr ${version} is available.`,
+      detail: 'Download it now? You can keep using the app while it downloads.',
+    })
+    if (response === 0) startDownload()
+  } finally {
+    dialogOpen = false
+  }
+}
+
+async function alertUpdateDownloaded(version) {
+  if (dialogOpen) return
+  dialogOpen = true
+  try {
+    const { response } = await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Update ready',
+      message: `Plannr ${version} has been downloaded.`,
+      detail: 'Restart now to finish installing, or it will install the next time you quit.',
+    })
+    if (response === 0) autoUpdater.quitAndInstall()
+  } finally {
+    dialogOpen = false
+  }
+}
+
+function check() {
+  autoUpdater.checkForUpdates().catch((e) => {
+    // Offline / transient / no release yet — logged, but the UI stays quiet
+    // (no scary banner for a failed check).
+    logger.error('autoUpdater: check failed', e)
+  })
+}
+
+let started = false
 
 export function initAutoUpdater() {
-  if (initialized) return
-  initialized = true
-
-  // IPC the renderer's update button calls. Registered even in dev so those
-  // calls resolve cleanly (reporting "dev") instead of throwing "no handler".
+  // IPC the in-app button uses (manual trigger + state sync). Registered even
+  // in dev so renderer calls resolve cleanly instead of throwing.
   ipcMain.handle('updates:getState', () => lastState)
-
-  ipcMain.handle('updates:check', async () => {
-    if (!app.isPackaged) return { status: 'dev' }
-    try {
-      const result = await autoUpdater.checkForUpdates()
-      return { status: 'checked', version: result?.updateInfo?.version }
-    } catch (err) {
-      // Offline, or no published release yet — log but don't surface a scary
-      // error to the UI (the button just stays hidden, see UpdateButton.vue).
-      logger.error('autoUpdater: check failed', err)
-      return { status: 'error', message: String(err?.message || err) }
-    }
+  ipcMain.handle('updates:check', () => {
+    if (app.isPackaged) check()
+    return lastState
   })
-
-  ipcMain.handle('updates:download', async () => {
+  ipcMain.handle('updates:download', () => {
     if (!app.isPackaged) return { status: 'dev' }
-    try {
-      await autoUpdater.downloadUpdate()
-      return { status: 'downloading' }
-    } catch (err) {
-      logger.error('autoUpdater: download failed', err)
-      broadcast({ status: 'error', message: String(err?.message || err) })
-      return { status: 'error', message: String(err?.message || err) }
-    }
+    startDownload()
+    return { status: 'downloading' }
   })
-
   ipcMain.handle('updates:install', () => {
-    if (!app.isPackaged) return { status: 'dev' }
-    // Relaunch into the freshly downloaded version.
-    autoUpdater.quitAndInstall()
+    if (app.isPackaged) autoUpdater.quitAndInstall()
     return { status: 'installing' }
   })
 
-  // No installer to swap out when running from source / unpacked, and there's
-  // no embedded app-update.yml, so stop here — the IPC handlers above still
-  // answer (with "dev") and the button stays hidden.
+  // No installer to swap out when running from source / unpacked, and no
+  // embedded app-update.yml, so don't start the checker. The IPC handlers above
+  // still answer (the in-app button just stays hidden).
   if (!app.isPackaged) {
     logger.info('autoUpdater: dev mode — auto-update disabled')
     return
   }
+  if (started) return
+  started = true
 
   autoUpdater.logger = updaterLogger
-  autoUpdater.autoDownload = false // wait for the user to click Update
-  autoUpdater.autoInstallOnAppQuit = true // safety net if they quit mid-flow
+  autoUpdater.autoDownload = false // wait for the user to accept the alert
+  autoUpdater.autoInstallOnAppQuit = true // if they defer the restart, install on quit
 
   autoUpdater.on('update-available', (info) => {
     logger.info('autoUpdater: update available', info.version)
     broadcast({ status: 'available', version: info.version })
+    // Proactive native alert — fires regardless of sign-in state. Once per
+    // version per run so an hourly re-check doesn't nag repeatedly.
+    if (promptedVersion !== info.version) {
+      promptedVersion = info.version
+      void alertUpdateAvailable(info.version)
+    }
   })
-  autoUpdater.on('update-not-available', () => {
-    broadcast({ status: 'not-available' })
-  })
-  autoUpdater.on('download-progress', (p) => {
-    broadcast({ status: 'downloading', percent: Math.round(p.percent) })
-  })
+  autoUpdater.on('update-not-available', () => broadcast({ status: 'not-available' }))
+  autoUpdater.on('download-progress', (p) =>
+    broadcast({ status: 'downloading', percent: Math.round(p.percent) }),
+  )
   autoUpdater.on('update-downloaded', (info) => {
     logger.info('autoUpdater: update downloaded', info.version)
     broadcast({ status: 'downloaded', version: info.version })
+    void alertUpdateDownloaded(info.version)
   })
   autoUpdater.on('error', (err) => {
     logger.error('autoUpdater: error', err)
     broadcast({ status: 'error', message: String(err?.message || err) })
   })
+
+  // Check on launch, then periodically while the app stays open.
+  check()
+  setInterval(check, CHECK_INTERVAL_MS)
 }
