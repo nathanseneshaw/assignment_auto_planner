@@ -1,7 +1,7 @@
 {
   "name": "plannr",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Plan your coursework by subscribing to your school's iCalendar (ICS) feeds.",
   "type": "module",
   "main": "electron/main.js",
