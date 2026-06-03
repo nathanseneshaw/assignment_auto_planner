@@ -38,17 +38,71 @@ export function clientFor(req) {
   })
 }
 
-/** Validates the JWT by calling getUser() and attaches { user, supabase } to req. */
+// Short-TTL cache of validated bearer tokens so repeated requests sharing one
+// token don't each pay a network round-trip to GoTrue's /auth/v1/user. RLS is
+// unaffected (enforced by PostgREST from the JWT on every query regardless).
+const AUTH_CACHE_TTL_MS = 60_000
+const AUTH_CACHE_MAX = 1000
+const authCache = new Map() // token -> { user, expiresAt }
+
+function authCacheGet(token) {
+  const entry = authCache.get(token)
+  if (!entry) return null
+  if (entry.expiresAt < Date.now()) {
+    authCache.delete(token)
+    return null
+  }
+  return entry.user
+}
+
+/** Decode a JWT's `exp` (seconds) without verifying — used only to bound caching. */
+function jwtExpMs(token) {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'))
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+function authCacheSet(token, user) {
+  if (authCache.size >= AUTH_CACHE_MAX) {
+    const oldest = authCache.keys().next().value
+    if (oldest !== undefined) authCache.delete(oldest)
+  }
+  // Never let a cached entry outlive the token's own expiry.
+  const exp = jwtExpMs(token)
+  const expiresAt = exp != null
+    ? Math.min(Date.now() + AUTH_CACHE_TTL_MS, exp)
+    : Date.now() + AUTH_CACHE_TTL_MS
+  authCache.set(token, { user, expiresAt })
+}
+
+function bearerToken(req) {
+  const auth = req.headers.authorization || ''
+  if (!auth.toLowerCase().startsWith('bearer ')) return null
+  return auth.slice(auth.indexOf(' ') + 1).trim() || null
+}
+
+/** Validates the JWT (cached briefly) and attaches { user, supabase } to req. */
 export async function requireUser(req, res, next) {
   try {
     const supabase = clientFor(req)
     if (!supabase) {
       return res.status(401).json({ success: false, error: 'Missing Authorization bearer token' })
     }
+    const token = bearerToken(req)
+    const cachedUser = token ? authCacheGet(token) : null
+    if (cachedUser) {
+      req.supabase = supabase
+      req.user = cachedUser
+      return next()
+    }
     const { data, error } = await supabase.auth.getUser()
     if (error || !data?.user) {
       return res.status(401).json({ success: false, error: 'Invalid or expired token' })
     }
+    if (token) authCacheSet(token, data.user)
     req.supabase = supabase
     req.user = data.user
     next()
