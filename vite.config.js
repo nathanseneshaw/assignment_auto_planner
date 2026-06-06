@@ -11,6 +11,12 @@ const isElectronBuild = process.env.VITE_BUILD_TARGET === 'electron'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  test: {
+    globals: true,
+    environment: 'happy-dom',
+    include: ['src/**/__tests__/**/*.test.js'],
+    setupFiles: ['src/stores/__tests__/setup.js'],
+  },
   base: './',
   define: {
     __IS_ELECTRON__: JSON.stringify(isElectronBuild),
