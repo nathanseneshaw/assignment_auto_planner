@@ -49,8 +49,8 @@ watch(
     if (user && isSupabaseConfigured) {
       await hydrateLmsStoresFromSupabase()
     } else if (!user && previous) {
-      coursesStore.replaceFromHydration([])
-      assignmentsStore.replaceFromHydration([])
+      coursesStore.clearAll()
+      assignmentsStore.clearAll()
       tasksStore.clearAll()
     }
   }
