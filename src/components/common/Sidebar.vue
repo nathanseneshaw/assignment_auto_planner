@@ -1,66 +1,106 @@
 <script setup>
 import { computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { COURSE_PLANNER } from '../../config/featureFlags.js'
+import { useTasksStore } from '../../stores/tasks'
+import { useAssignmentsStore } from '../../stores/assignments'
+import { useCoursesStore } from '../../stores/courses'
+import { useProfileStore } from '../../stores/profile'
+import { useAuthStore } from '../../stores/auth'
+import { isSupabaseConfigured } from '../../lib/supabase'
 
-const props = defineProps({
-  open: {
-    type: Boolean,
-    default: true
-  },
+defineProps({
   mobileOpen: {
     type: Boolean,
     default: false
   }
 })
 
-const emit = defineEmits(['toggle', 'closeMobile'])
+const emit = defineEmits(['closeMobile'])
 
 const route = useRoute()
+const router = useRouter()
+const tasksStore = useTasksStore()
+const assignmentsStore = useAssignmentsStore()
+const coursesStore = useCoursesStore()
+const profileStore = useProfileStore()
+const authStore = useAuthStore()
 
 watch(() => route.path, () => {
   emit('closeMobile')
 })
 
-const navItems = [
-  { 
-    name: 'Dashboard', 
-    path: '/dashboard', 
-    icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
-    description: 'Overview & stats'
+/** Local `YYYY-MM-DD` key (timezone-safe — never toISOString). */
+function localDateKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Count of tasks scheduled within the current Mon–Sun week. */
+const weekTaskCount = computed(() => {
+  const now = new Date()
+  const day = now.getDay() // 0 = Sun
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - ((day + 6) % 7))
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  const start = localDateKey(monday)
+  const end = localDateKey(sunday)
+  return tasksStore.tasks.filter(t => t.scheduledDate >= start && t.scheduledDate <= end).length
+})
+
+// Sidebar items grouped exactly like the mockup, but limited to routes that
+// actually exist in the app (no Inbox / Syllabi / Archive — those have no page).
+const sections = computed(() => [
+  {
+    label: 'Today',
+    items: [
+      { name: 'Focus', path: '/dashboard' },
+      { name: 'Agenda', path: '/tasks', count: tasksStore.todaysTasks.filter(t => !t.completed).length },
+    ],
   },
   {
-    name: 'Assignments',
-    path: '/assignments',
-    icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
-    description: 'All assignments'
+    label: 'Plan',
+    items: [
+      { name: 'Assignments', path: '/assignments', count: assignmentsStore.upcomingAssignments.length },
+      { name: 'Week', path: '/planner', count: weekTaskCount.value },
+      ...(COURSE_PLANNER
+        ? [{ name: 'Courses', path: '/course-planner', count: coursesStore.courses.length }]
+        : []),
+    ],
   },
-  {
-    name: 'Tasks',
-    path: '/tasks',
-    icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
-    description: 'Daily tasks'
-  },
-  { 
-    name: 'Planner', 
-    path: '/planner', 
-    icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
-    description: 'Week & month'
-  },
-  ...(COURSE_PLANNER ? [{
-    name: 'Course Planner',
-    path: '/course-planner',
-    icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
-    description: 'Find & schedule courses'
-  }] : []),
-]
+])
+
+const userName = computed(() => {
+  if (isSupabaseConfigured && authStore.user) {
+    return (
+      authStore.user.user_metadata?.full_name ||
+      authStore.user.user_metadata?.name ||
+      authStore.user.email?.split('@')[0] ||
+      'Student'
+    )
+  }
+  return profileStore.profile.name || 'Student'
+})
+
+const userInitials = computed(() => {
+  const name = userName.value
+  if (!name || name === 'Student') {
+    if (isSupabaseConfigured && authStore.user?.email) {
+      return authStore.user.email.slice(0, 2).toUpperCase()
+    }
+    return 'S'
+  }
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+})
+
+const userSubtitle = computed(() => {
+  if (profileStore.profile.school?.trim()) return profileStore.profile.school.trim()
+  if (isSupabaseConfigured && authStore.user?.email) return authStore.user.email
+  return profileStore.profile.email || 'Student planner'
+})
 
 const isActive = (path) => {
-  if (path === '/dashboard') {
-    return route.path === '/dashboard'
-  }
-  // `/course-planner` must not also light up `/course` — require either an
-  // exact match or that the next character is a path separator.
+  if (path === '/dashboard') return route.path === '/dashboard'
   if (route.path === path) return true
   return route.path.startsWith(path + '/')
 }
@@ -70,7 +110,7 @@ const isActive = (path) => {
   <!-- Mobile Overlay -->
   <Teleport to="body">
     <Transition name="fade">
-      <div 
+      <div
         v-if="mobileOpen"
         class="fixed inset-0 bg-stone-950/30 backdrop-blur-[2px] z-40 lg:hidden"
         @click="emit('closeMobile')"
@@ -80,30 +120,21 @@ const isActive = (path) => {
 
   <!-- Sidebar -->
   <aside
-    class="fixed top-0 left-0 z-50 h-screen bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/80 dark:border-gray-700/80 flex flex-col transition-all duration-300 ease-in-out shadow-[1px_0_24px_rgba(28,25,23,0.05)]"
-    :class="[
-      open ? 'lg:w-64' : 'lg:w-20',
-      mobileOpen ? 'w-72 translate-x-0' : '-translate-x-full lg:translate-x-0'
-    ]"
+    class="fixed top-0 left-0 z-50 h-screen w-64 bg-paper dark:bg-gray-900/95 backdrop-blur-xl border-r border-paper-line dark:border-gray-700/80 flex flex-col transition-transform duration-300 ease-in-out"
+    :class="mobileOpen ? 'w-72 translate-x-0' : '-translate-x-full lg:translate-x-0'"
   >
     <!-- Logo -->
-    <div class="flex items-center justify-between h-14 px-3 sm:px-4 border-b border-gray-100 dark:border-gray-700/80 flex-shrink-0">
-      <div class="flex items-center gap-3">
-        <!-- Brand icon: swaps with theme. Both load but only one renders. -->
-        <img src="/plannr-icon-light.svg" alt="" class="w-9 h-9 block dark:hidden" />
-        <img src="/plannr-icon-dark.svg" alt="" class="w-9 h-9 hidden dark:block" />
-        <div v-if="open || mobileOpen" class="overflow-hidden min-w-0">
-          <span class="text-[15px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight whitespace-nowrap">
-            Plannr
-          </span>
-          <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium truncate">Student planner</p>
-        </div>
+    <div class="flex items-center justify-between h-16 px-5 flex-shrink-0">
+      <div class="flex items-center gap-2.5">
+        <img src="/plannr-icon-light.svg" alt="" class="w-7 h-7 block dark:hidden" />
+        <img src="/plannr-icon-dark.svg" alt="" class="w-7 h-7 hidden dark:block" />
+        <span class="text-[15px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Plannr</span>
       </div>
-      
+
       <!-- Mobile Close Button -->
       <button
         @click="emit('closeMobile')"
-        class="lg:hidden p-2 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-lg transition-colors"
+        class="lg:hidden p-2 -mr-2 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg transition-colors"
       >
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -112,68 +143,54 @@ const isActive = (path) => {
     </div>
 
     <!-- Navigation -->
-    <nav class="flex-1 p-2.5 space-y-0.5 overflow-y-auto">
-      <router-link
-        v-for="item in navItems"
-        :key="item.path"
-        :to="item.path"
-        class="group relative flex items-center gap-3 px-2.5 py-2.5 rounded-xl transition-[color,background-color] duration-200 ease-out"
-        :class="[
-          isActive(item.path)
-            ? 'bg-gray-100/90 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100'
-            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50/90 dark:hover:bg-gray-700/40 hover:text-gray-900 dark:hover:text-gray-100'
-        ]"
-      >
-        <span
-          class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-full bg-primary-900 transition-[height,opacity] duration-200"
-          :class="isActive(item.path) ? 'h-6 opacity-100' : 'h-0 opacity-0'"
-          aria-hidden="true"
-        />
-        <div 
-          class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-          :class="isActive(item.path)
-            ? 'bg-primary-900 text-white'
-            : 'bg-transparent text-gray-500 dark:text-gray-500 group-hover:text-gray-700 dark:group-hover:text-gray-300'"
-        >
-          <svg 
-            class="w-[1.125rem] h-[1.125rem]" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-            stroke-width="2"
+    <nav class="flex-1 px-5 py-2 overflow-y-auto">
+      <div v-for="section in sections" :key="section.label" class="mb-7">
+        <p class="eyebrow text-gray-400 dark:text-gray-500 mb-2.5 px-0.5">{{ section.label }}</p>
+        <div class="space-y-0.5">
+          <router-link
+            v-for="item in section.items"
+            :key="item.path"
+            :to="item.path"
+            class="group flex items-center gap-2 rounded-lg px-2 py-1.5 -mx-2 transition-colors duration-150"
+            :class="isActive(item.path)
+              ? 'text-gray-900 dark:text-gray-100'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'"
           >
-            <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
-          </svg>
+            <span
+              class="w-1 h-1 rounded-full bg-primary-700 transition-opacity"
+              :class="isActive(item.path) ? 'opacity-100' : 'opacity-0'"
+              aria-hidden="true"
+            />
+            <span
+              class="flex-1 text-[13.5px] tracking-tight"
+              :class="isActive(item.path) ? 'font-semibold' : 'font-medium'"
+            >
+              {{ item.name }}
+            </span>
+            <span
+              v-if="item.count"
+              class="font-mono text-[10.5px] tabular-nums text-gray-400 dark:text-gray-500"
+            >
+              {{ item.count }}
+            </span>
+          </router-link>
         </div>
-        <div v-if="open || mobileOpen" class="flex-1 min-w-0 pl-0.5">
-          <p class="text-[13px] font-medium whitespace-nowrap truncate leading-tight">
-            {{ item.name }}
-          </p>
-          <p 
-            class="text-[11px] truncate transition-colors mt-0.5 font-normal"
-            :class="isActive(item.path) ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'"
-          >
-            {{ item.description }}
-          </p>
-        </div>
-      </router-link>
+      </div>
     </nav>
 
-    <!-- Desktop Toggle Button -->
+    <!-- User profile (pinned bottom, mirrors the mockup) -->
     <button
       type="button"
-      @click="emit('toggle')"
-      class="hidden lg:flex absolute -right-3 top-[4.5rem] w-7 h-7 bg-white dark:bg-gray-800 border border-gray-200/90 dark:border-gray-700 rounded-full items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm shadow-gray-900/5"
+      @click="router.push('/profile')"
+      class="flex items-center gap-3 px-5 py-4 m-2 rounded-xl text-left hover:bg-gray-900/[0.03] dark:hover:bg-gray-100/[0.04] transition-colors"
     >
-      <svg 
-        class="w-4 h-4 transition-transform duration-300" 
-        :class="{ 'rotate-180': !open }"
-        fill="none" 
-        viewBox="0 0 24 24" 
-        stroke="currentColor"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-      </svg>
+      <div class="w-9 h-9 rounded-full bg-primary-900 flex items-center justify-center flex-shrink-0">
+        <span class="text-[11px] font-semibold text-white tracking-wide">{{ userInitials }}</span>
+      </div>
+      <div class="min-w-0">
+        <p class="text-[13px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight truncate">{{ userName }}</p>
+        <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate">{{ userSubtitle }}</p>
+      </div>
     </button>
   </aside>
 </template>

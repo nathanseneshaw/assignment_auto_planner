@@ -34,6 +34,7 @@
     "@anthropic-ai/sdk": "^0.32.1",
     "@fontsource-variable/geist": "^5.2.9",
     "@fontsource-variable/geist-mono": "^5.2.8",
+    "@fontsource-variable/newsreader": "^5.2.10",
     "@supabase/supabase-js": "^2.105.3",
     "@vueuse/core": "^14.2.1",
     "cheerio": "^1.0.0",

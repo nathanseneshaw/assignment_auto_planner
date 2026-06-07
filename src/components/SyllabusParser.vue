@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Button, Card, Input, Modal } from './ui'
+import { Button, Input, Modal } from './ui'
+import IntegrationRow from './features/IntegrationRow.vue'
 import * as syllabusService from '../services/syllabusService'
 import { hydrateLmsStoresFromSupabase } from '../services/lmsSupabaseHydration'
 import { useAuthStore } from '../stores/auth'
@@ -196,69 +197,67 @@ function handleModalClose() {
 </script>
 
 <template>
-  <Card padding="md">
-    <div class="mb-4">
-      <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Syllabus parser</h3>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-        Upload a course syllabus (PDF or DOCX). We'll use AI to pull out the course details and assignment due dates,
-        let you review and edit them, then add everything to your assignments.
-      </p>
-    </div>
+  <IntegrationRow icon="📄" title="Syllabus import">
+    <template #subtitle>
+      <span v-if="!authStore.user">Sign in to import a syllabus</span>
+      <span v-else-if="fileError || parseError" class="text-danger-600 dark:text-danger-400">{{ fileError || parseError }}</span>
+      <span v-else-if="saveResult" class="text-primary-700 dark:text-primary-400">
+        Imported {{ saveResult.courseName }} · {{ saveResult.assignmentsInserted }} assignment(s) added
+      </span>
+      <span v-else-if="parsing">Reading {{ file?.name }}…</span>
+      <span v-else-if="file">{{ file.name }} · ready to parse</span>
+      <span v-else>PDF or DOCX, up to 5 MB · AI pulls out due dates</span>
+    </template>
 
-    <div class="space-y-4">
-      <div v-if="!authStore.user" class="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-xl p-3">
-        Sign in to use the syllabus parser.
-      </div>
+    <template #action>
+      <input
+        ref="fileInputEl"
+        type="file"
+        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        class="hidden"
+        @change="onFileChange"
+      />
 
-      <div>
-        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Syllabus file</label>
-        <input
-          ref="fileInputEl"
-          type="file"
-          accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          class="hidden"
-          @change="onFileChange"
-        />
-        <div class="flex flex-wrap items-center gap-3">
-          <Button variant="secondary" :disabled="parsing" @click="pickFile">
-            Choose file…
-          </Button>
-          <span v-if="file" class="inline-flex items-center gap-1.5 max-w-xs min-w-0">
-            <span class="text-sm text-gray-700 dark:text-gray-200 truncate">{{ file.name }}</span>
-            <button
-              type="button"
-              :disabled="parsing"
-              class="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:pointer-events-none"
-              @click="clearFile"
-            >
-              <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-                <path d="M1 1l8 8M9 1l-8 8" />
-              </svg>
-            </button>
-          </span>
-          <span v-else class="text-sm text-gray-400 dark:text-gray-500">PDF or DOCX, up to 5 MB</span>
-        </div>
-        <p v-if="fileError" class="mt-2 text-sm text-danger-600">{{ fileError }}</p>
-      </div>
+      <!-- No file yet → open the picker -->
+      <button
+        v-if="!file"
+        type="button"
+        :disabled="!authStore.user"
+        class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors border-gray-300 text-gray-700 hover:bg-white/70 hover:border-gray-400 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
+        @click="pickFile"
+      >
+        Import <span aria-hidden="true">→</span>
+      </button>
 
-      <div>
-        <Button :loading="parsing" :disabled="!canParse" @click="handleParse">
-          Parse syllabus
-        </Button>
-      </div>
-
-      <div v-if="parseError" class="text-sm text-danger-700 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/30 border border-danger-200 dark:border-danger-800/60 rounded-xl p-3">
-        {{ parseError }}
-      </div>
-
-      <div v-if="saveResult" class="text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/60 rounded-xl p-3">
-        Imported <strong>{{ saveResult.courseName }}</strong> with {{ saveResult.assignmentsInserted }} assignment(s) — visible now on the Assignments page.
-        <span v-if="saveResult.assignmentsSkipped > 0">
-          ({{ saveResult.assignmentsSkipped }} row(s) without a due date were skipped.)
-        </span>
-      </div>
-    </div>
-  </Card>
+      <!-- File chosen → clear + parse -->
+      <template v-else>
+        <button
+          type="button"
+          title="Remove file"
+          :disabled="parsing"
+          class="w-7 h-7 rounded-full inline-flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-danger-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-danger-500/30 disabled:opacity-40 disabled:pointer-events-none"
+          @click="clearFile"
+        >
+          <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <path d="M1 1l8 8M9 1l-8 8" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          :disabled="!canParse"
+          class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors border-primary-300 text-primary-700 hover:bg-primary-50 hover:border-primary-400 dark:border-primary-700/70 dark:text-primary-300 dark:hover:bg-primary-900/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+          @click="handleParse"
+        >
+          <svg v-if="parsing" class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          {{ parsing ? 'Parsing…' : 'Parse' }}
+          <span v-if="!parsing" aria-hidden="true">→</span>
+        </button>
+      </template>
+    </template>
+  </IntegrationRow>
 
   <!-- Review modal — appears after a successful parse ----------------------- -->
   <Modal
