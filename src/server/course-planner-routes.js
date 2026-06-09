@@ -18,6 +18,10 @@ import * as ttu from './course-planner/ttu-scraper.js'
 import * as tamu from './course-planner/tamu-scraper.js'
 import * as smu from './course-planner/smu-scraper.js'
 import * as tamuc from './course-planner/tamuc-scraper.js'
+import * as txst from './course-planner/txst-scraper.js'
+import * as baylor from './course-planner/baylor-scraper.js'
+import * as uh from './course-planner/uh-scraper.js'
+import * as uta from './course-planner/uta-scraper.js'
 
 const router = Router()
 
@@ -67,6 +71,34 @@ const SCHOOLS = {
     // Schedule page exposes max + enrolled seats per section.
     enrollmentDataAvailable: true,
     scraper: tamuc,
+  },
+  txst: {
+    code: 'txst',
+    name: 'Texas State University',
+    // Banner SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: txst,
+  },
+  baylor: {
+    code: 'baylor',
+    name: 'Baylor University',
+    // Banner SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: baylor,
+  },
+  uh: {
+    code: 'uh',
+    name: 'University of Houston',
+    // PeopleSoft public class search shows only open/closed, not seat counts.
+    enrollmentDataAvailable: false,
+    scraper: uh,
+  },
+  uta: {
+    code: 'uta',
+    name: 'University of Texas at Arlington',
+    // PeopleSoft public class search shows only open/closed, not seat counts.
+    enrollmentDataAvailable: false,
+    scraper: uta,
   },
 }
 

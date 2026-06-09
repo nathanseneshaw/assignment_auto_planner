@@ -9,11 +9,13 @@ import IcsFeedsManager from '../components/features/IcsFeedsManager.vue'
 import SyllabusParser from '../components/SyllabusParser.vue'
 import { listSchools } from '../services/coursePlannerApi.js'
 import { COURSE_PLANNER } from '../config/featureFlags.js'
+import { useCoursePlannerStore } from '../stores/coursePlanner'
 
 const router = useRouter()
 
 const profileStore = useProfileStore()
 const authStore = useAuthStore()
+const plannerStore = useCoursePlannerStore()
 
 const accountDisplayName = computed(() => {
   const u = authStore.user
@@ -48,7 +50,15 @@ const schoolsLoading = ref(false)
 const schoolsError = ref('')
 const selectedSchool = computed({
   get: () => profileStore.profile.school || '',
-  set: (v) => profileStore.updateProfile({ school: v }),
+  set: (v) => {
+    // No-op if the school didn't actually change (avoids wiping the planner when
+    // the Select re-emits the same value).
+    if (v === (profileStore.profile.school || '')) return
+    profileStore.updateProfile({ school: v })
+    // Switching schools clears the Course Planner (search state + saved weekly
+    // plan) so courses from the previous school don't linger.
+    plannerStore.resetForSchoolChange()
+  },
 })
 
 async function loadSupportedSchools() {
