@@ -90,7 +90,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 const selectClasses = computed(() => {
   const size = props.size === 'sm' ? ['pl-3 pr-10 py-2 text-sm'] : ['pl-4 pr-11 py-2.5 text-[15px]']
   return [
-    'w-full rounded-xl border bg-white text-gray-900 font-medium tracking-tight',
+    'w-full rounded-xl border bg-surface text-gray-900 font-medium tracking-tight',
     'transition-[border-color,box-shadow,background-color] duration-200',
     'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20',
     'appearance-none cursor-pointer',
@@ -132,7 +132,7 @@ function onNativeChange(e) {
         :disabled="disabled"
         :aria-expanded="open"
         aria-haspopup="listbox"
-        class="w-full flex items-center justify-between gap-2 rounded-xl border bg-white text-left font-medium tracking-tight transition-[border-color,box-shadow,background-color] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+        class="w-full flex items-center justify-between gap-2 rounded-xl border bg-surface text-left font-medium tracking-tight transition-[border-color,box-shadow,background-color] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
         :class="[
           size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-2.5 text-[15px]',
           error
@@ -164,7 +164,7 @@ function onNativeChange(e) {
         <div
           v-if="open"
           role="listbox"
-          class="absolute z-50 mt-1.5 w-full rounded-xl border border-gray-200/80 bg-white py-1 shadow-[0_4px_16px_rgba(15,23,42,0.08),0_2px_4px_rgba(15,23,42,0.04)]"
+          class="absolute z-50 mt-1.5 w-full rounded-xl border border-gray-200/80 bg-surface py-1 shadow-[0_4px_16px_rgba(15,23,42,0.08),0_2px_4px_rgba(15,23,42,0.04)]"
           style="max-height: 280px; overflow-y: auto;"
         >
           <button

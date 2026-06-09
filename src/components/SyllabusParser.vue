@@ -223,7 +223,7 @@ function handleModalClose() {
         v-if="!file"
         type="button"
         :disabled="!authStore.user"
-        class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors border-gray-300 text-gray-700 hover:bg-white/70 hover:border-gray-400 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors border-gray-300 text-gray-700 hover:bg-surface/70 hover:border-gray-400 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
         @click="pickFile"
       >
         Import <span aria-hidden="true">→</span>
@@ -309,7 +309,7 @@ function handleModalClose() {
                 <input
                   type="date"
                   :value="isoToDateInput(a.dueAt)"
-                  class="w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 scheme-light dark:scheme-dark"
+                  class="w-full px-4 py-2.5 rounded-xl border bg-surface dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 scheme-light dark:scheme-dark"
                   :class="a.dueAt ? 'border-gray-200 dark:border-gray-700' : 'border-danger-300 bg-danger-50/40 dark:bg-danger-900/30'"
                   @input="onDueDateInput(idx, $event)"
                 />
@@ -327,8 +327,8 @@ function handleModalClose() {
 
     <template #footer>
       <div class="flex items-center justify-end gap-3">
-        <Button variant="ghost" :disabled="saving" @click="reviewOpen = false">Cancel</Button>
-        <Button :loading="saving" :disabled="!canSave" @click="handleSave">
+        <Button variant="secondary" :disabled="saving" @click="reviewOpen = false">Cancel</Button>
+        <Button variant="primary" :loading="saving" :disabled="!canSave" @click="handleSave">
           Import course
         </Button>
       </div>

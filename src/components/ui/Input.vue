@@ -39,7 +39,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'focus', 'blur'])
 
 const inputClasses = computed(() => [
-  'w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-[border-color,box-shadow,background-color] duration-200',
+  'w-full px-4 py-2.5 rounded-xl border bg-surface dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition-[border-color,box-shadow,background-color] duration-200',
   'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 dark:focus-visible:ring-primary-500/30',
   'placeholder:text-gray-400 dark:placeholder:text-gray-500',
   'disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed',

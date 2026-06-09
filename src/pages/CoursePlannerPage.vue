@@ -493,12 +493,12 @@ function saveWork() {
           <div class="overflow-x-auto">
             <div class="grid grid-cols-[3rem_repeat(7,minmax(5.5rem,1fr))] min-w-[46rem]">
               <!-- Day header row -->
-              <div class="bg-white border-b border-b-gray-200 border-r border-r-gray-100 h-9"></div>
+              <div class="bg-surface border-b border-b-gray-200 border-r border-r-gray-100 h-9"></div>
               <div
                 v-for="d in DAYS"
                 :key="d.code"
                 class="flex items-center justify-center h-9 border-b border-b-gray-200 border-r border-r-gray-100 px-2 text-[11px] font-semibold tracking-widest uppercase"
-                :class="(d.code === 'S' || d.code === 'U') ? 'bg-gray-50/70 text-gray-400' : 'bg-white text-gray-500'"
+                :class="(d.code === 'S' || d.code === 'U') ? 'bg-gray-50/70 text-gray-400' : 'bg-surface text-gray-500'"
               >
                 {{ d.label }}
               </div>
@@ -521,7 +521,7 @@ function saveWork() {
                 v-for="d in DAYS"
                 :key="d.code"
                 class="border-t border-r border-gray-100 relative"
-                :class="(d.code === 'S' || d.code === 'U') ? 'bg-gray-50/70' : 'bg-white'"
+                :class="(d.code === 'S' || d.code === 'U') ? 'bg-gray-50/70' : 'bg-surface'"
                 :style="{ height: gridHeightPx + 'px' }"
               >
                 <!-- Hour lines -->
@@ -626,7 +626,7 @@ function saveWork() {
                 class="px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors"
                 :class="shift.days.includes(d.code)
                   ? 'bg-primary-900 text-white border-primary-900'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                  : 'bg-surface text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
                 @click="toggleDraftDay(shift, d.code)"
               >
                 {{ d.label }}
@@ -640,7 +640,7 @@ function saveWork() {
                 <input
                   v-model="shift.startTime"
                   type="time"
-                  class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 hover:border-gray-300/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200"
+                  class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-surface text-gray-900 hover:border-gray-300/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200"
                 />
               </div>
               <div class="space-y-1.5">
@@ -648,7 +648,7 @@ function saveWork() {
                 <input
                   v-model="shift.endTime"
                   type="time"
-                  class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 hover:border-gray-300/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200"
+                  class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-surface text-gray-900 hover:border-gray-300/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200"
                 />
               </div>
             </div>

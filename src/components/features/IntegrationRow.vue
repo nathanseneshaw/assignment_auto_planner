@@ -17,7 +17,7 @@ defineProps({
   <div class="group flex items-center gap-3.5 py-4 border-t border-paper-line dark:border-gray-700/50">
     <!-- Icon tile -->
     <div
-      class="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center text-lg leading-none select-none bg-white/70 dark:bg-gray-800/70 border border-paper-line dark:border-gray-700/60"
+      class="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center text-lg leading-none select-none bg-surface/70 dark:bg-gray-800/70 border border-paper-line dark:border-gray-700/60"
       aria-hidden="true"
     >
       <slot name="icon">{{ icon }}</slot>

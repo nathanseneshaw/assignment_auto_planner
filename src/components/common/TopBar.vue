@@ -197,8 +197,8 @@ function goToTask() {
         <div class="relative">
           <button
             @click="showSearch = !showSearch"
-            class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-paper-line dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-white/60 dark:hover:bg-gray-800/60 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-            :class="{ 'bg-white/70 dark:bg-gray-800/70 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100': showSearch }"
+            class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-paper-line dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-surface/60 dark:hover:bg-gray-800/60 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+            :class="{ 'bg-surface/70 dark:bg-gray-800/70 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100': showSearch }"
             aria-label="Search"
           >
             <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -210,17 +210,17 @@ function goToTask() {
           <Transition name="dropdown">
             <div
               v-if="showSearch"
-              class="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl shadow-lg shadow-gray-900/8 dark:shadow-gray-900/40 border border-gray-200/80 dark:border-gray-700 p-3"
+              class="absolute right-0 top-full mt-2 w-72 bg-surface dark:bg-gray-800 rounded-2xl shadow-lg shadow-gray-900/8 dark:shadow-gray-900/40 border border-gray-200/80 dark:border-gray-700 p-3"
             >
               <div class="relative">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
                   v-model="searchQuery"
                   type="text"
-                  placeholder="Search assignments, tasks..."
-                  class="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:bg-white dark:focus:bg-gray-700 focus:border-primary-300 dark:focus:border-primary-500/60"
+                  placeholder="Search assignments, tasks…"
+                  class="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-paper/60 dark:bg-gray-900/40 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-[border-color,box-shadow] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 focus-visible:border-primary-300/80 dark:focus-visible:border-primary-500/60 focus:bg-surface dark:focus:bg-gray-800"
                   @keyup.enter="handleSearch"
                   @keyup.esc="showSearch = false"
                   autofocus
@@ -229,7 +229,7 @@ function goToTask() {
               <!-- Search results -->
               <div v-if="searchQuery.trim() && hasResults" class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/80 space-y-3">
                 <div v-if="searchResults.assignments.length > 0">
-                  <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5 px-1">Assignments</p>
+                  <p class="eyebrow text-gray-400 dark:text-gray-500 mb-1.5 px-1">Assignments</p>
                   <div class="space-y-0.5">
                     <button
                       v-for="a in searchResults.assignments"
@@ -239,12 +239,12 @@ function goToTask() {
                       class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
                     >
                       <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ a.title }}</p>
-                      <p v-if="a.dueDate" class="text-[11px] text-gray-400 dark:text-gray-500">Due {{ a.dueDate }}</p>
+                      <p v-if="a.dueDate" class="eyebrow text-gray-400 dark:text-gray-500 mt-0.5">Due {{ a.dueDate }}</p>
                     </button>
                   </div>
                 </div>
                 <div v-if="searchResults.tasks.length > 0">
-                  <p class="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5 px-1">Tasks</p>
+                  <p class="eyebrow text-gray-400 dark:text-gray-500 mb-1.5 px-1">Tasks</p>
                   <div class="space-y-0.5">
                     <button
                       v-for="t in searchResults.tasks"
@@ -254,7 +254,7 @@ function goToTask() {
                       class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                     >
                       <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ t.title }}</p>
-                      <p v-if="t.scheduledDate" class="text-[11px] text-gray-400 dark:text-gray-500">{{ t.scheduledDate }}</p>
+                      <p v-if="t.scheduledDate" class="eyebrow text-gray-400 dark:text-gray-500 mt-0.5">{{ t.scheduledDate }}</p>
                     </button>
                   </div>
                 </div>
@@ -267,7 +267,7 @@ function goToTask() {
 
               <!-- Quick links (shown when no query) -->
               <div v-else class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/80">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick Links</p>
+                <p class="eyebrow text-gray-400 dark:text-gray-500 mb-2">Quick Links</p>
                 <div class="space-y-1">
                   <button
                     type="button"
@@ -293,8 +293,8 @@ function goToTask() {
         <div ref="notificationsEl" class="relative">
           <button
             @click="showNotifications = !showNotifications"
-            class="relative w-9 h-9 inline-flex items-center justify-center rounded-lg border border-paper-line dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-white/60 dark:hover:bg-gray-800/60 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-            :class="{ 'bg-white/70 dark:bg-gray-800/70 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100': showNotifications }"
+            class="relative w-9 h-9 inline-flex items-center justify-center rounded-lg border border-paper-line dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-surface/60 dark:hover:bg-gray-800/60 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+            :class="{ 'bg-surface/70 dark:bg-gray-800/70 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100': showNotifications }"
             aria-label="Notifications"
           >
             <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -310,36 +310,36 @@ function goToTask() {
           <Transition name="dropdown">
             <div
               v-if="showNotifications"
-              class="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-lg shadow-gray-900/8 dark:shadow-gray-900/40 border border-gray-200/80 dark:border-gray-700 overflow-hidden"
+              class="absolute right-0 top-full mt-2 w-80 bg-surface dark:bg-gray-800 rounded-2xl shadow-lg shadow-gray-900/8 dark:shadow-gray-900/40 border border-gray-200/80 dark:border-gray-700 overflow-hidden"
             >
-              <div class="px-4 py-3 border-b border-gray-100/80 dark:border-gray-700/80 flex items-center justify-between">
-                <h3 class="text-[15px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Notifications</h3>
-                <span v-if="visibleNotifications.length" class="text-xs text-gray-500 dark:text-gray-400">{{ visibleNotifications.length }} new</span>
+              <div class="px-4 py-3 border-b border-paper-line dark:border-gray-700/60 flex items-center justify-between">
+                <h3 class="display text-lg text-gray-900 dark:text-gray-100">Notifications</h3>
+                <span v-if="visibleNotifications.length" class="eyebrow text-rust-600 dark:text-rust-500">{{ visibleNotifications.length }} new</span>
               </div>
 
-              <div v-if="visibleNotifications.length === 0" class="p-6 text-center">
-                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                  <svg class="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div v-if="visibleNotifications.length === 0" class="px-6 py-8 text-center">
+                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                  <svg class="w-6 h-6 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <p class="text-gray-500 dark:text-gray-400 text-sm">All caught up!</p>
+                <p class="font-serif italic text-base text-gray-500 dark:text-gray-400">All caught up!</p>
               </div>
 
               <div v-else class="max-h-64 overflow-y-auto">
                 <div
                   v-for="notification in visibleNotifications"
                   :key="notification.id"
-                  class="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors border-b border-gray-50 dark:border-gray-700/50 last:border-0 group"
+                  class="px-4 py-3 hover:bg-paper/60 dark:hover:bg-gray-700/50 transition-colors border-b border-paper-line/60 dark:border-gray-700/40 last:border-0 group"
                 >
                   <div class="flex items-start gap-3">
                     <div
                       class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                      :class="notification.type === 'danger' ? 'bg-danger-100 dark:bg-danger-900/40' : 'bg-warning-100 dark:bg-warning-900/40'"
+                      :class="notification.type === 'danger' ? 'bg-rust-100 dark:bg-rust-500/15' : 'bg-warning-100 dark:bg-warning-900/40'"
                     >
                       <svg
                         class="w-4 h-4"
-                        :class="notification.type === 'danger' ? 'text-danger-600 dark:text-danger-400' : 'text-warning-600 dark:text-warning-400'"
+                        :class="notification.type === 'danger' ? 'text-rust-600 dark:text-rust-500' : 'text-warning-600 dark:text-warning-400'"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -348,8 +348,8 @@ function goToTask() {
                       </svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ notification.title }}</p>
-                      <p class="text-xs text-gray-500 dark:text-gray-400">{{ notification.message }}</p>
+                      <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ notification.title }}</p>
+                      <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ notification.message }}</p>
                     </div>
                     <button
                       type="button"
@@ -365,13 +365,14 @@ function goToTask() {
                 </div>
               </div>
 
-              <div class="px-4 py-3 border-t border-gray-100/80 dark:border-gray-700/80 bg-gray-50/50 dark:bg-gray-800/50">
+              <div class="px-4 py-3 border-t border-paper-line dark:border-gray-700/60 bg-paper/40 dark:bg-gray-800/50">
                 <button
                   type="button"
                   @click="router.push('/planner'); showNotifications = false"
-                  class="w-full text-center text-sm font-semibold text-gray-800 dark:text-gray-300 hover:text-primary-900 dark:hover:text-primary-400 transition-colors"
+                  class="group w-full inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-700 dark:hover:text-primary-400 transition-colors"
                 >
-                  Open weekly planner →
+                  Open weekly planner
+                  <span class="transition-transform group-hover:translate-x-0.5" aria-hidden="true">→</span>
                 </button>
               </div>
             </div>

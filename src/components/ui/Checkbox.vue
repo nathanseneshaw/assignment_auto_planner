@@ -48,7 +48,7 @@ const toggle = () => {
         sizeClasses[size],
         modelValue 
           ? 'bg-primary-600 border-primary-600' 
-          : 'border-gray-300 hover:border-primary-400 bg-white'
+          : 'border-gray-300 hover:border-primary-400 bg-surface'
       ]"
     >
       <svg 

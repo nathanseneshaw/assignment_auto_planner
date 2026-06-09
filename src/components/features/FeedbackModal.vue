@@ -64,7 +64,7 @@ async function handleSubmit() {
         <!-- Star Rating -->
         <div>
           <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2.5">
-            How would you rate Plannr? <span class="text-danger-500">*</span>
+            How would you rate Plannr? <span class="text-rust-500">*</span>
           </label>
           <div class="flex flex-col items-center gap-2">
             <div class="flex gap-1">
@@ -80,7 +80,7 @@ async function handleSubmit() {
                 <svg
                   class="w-9 h-9 transition-all duration-150"
                   :class="star <= (hoveredRating || rating)
-                    ? 'text-amber-400 scale-110 drop-shadow-sm'
+                    ? 'text-warning-400 scale-110 drop-shadow-sm'
                     : 'text-gray-200 dark:text-gray-600'"
                   viewBox="0 0 24 24"
                   :fill="star <= (hoveredRating || rating) ? 'currentColor' : 'currentColor'"
@@ -89,9 +89,9 @@ async function handleSubmit() {
                 </svg>
               </button>
             </div>
-            <span class="text-sm font-medium h-5 transition-all duration-150"
+            <span class="eyebrow h-5 transition-all duration-150"
               :class="(hoveredRating || rating)
-                ? 'text-amber-500 dark:text-amber-400'
+                ? 'text-warning-600 dark:text-warning-400'
                 : 'text-transparent'"
             >
               {{ ratingLabels[hoveredRating || rating] }}
@@ -110,9 +110,9 @@ async function handleSubmit() {
             rows="3"
             maxlength="1000"
             placeholder="What do you love? What could be better?"
-            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200 resize-none text-sm leading-relaxed"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-surface dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200 resize-none text-sm leading-relaxed"
           />
-          <p class="text-right text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+          <p class="text-right font-mono text-[11px] text-gray-400 dark:text-gray-500 mt-1">
             {{ message.length }}/1000
           </p>
         </div>
@@ -128,7 +128,7 @@ async function handleSubmit() {
           </svg>
         </div>
         <div>
-          <p class="text-[15px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">
+          <p class="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100">
             Thanks for your feedback!
           </p>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
