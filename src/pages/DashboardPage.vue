@@ -144,7 +144,10 @@ const activity = computed(() => {
 })
 
 function cellClass(day) {
-  return day.future ? 'bg-transparent' : LEVEL_CLASS[day.level]
+  // Days later this week (after today) have no activity yet — render them as
+  // empty tiles rather than hiding them, so the current week's column stays a
+  // full rectangle instead of leaving cells dangling off the top-right.
+  return LEVEL_CLASS[day.level]
 }
 </script>
 
@@ -170,7 +173,7 @@ function cellClass(day) {
         </header>
 
         <!-- Stat group -->
-        <div class="grid grid-cols-3 rounded-2xl border border-paper-line dark:border-gray-700/60 overflow-hidden bg-white/30 dark:bg-gray-800/20">
+        <div class="grid grid-cols-3 rounded-2xl border border-paper-line dark:border-gray-700/60 overflow-hidden bg-surface/30 dark:bg-gray-800/20">
           <!-- Today's tasks -->
           <div class="p-5 sm:p-6 border-r border-paper-line dark:border-gray-700/60">
             <p class="display text-4xl sm:text-5xl text-gray-900 dark:text-gray-50 leading-none">
@@ -257,7 +260,7 @@ function cellClass(day) {
             <p class="mt-1.5 text-sm text-gray-400 dark:text-gray-500">Add assignments to get tasks scheduled automatically.</p>
             <button
               type="button"
-              @click="router.push('/tasks')"
+              @click="router.push({ path: '/tasks', query: { new: '1' } })"
               class="mt-5 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-900 hover:bg-primary-800 text-white text-[13px] font-semibold transition-colors duration-200 active:scale-[0.98] shadow-sm shadow-primary-900/15"
             >
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -275,35 +278,35 @@ function cellClass(day) {
             <span class="eyebrow text-gray-400">Past 14 weeks</span>
           </div>
 
-          <div class="mt-5 overflow-x-auto">
-            <!-- Month labels -->
-            <div class="flex gap-[3px]">
-              <div class="w-3 mr-1 shrink-0" aria-hidden="true" />
+          <div class="mt-5 max-w-2xl">
+            <!-- Month labels (mirror the grid columns so they line up) -->
+            <div class="flex gap-1.5">
+              <div class="w-6 shrink-0" aria-hidden="true" />
               <div
                 v-for="(label, i) in activity.monthLabels"
                 :key="`m-${i}`"
-                class="w-3 shrink-0 relative"
+                class="flex-1 relative h-4"
               >
-                <span v-if="label" class="absolute left-0 top-0 font-mono text-[9px] tracking-wide text-gray-400 whitespace-nowrap">{{ label }}</span>
+                <span v-if="label" class="absolute left-0 bottom-0 font-mono text-[10px] tracking-wide text-gray-400 whitespace-nowrap">{{ label }}</span>
               </div>
             </div>
 
-            <!-- Grid -->
-            <div class="flex gap-[3px] mt-1">
+            <!-- Grid: cells grow to fill the width as squares -->
+            <div class="flex gap-1.5 mt-1.5">
               <!-- Day-of-week labels -->
-              <div class="flex flex-col gap-[3px] mr-1 shrink-0">
+              <div class="w-6 shrink-0 flex flex-col gap-1.5">
                 <span
                   v-for="(d, r) in DAY_LABELS"
                   :key="`d-${r}`"
-                  class="w-3 h-3 font-mono text-[9px] leading-none text-gray-400 flex items-center"
+                  class="flex-1 flex items-center font-mono text-[10px] leading-none text-gray-400"
                 >{{ d }}</span>
               </div>
               <!-- Weeks -->
-              <div v-for="(week, i) in activity.weeks" :key="`w-${i}`" class="flex flex-col gap-[3px] shrink-0">
+              <div v-for="(week, i) in activity.weeks" :key="`w-${i}`" class="flex-1 flex flex-col gap-1.5">
                 <div
                   v-for="day in week"
                   :key="day.key"
-                  class="w-3 h-3 rounded-[3px]"
+                  class="aspect-square rounded-[5px]"
                   :class="cellClass(day)"
                   :title="`${day.count} completed · ${day.key}`"
                 />
@@ -312,10 +315,10 @@ function cellClass(day) {
           </div>
 
           <!-- Legend -->
-          <div class="mt-4 flex items-center justify-between gap-4">
+          <div class="mt-4 max-w-2xl flex items-center justify-between gap-4">
             <div class="flex items-center gap-1.5">
               <span class="font-mono text-[10px] text-gray-400">Less</span>
-              <span v-for="lvl in 5" :key="`l-${lvl}`" class="w-3 h-3 rounded-[3px]" :class="LEVEL_CLASS[lvl - 1]" />
+              <span v-for="lvl in 5" :key="`l-${lvl}`" class="w-3.5 h-3.5 rounded-[4px]" :class="LEVEL_CLASS[lvl - 1]" />
               <span class="font-mono text-[10px] text-gray-400">More</span>
             </div>
             <p class="text-xs text-gray-400 dark:text-gray-500">

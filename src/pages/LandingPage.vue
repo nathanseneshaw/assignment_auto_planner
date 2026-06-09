@@ -72,7 +72,7 @@ function toggleFaq(i) {
     class="min-h-screen scroll-smooth bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(16,185,129,0.08),transparent_50%),#fafaf9] text-gray-900"
   >
     <header
-      class="sticky top-0 z-20 border-b border-gray-200/70 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70"
+      class="sticky top-0 z-20 border-b border-gray-200/70 bg-surface/80 backdrop-blur-xl supports-[backdrop-filter]:bg-surface/70"
     >
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
         <RouterLink to="/" class="flex items-center gap-3 group min-w-0">
@@ -150,14 +150,14 @@ function toggleFaq(i) {
         </div>
 
         <div
-          class="mt-16 sm:mt-20 rounded-3xl border border-gray-200/80 bg-white shadow-xl shadow-gray-900/[0.06] overflow-hidden"
+          class="mt-16 sm:mt-20 rounded-3xl border border-gray-200/80 bg-surface shadow-xl shadow-gray-900/[0.06] overflow-hidden"
         >
           <!-- Abstract illustration of the planner's week view — not a literal screenshot. -->
           <div
             class="aspect-[4/3] sm:aspect-[16/9] bg-gradient-to-br from-gray-50 via-white to-primary-100/50 p-4 sm:p-6"
           >
             <div
-              class="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/80 shadow-sm"
+              class="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-surface/80 shadow-sm"
             >
               <div class="flex h-9 shrink-0 items-center gap-1.5 border-b border-gray-200/70 px-4">
                 <span class="h-2.5 w-2.5 rounded-full bg-gray-200"></span>
@@ -207,7 +207,7 @@ function toggleFaq(i) {
         </div>
       </section>
 
-      <section id="features" class="scroll-mt-20 border-t border-gray-200/80 bg-white/50 py-16 sm:py-20">
+      <section id="features" class="scroll-mt-20 border-t border-gray-200/80 bg-surface/50 py-16 sm:py-20">
         <div class="max-w-6xl mx-auto px-4 sm:px-6">
           <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Why students use it</h2>
           <p class="mt-2 text-gray-600 max-w-2xl">
@@ -219,7 +219,7 @@ function toggleFaq(i) {
             <li
               v-for="item in features"
               :key="item.title"
-              class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm shadow-gray-900/[0.03]"
+              class="rounded-2xl border border-gray-200/80 bg-surface p-6 shadow-sm shadow-gray-900/[0.03]"
             >
               <div class="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center text-primary-900 mb-4">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -253,7 +253,7 @@ function toggleFaq(i) {
             <a
               :href="installerUrl"
               download
-              class="flex items-center gap-4 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-900/[0.03] hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              class="flex items-center gap-4 rounded-2xl border border-gray-200/80 bg-surface p-5 shadow-sm shadow-gray-900/[0.03] hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5 transition-all group"
             >
               <svg
                 class="w-10 h-10 shrink-0 text-primary-700"
@@ -287,7 +287,7 @@ function toggleFaq(i) {
         </div>
       </section>
 
-      <section id="faq" class="scroll-mt-20 border-t border-gray-200/80 bg-white/50 py-16 sm:py-20">
+      <section id="faq" class="scroll-mt-20 border-t border-gray-200/80 bg-surface/50 py-16 sm:py-20">
         <div class="max-w-3xl mx-auto px-4 sm:px-6">
           <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Frequently asked questions</h2>
           <p class="mt-2 text-gray-600">Everything you need to know before you dive in.</p>
@@ -296,7 +296,7 @@ function toggleFaq(i) {
             <li
               v-for="(item, i) in faqs"
               :key="item.q"
-              class="rounded-2xl border border-gray-200/80 bg-white shadow-sm shadow-gray-900/[0.03]"
+              class="rounded-2xl border border-gray-200/80 bg-surface shadow-sm shadow-gray-900/[0.03]"
             >
               <button
                 type="button"
@@ -346,7 +346,7 @@ function toggleFaq(i) {
                     variant="secondary"
                     size="lg"
                     type="button"
-                    class="!bg-white !text-primary-900 hover:!bg-gray-100"
+                    class="!bg-surface !text-primary-900 hover:!bg-gray-100"
                     @click="navigate"
                   >
                     Sign in
@@ -357,7 +357,7 @@ function toggleFaq(i) {
                     variant="outline"
                     size="lg"
                     type="button"
-                    class="!border-white/40 !text-white hover:!bg-white/10"
+                    class="!border-white/40 !text-white hover:!bg-surface/10"
                     @click="navigate"
                   >
                     Create account
@@ -370,7 +370,7 @@ function toggleFaq(i) {
                     variant="secondary"
                     size="lg"
                     type="button"
-                    class="!bg-white !text-primary-900 hover:!bg-gray-100"
+                    class="!bg-surface !text-primary-900 hover:!bg-gray-100"
                     @click="navigate"
                   >
                     Open the app

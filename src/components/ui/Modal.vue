@@ -77,12 +77,12 @@ onUnmounted(() => {
         
         <!-- Modal Content -->
         <div 
-          class="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(28,25,23,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full overflow-hidden"
+          class="relative bg-surface dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(28,25,23,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full overflow-hidden"
           :class="sizeClasses[size]"
           @click.stop
         >
           <!-- Header -->
-          <div v-if="title || $slots.header" class="flex items-center justify-between px-6 py-4 border-b border-gray-100/80 dark:border-gray-700/80">
+          <div v-if="title || $slots.header" class="flex items-center justify-between px-6 py-4 border-b border-paper-line/70 dark:border-gray-700/80">
             <slot name="header">
               <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">{{ title }}</h3>
             </slot>
@@ -104,7 +104,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Footer -->
-          <div v-if="$slots.footer" class="px-6 py-4 border-t border-gray-100/80 dark:border-gray-700/80 bg-gray-50/50 dark:bg-gray-800/50">
+          <div v-if="$slots.footer" class="px-6 py-4 border-t border-paper-line/70 dark:border-gray-700/80 bg-paper/40 dark:bg-gray-800/50">
             <slot name="footer" />
           </div>
         </div>

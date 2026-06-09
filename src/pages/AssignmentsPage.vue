@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAssignmentsStore } from '../stores/assignments'
 import { useCoursesStore } from '../stores/courses'
-import { Modal, Input, Dropdown, Button, ConfirmDialog } from '../components/ui'
+import { Modal, Input, Dropdown, DatePicker, Button, ConfirmDialog } from '../components/ui'
 import { resolveAssignmentCourseName, importSourceLabel } from '../utils/assignmentDisplay.js'
 
 const route = useRoute()
@@ -292,12 +292,7 @@ onMounted(() => {
 <template>
   <div class="pb-12">
     <!-- Top meta bar -->
-    <div class="flex items-center justify-between gap-4 pb-6">
-      <nav class="eyebrow flex items-center gap-2 text-gray-400">
-        <button type="button" class="hover:text-gray-700 dark:hover:text-gray-200 transition-colors" @click="router.push('/')">Home</button>
-        <span class="text-gray-300 dark:text-gray-600">/</span>
-        <span class="text-gray-600 dark:text-gray-300">Assignments</span>
-      </nav>
+    <div class="flex items-center justify-end gap-4 pb-6">
       <p class="eyebrow text-gray-400">
         {{ counts.all }} Total
         <span class="mx-1.5 text-gray-300 dark:text-gray-600">·</span>
@@ -546,12 +541,12 @@ onMounted(() => {
         />
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description</label>
+          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Description</label>
           <textarea
             v-model="formData.description"
             rows="4"
             placeholder="Add any details about the assignment..."
-            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-surface dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200 resize-none"
           ></textarea>
         </div>
 
@@ -559,15 +554,10 @@ onMounted(() => {
           <Dropdown v-model="formData.courseId" label="Course" :options="modalCourseOptions" />
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
               Due Date <span class="text-danger-500">*</span>
             </label>
-            <input
-              v-model="formData.dueDate"
-              type="date"
-              required
-              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent scheme-light dark:scheme-dark"
-            />
+            <DatePicker v-model="formData.dueDate" placeholder="Pick a due date" />
           </div>
         </div>
 

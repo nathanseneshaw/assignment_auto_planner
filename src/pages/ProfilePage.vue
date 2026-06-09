@@ -401,7 +401,7 @@ onMounted(loadSupportedSchools)
           :title="profileStore.profile.darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
         >
           <span
-            class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200"
+            class="inline-block h-3.5 w-3.5 transform rounded-full bg-surface shadow-sm transition-transform duration-200"
             :class="profileStore.profile.darkMode ? 'translate-x-4' : 'translate-x-0.5'"
           />
         </button>

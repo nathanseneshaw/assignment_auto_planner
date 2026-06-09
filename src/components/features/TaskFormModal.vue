@@ -1,12 +1,16 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Modal, Input, Dropdown, Button } from '../ui'
+import { Modal, Input, Dropdown, DatePicker, Button } from '../ui'
 import { useAssignmentsStore } from '../../stores/assignments'
 import { useCoursesStore } from '../../stores/courses'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   task: { type: Object, default: null },
+  // Pre-fills the scheduled date when adding a brand-new task (e.g. the planner
+  // opens the modal already pinned to the day the user is viewing). Ignored when
+  // editing an existing task.
+  defaultDate: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue', 'save'])
@@ -18,20 +22,20 @@ const PRIORITY_OPTIONS = [
   {
     value: 'normal',
     label: 'Normal',
-    activeClasses: 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-[0_0_8px_2px_rgba(52,211,153,0.35)]',
-    dot: 'bg-emerald-500',
+    activeClasses: 'bg-primary-700 border-primary-700 text-white shadow-sm shadow-primary-900/20 dark:bg-primary-600 dark:border-primary-600',
+    dot: 'bg-white',
   },
   {
     value: 'high',
     label: 'High',
-    activeClasses: 'bg-amber-50 border-amber-300 text-amber-700 shadow-[0_0_8px_2px_rgba(251,191,36,0.35)]',
-    dot: 'bg-amber-400',
+    activeClasses: 'bg-warning-500 border-warning-500 text-white shadow-sm shadow-warning-600/25 dark:bg-warning-500 dark:border-warning-500',
+    dot: 'bg-white',
   },
   {
     value: 'urgent',
     label: 'Urgent',
-    activeClasses: 'bg-danger-50 border-danger-300 text-danger-600 shadow-[0_0_8px_2px_rgba(239,68,68,0.35)]',
-    dot: 'bg-danger-500',
+    activeClasses: 'bg-danger-600 border-danger-600 text-white shadow-sm shadow-danger-600/25 dark:bg-danger-600 dark:border-danger-600',
+    dot: 'bg-white',
   },
 ]
 
@@ -90,7 +94,7 @@ watch(() => props.modelValue, (open) => {
     assignmentId.value = props.task.assignmentId || ''
   } else {
     title.value = ''
-    scheduledDate.value = ''
+    scheduledDate.value = props.defaultDate || ''
     priorityLevel.value = 'normal'
     courseId.value = ''
     assignmentId.value = ''
@@ -133,32 +137,36 @@ function handleSubmit() {
 </script>
 
 <template>
-  <Modal :modelValue="modelValue" :title="modalTitle" size="lg" @close="close" @update:modelValue="emit('update:modelValue', $event)">
+  <Modal :modelValue="modelValue" size="lg" @close="close" @update:modelValue="emit('update:modelValue', $event)">
+    <template #header>
+      <h3 class="display text-xl text-gray-900 dark:text-gray-100">{{ modalTitle }}</h3>
+    </template>
+
     <form id="task-form" class="space-y-5" @submit.prevent="handleSubmit">
       <!-- Title -->
-      <Input
-        v-model="title"
-        label="Task"
-        placeholder="e.g. Read chapter 4, review notes..."
-        :error="titleError"
-        required
-      />
-
-      <!-- Scheduled Date -->
-      <div>
-        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-          Scheduled Date <span class="text-gray-400 font-normal text-xs">(optional)</span>
+      <div class="space-y-1.5">
+        <label class="eyebrow text-gray-500 dark:text-gray-400">
+          Task <span class="text-rust-500">*</span>
         </label>
-        <input
-          v-model="scheduledDate"
-          type="date"
-          class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200 scheme-light dark:scheme-dark"
+        <Input
+          v-model="title"
+          placeholder="e.g. Read chapter 4, review notes..."
+          :error="titleError"
+          required
         />
       </div>
 
+      <!-- Scheduled Date -->
+      <div class="space-y-1.5">
+        <label class="eyebrow text-gray-500 dark:text-gray-400">
+          Scheduled Date <span class="normal-case text-gray-400 dark:text-gray-500">(optional)</span>
+        </label>
+        <DatePicker v-model="scheduledDate" placeholder="Pick a day (optional)" />
+      </div>
+
       <!-- Priority -->
-      <div>
-        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Priority</label>
+      <div class="space-y-2">
+        <label class="eyebrow text-gray-500 dark:text-gray-400">Priority</label>
         <div class="flex gap-2">
           <button
             v-for="opt in PRIORITY_OPTIONS"
@@ -167,7 +175,7 @@ function handleSubmit() {
             class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all duration-150"
             :class="priorityLevel === opt.value
               ? opt.activeClasses
-              : 'bg-white dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+              : 'bg-surface dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
             @click="priorityLevel = opt.value"
           >
             <span
@@ -180,10 +188,16 @@ function handleSubmit() {
       </div>
 
       <!-- Course -->
-      <Dropdown v-model="courseId" label="Course" :options="courseOptions" />
+      <div class="space-y-1.5">
+        <label class="eyebrow text-gray-500 dark:text-gray-400">Course</label>
+        <Dropdown v-model="courseId" :options="courseOptions" />
+      </div>
 
       <!-- Assignment (filtered by course) -->
-      <Dropdown v-model="assignmentId" label="Assignment" :options="assignmentOptions" />
+      <div class="space-y-1.5">
+        <label class="eyebrow text-gray-500 dark:text-gray-400">Assignment</label>
+        <Dropdown v-model="assignmentId" :options="assignmentOptions" />
+      </div>
     </form>
 
     <template #footer>

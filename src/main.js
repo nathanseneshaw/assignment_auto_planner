@@ -4,8 +4,6 @@ import router from './router'
 import App from './App.vue'
 import '@fontsource-variable/geist'
 import '@fontsource-variable/geist-mono'
-import '@fontsource-variable/newsreader/wght.css'
-import '@fontsource-variable/newsreader/wght-italic.css'
 import './style.css'
 import { useAuthStore } from './stores/auth'
 
