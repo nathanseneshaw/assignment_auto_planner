@@ -38,7 +38,7 @@ export const useTasksStore = defineStore('tasks', () => {
   /** Past-scheduled but still incomplete tasks. */
   const overdueTasks = computed(() => {
     const today = localDateKey()
-    return tasks.value.filter(t => t.scheduledDate < today && !t.completed)
+    return tasks.value.filter(t => t.scheduledDate && t.scheduledDate < today && !t.completed)
   })
 
   /**

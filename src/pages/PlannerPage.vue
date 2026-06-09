@@ -172,7 +172,7 @@ function onDragEnd() {
 }
 
 function onDragOverCell(event, day) {
-  if (!draggingItem.value || day.inMonth === false) return
+  if (!draggingItem.value) return
   event.preventDefault()
   event.dataTransfer.dropEffect = 'move'
   dragOverDateKey.value = day.dateKey
@@ -187,7 +187,7 @@ function onDragLeaveCell(event, day) {
 function onDropCell(event, day) {
   event.preventDefault()
   const item = draggingItem.value
-  if (!item || day.inMonth === false) return
+  if (!item) return
   const newDateKey = day.dateKey
   if (item.kind === 'task') {
     tasksStore.rescheduleTask(item.id, newDateKey)
@@ -669,12 +669,12 @@ function getCourseColor(courseId) {
               :key="day.dateKey"
               class="min-h-[100px] sm:min-h-[140px] p-1 sm:p-2 flex flex-col gap-1 transition-colors"
               :class="[
-                !day.inMonth ? 'bg-gray-50/70 dark:bg-gray-800/40 text-gray-400' : '',
+                !day.inMonth && dragOverDateKey !== day.dateKey ? 'bg-gray-50/70 dark:bg-gray-800/40 text-gray-400' : '',
                 day.inMonth && day.isToday && dragOverDateKey !== day.dateKey
                   ? 'bg-primary-50/50 dark:bg-primary-900/20 ring-1 ring-inset ring-primary-200/60 dark:ring-primary-700/40 z-1'
                   : '',
                 day.inMonth && day.isWeekend && !day.isToday && dragOverDateKey !== day.dateKey ? 'bg-gray-50/40 dark:bg-gray-700/20' : '',
-                day.inMonth && dragOverDateKey === day.dateKey ? 'bg-primary-100/60 dark:bg-primary-800/30 ring-2 ring-inset ring-primary-400 dark:ring-primary-500' : ''
+                dragOverDateKey === day.dateKey ? 'bg-primary-100/60 dark:bg-primary-800/30 ring-2 ring-inset ring-primary-400 dark:ring-primary-500' : ''
               ]"
               @dragover="onDragOverCell($event, day)"
               @dragleave="onDragLeaveCell($event, day)"
@@ -713,7 +713,8 @@ function getCourseColor(courseId) {
                     getCourseColor(item.courseId).bg,
                     getCourseColor(item.courseId).border,
                     item.completed ? 'opacity-60' : '',
-                    draggingItem?.id === item.id ? 'opacity-40 ring-1 ring-gray-400' : ''
+                    draggingItem?.id === item.id ? 'opacity-40 ring-1 ring-gray-400' : '',
+                    !day.inMonth && draggingItem?.id !== item.id ? 'opacity-50' : ''
                   ]"
                   @dragstart="onDragStart($event, item)"
                   @dragend="onDragEnd"

@@ -65,9 +65,26 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
   }
 
   /**
-   * Sync all feeds, then refresh the feed list (for updated timestamps) and
-   * hydrate the LMS stores so newly created courses/assignments appear.
-   * Guarded by `syncing` so the user can't double-trigger.
+   * Apply the refreshed feed rows the sync endpoint returns (so we avoid a
+   * second `GET /api/ics/feeds`). Falls back to a fetch only when an older
+   * server omits `feeds` from the response.
+   */
+  async function applySyncedFeeds(result) {
+    if (Array.isArray(result?.feeds)) {
+      feeds.value = result.feeds
+      return
+    }
+    try {
+      feeds.value = await icsService.listFeeds()
+    } catch {
+      // non-fatal — sync result already captured.
+    }
+  }
+
+  /**
+   * Sync every feed, apply the refreshed feed rows the server returns, and
+   * re-hydrate the LMS stores only when the DB actually changed. Guarded by
+   * `syncing` so the user can't double-trigger.
    */
   async function syncAll() {
     if (syncing.value) return null
@@ -76,14 +93,13 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     try {
       const result = await icsService.syncAll()
       lastSyncResult.value = result
-      // Refresh the feeds list to pick up last_synced_at and status changes.
-      try {
-        feeds.value = await icsService.listFeeds()
-      } catch {
-        // non-fatal — sync result already captured.
+      await applySyncedFeeds(result)
+      // Only re-hydrate Pinia when the DB actually changed. `changed === false`
+      // (new server, nothing new) skips a getUser + 3 table selects; a missing
+      // flag (older server) defaults to hydrating so behavior stays correct.
+      if (result?.changed !== false) {
+        await hydrateLmsStoresFromSupabase()
       }
-      // Pull the upserted courses/assignments into the existing Pinia stores.
-      await hydrateLmsStoresFromSupabase()
       return result
     } catch (e) {
       lastError.value = e?.message || String(e)
@@ -101,12 +117,10 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     try {
       const result = await icsService.syncOne(id)
       lastSyncResult.value = result
-      try {
-        feeds.value = await icsService.listFeeds()
-      } catch {
-        /* non-fatal */
+      await applySyncedFeeds(result)
+      if (result?.changed !== false) {
+        await hydrateLmsStoresFromSupabase()
       }
-      await hydrateLmsStoresFromSupabase()
       return result
     } catch (e) {
       lastError.value = e?.message || String(e)

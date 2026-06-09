@@ -19,6 +19,24 @@ export const useAssignmentsStore = defineStore('assignments', () => {
   const loading = ref(false)
   const error = ref(null)
 
+  /**
+   * In-flight best-effort persists (the fire-and-forget writes from
+   * add/updateAssignment). Hydration awaits these before snapshotting Supabase
+   * so a re-hydration triggered mid-write — e.g. the ICS auto-sync that fires
+   * when the browser tab regains focus — can't race the INSERT and drop a row
+   * that hasn't landed server-side yet.
+   */
+  const pendingPersists = new Set()
+  function trackPersist(promise) {
+    pendingPersists.add(promise)
+    promise.finally(() => pendingPersists.delete(promise))
+    return promise
+  }
+  /** Resolve once every in-flight persist has settled (used by hydration). */
+  async function flushPendingPersists() {
+    await Promise.allSettled([...pendingPersists])
+  }
+
   const assignmentsByDueDate = computed(() => {
     return [...assignments.value].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
   })
@@ -74,8 +92,9 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     assignments.value.push(newAssignment)
 
     // Fire-and-forget persist. Requires the parent course to already exist
-    // (or to be persistable) — orphan assignments are skipped here.
-    void (async () => {
+    // (or to be persistable) — orphan assignments are skipped here. Tracked so
+    // hydration can wait for it before re-snapshotting (see flushPendingPersists).
+    trackPersist((async () => {
       const coursesStore = useCoursesStore()
       const parent = coursesStore.getCourseById(assignment.courseId)
       if (!parent) return
@@ -90,7 +109,7 @@ export const useAssignmentsStore = defineStore('assignments', () => {
           assignments.value[idx] = { ...assignments.value[idx], supabaseAssignmentId: aid }
         }
       }
-    })()
+    })())
 
     return newAssignment
   }
@@ -110,7 +129,7 @@ export const useAssignmentsStore = defineStore('assignments', () => {
       (merged.blackboardId != null && String(merged.blackboardId).trim() !== '')
     if (!merged.supabaseAssignmentId && !hasExt) return
 
-    void (async () => {
+    trackPersist((async () => {
       const coursesStore = useCoursesStore()
       const parent = coursesStore.getCourseById(merged.courseId)
       if (!parent?.supabaseCourseId) return
@@ -121,7 +140,7 @@ export const useAssignmentsStore = defineStore('assignments', () => {
           assignments.value[idx] = { ...assignments.value[idx], supabaseAssignmentId: aid }
         }
       }
-    })()
+    })())
   }
 
   /** Local-only delete; intentionally does not remove the Supabase row. */
@@ -129,9 +148,25 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     assignments.value = assignments.value.filter(a => a.id !== id)
   }
 
-  /** Full replace (e.g. Supabase hydration). */
+  /**
+   * Replace local state from a Supabase hydration snapshot, but KEEP any
+   * optimistic, not-yet-persisted creates (no `supabaseAssignmentId`) so a
+   * hydration that races an in-flight create — e.g. the ICS auto-sync on tab
+   * refocus — can't wipe the new row before its write lands. Rows that already
+   * carry a server id are represented by `list` (or were intentionally deleted
+   * server-side, e.g. on feed removal), so we never re-add those.
+   *
+   * Use {@link clearAll} for sign-out — that path must drop everything.
+   */
   function replaceFromHydration(list) {
-    assignments.value = Array.isArray(list) ? list : []
+    const incoming = Array.isArray(list) ? list : []
+    const pendingLocal = assignments.value.filter((a) => !a.supabaseAssignmentId)
+    assignments.value = [...incoming, ...pendingLocal]
+  }
+
+  /** Hard reset of all local state (e.g. on sign-out). */
+  function clearAll() {
+    assignments.value = []
   }
 
   function getAssignmentById(id) {
@@ -193,6 +228,8 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     updateAssignment,
     deleteAssignment,
     replaceFromHydration,
+    clearAll,
+    flushPendingPersists,
     getAssignmentById,
     updateProgress,
     markAssignmentComplete,

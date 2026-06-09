@@ -132,10 +132,30 @@ export const useCoursesStore = defineStore('courses', () => {
     courses.value = courses.value.filter(c => c.id !== id)
   }
 
-  /** Full replace (e.g. Supabase hydration). Clears in-flight persist dedupe. */
+  /** Resolve once every in-flight course persist has settled (used by hydration). */
+  async function flushPendingPersists() {
+    await Promise.allSettled([...coursePersistPromises.values()])
+  }
+
+  /**
+   * Replace local state from a Supabase hydration snapshot, but KEEP any
+   * optimistic, not-yet-persisted courses (no `supabaseCourseId`) so a hydration
+   * that races an in-flight create can't wipe a course the user just added.
+   * Rows already tracked server-side are represented by `list`.
+   *
+   * Use {@link clearAll} for sign-out — that path must drop everything.
+   */
   function replaceFromHydration(list) {
+    const incoming = Array.isArray(list) ? list : []
+    const pendingLocal = courses.value.filter((c) => !c.supabaseCourseId)
     coursePersistPromises.clear()
-    courses.value = Array.isArray(list) ? list : []
+    courses.value = [...incoming, ...pendingLocal]
+  }
+
+  /** Hard reset of all local state (e.g. on sign-out). */
+  function clearAll() {
+    coursePersistPromises.clear()
+    courses.value = []
   }
 
   function getCourseById(id) {
@@ -152,6 +172,8 @@ export const useCoursesStore = defineStore('courses', () => {
     updateCourse,
     deleteCourse,
     replaceFromHydration,
+    clearAll,
+    flushPendingPersists,
     getCourseById,
   }
 })

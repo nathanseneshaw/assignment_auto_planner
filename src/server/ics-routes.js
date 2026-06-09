@@ -23,6 +23,7 @@ import { Router } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { rateLimit } from 'express-rate-limit'
 import WebSocket from 'ws'
+import { createHash } from 'node:crypto'
 import { fetchIcsFeed } from './ics-fetcher.js'
 import { parseAndExpand } from './ics-parser.js'
 import { writeOccurrences } from './ics-supabase-writer.js'
@@ -73,17 +74,76 @@ function getServiceClient() {
   return _serviceClient
 }
 
-/** Validates the JWT by calling getUser() and attaches { user, supabase } to req. */
+// Short-TTL cache of validated bearer tokens. Every API hit otherwise costs a
+// network round-trip to GoTrue's /auth/v1/user just to gate the 401; a burst of
+// requests sharing one token (or repeated auto-sync ticks) would each re-pay it.
+// Keyed by the exact token; entries expire after AUTH_CACHE_TTL_MS. RLS is
+// unaffected — it's enforced by PostgREST from the JWT on every query regardless
+// of whether we revalidated the token here.
+const AUTH_CACHE_TTL_MS = 60_000
+const AUTH_CACHE_MAX = 1000
+const authCache = new Map() // token -> { user, expiresAt }
+
+function authCacheGet(token) {
+  const entry = authCache.get(token)
+  if (!entry) return null
+  if (entry.expiresAt < Date.now()) {
+    authCache.delete(token)
+    return null
+  }
+  return entry.user
+}
+
+/** Decode a JWT's `exp` (seconds) without verifying — used only to bound caching. */
+function jwtExpMs(token) {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'))
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+function authCacheSet(token, user) {
+  if (authCache.size >= AUTH_CACHE_MAX) {
+    // Cheap bound: evict the oldest inserted entry.
+    const oldest = authCache.keys().next().value
+    if (oldest !== undefined) authCache.delete(oldest)
+  }
+  // Never let a cached entry outlive the token's own expiry — otherwise a token
+  // that expires within the TTL window would keep passing the 401 gate.
+  const exp = jwtExpMs(token)
+  const expiresAt = exp != null
+    ? Math.min(Date.now() + AUTH_CACHE_TTL_MS, exp)
+    : Date.now() + AUTH_CACHE_TTL_MS
+  authCache.set(token, { user, expiresAt })
+}
+
+function bearerToken(req) {
+  const auth = req.headers.authorization || ''
+  if (!auth.toLowerCase().startsWith('bearer ')) return null
+  return auth.slice(auth.indexOf(' ') + 1).trim() || null
+}
+
+/** Validates the JWT (cached briefly) and attaches { user, supabase } to req. */
 async function requireUser(req, res, next) {
   try {
     const supabase = clientFor(req)
     if (!supabase) {
       return res.status(401).json({ success: false, error: 'Missing Authorization bearer token' })
     }
+    const token = bearerToken(req)
+    const cachedUser = token ? authCacheGet(token) : null
+    if (cachedUser) {
+      req.supabase = supabase
+      req.user = cachedUser
+      return next()
+    }
     const { data, error } = await supabase.auth.getUser()
     if (error || !data?.user) {
       return res.status(401).json({ success: false, error: 'Invalid or expired token' })
     }
+    if (token) authCacheSet(token, data.user)
     req.supabase = supabase
     req.user = data.user
     next()
@@ -265,10 +325,102 @@ router.delete('/api/ics/feeds/:id', requireUser, crudLimiter, async (req, res) =
  * - Fetch / parse failures fall through to the catch block and mark the feed
  *   `error` with the message truncated to 500 chars.
  */
+/** sha256 of the raw feed body — used to skip writes when nothing changed. */
+function feedContentHash(text) {
+  return createHash('sha256').update(text, 'utf8').digest('hex')
+}
+
+// Capability flag for the optional `ics_feeds.content_hash` column:
+// null = not probed yet, true = present, false = absent (degrade to always-sync).
+let feedHashColumn = null
+
+/** True when a PostgREST error means the column simply doesn't exist. */
+function isUndefinedColumnErr(error) {
+  if (!error) return false
+  const code = String(error.code || '')
+  if (code === '42703' || code === 'PGRST204') return true
+  return /content_hash/i.test(error.message || '') && /column|schema cache|does not exist/i.test(error.message || '')
+}
+
+/**
+ * Select the feeds to sync, including `content_hash` when the column exists.
+ * Feature-detects once: if the richer select errors with an undefined column,
+ * remember that and fall back to the base columns for the rest of the process.
+ */
+async function selectSyncFeeds(supabase, userId, feedId) {
+  const base = 'id, url, label'
+  const run = (cols) => {
+    let q = supabase.from('ics_feeds').select(cols).eq('user_id', userId)
+    if (feedId) q = q.eq('id', feedId)
+    return q
+  }
+  if (feedHashColumn === false) return run(base)
+
+  const { data, error } = await run(`${base}, content_hash`)
+  if (!error) {
+    feedHashColumn = true
+    return { data, error: null }
+  }
+  if (isUndefinedColumnErr(error)) {
+    feedHashColumn = false
+    return run(base)
+  }
+  return { data, error }
+}
+
+/**
+ * Update a feed's sync-status row, storing `content_hash` when supported.
+ * If the write fails purely because the column is absent, flip the capability
+ * flag and retry without it so a missing migration never breaks sync.
+ */
+async function updateFeedStatus(writeClient, userId, feedId, patch, newHash) {
+  const includeHash = feedHashColumn !== false && newHash != null
+  const body = includeHash ? { ...patch, content_hash: newHash } : { ...patch }
+  const { error } = await writeClient
+    .from('ics_feeds')
+    .update(body)
+    .eq('id', feedId)
+    .eq('user_id', userId)
+  if (error && includeHash && isUndefinedColumnErr(error)) {
+    feedHashColumn = false
+    await writeClient
+      .from('ics_feeds')
+      .update(patch)
+      .eq('id', feedId)
+      .eq('user_id', userId)
+  }
+}
+
 async function syncOneFeed(userSupabase, writeClient, userId, feed) {
   const startedAt = new Date().toISOString()
   try {
     const text = await fetchIcsFeed(feed.url)
+    const newHash = feedContentHash(text)
+
+    // Fast path: the feed body is byte-identical to the last successful sync,
+    // so there is nothing to parse or write. Just stamp the timestamp.
+    if (feedHashColumn === true && feed.content_hash && feed.content_hash === newHash) {
+      await updateFeedStatus(
+        writeClient,
+        userId,
+        feed.id,
+        { last_synced_at: startedAt, last_sync_status: 'success', last_sync_error: null },
+        newHash
+      )
+      return {
+        feedId: feed.id,
+        success: true,
+        skipped: true,
+        coursesInserted: 0,
+        coursesUpdated: 0,
+        assignmentsInserted: 0,
+        assignmentsUpdated: 0,
+        assignmentsUnchanged: 0,
+        occurrenceCount: 0,
+        writeErrors: [],
+      }
+    }
+
     const { occurrences } = parseAndExpand(text, {
       feedLabel: feed.label || null,
       feedId: feed.id,
@@ -283,17 +435,21 @@ async function syncOneFeed(userSupabase, writeClient, userId, feed) {
     const syncError = writeErrors.length > 0
       ? `${writeErrors.length} item(s) failed to save: ${writeErrors[0].error}`
       : null
-    await writeClient
-      .from('ics_feeds')
-      .update({
+    await updateFeedStatus(
+      writeClient,
+      userId,
+      feed.id,
+      {
         last_synced_at: startedAt,
         // Only mark `error` when there were events but none landed. Otherwise
         // we'd flap to red on transient single-row failures.
         last_sync_status: writeErrors.length > 0 && occurrences.length > 0 && counts.assignmentsInserted + counts.assignmentsUpdated === 0 ? 'error' : 'success',
         last_sync_error: syncError,
-      })
-      .eq('id', feed.id)
-      .eq('user_id', userId)
+      },
+      // Only cache the hash on a clean write — otherwise a partial failure would
+      // be treated as "unchanged" next time and never retried.
+      writeErrors.length === 0 ? newHash : null
+    )
     return {
       feedId: feed.id,
       success: true,
@@ -303,15 +459,13 @@ async function syncOneFeed(userSupabase, writeClient, userId, feed) {
     }
   } catch (e) {
     const msg = e?.message || String(e)
-    await writeClient
-      .from('ics_feeds')
-      .update({
-        last_synced_at: startedAt,
-        last_sync_status: 'error',
-        last_sync_error: msg.slice(0, 500),
-      })
-      .eq('id', feed.id)
-      .eq('user_id', userId)
+    await updateFeedStatus(
+      writeClient,
+      userId,
+      feed.id,
+      { last_synced_at: startedAt, last_sync_status: 'error', last_sync_error: msg.slice(0, 500) },
+      null
+    )
     return { feedId: feed.id, success: false, error: msg }
   }
 }
@@ -323,15 +477,15 @@ async function syncOneFeed(userSupabase, writeClient, userId, feed) {
  * inserts and we'd rather take a few extra seconds than have one feed's
  * burst starve the others. Per-feed results are aggregated into `totals`.
  */
+const ZERO_TOTALS = { coursesInserted: 0, coursesUpdated: 0, assignmentsInserted: 0, assignmentsUpdated: 0 }
+
 router.post('/api/ics/sync', requireUser, syncLimiter, async (req, res) => {
   const feedId = req.body?.feedId || null
   try {
-    let q = req.supabase.from('ics_feeds').select('id, url, label').eq('user_id', req.user.id)
-    if (feedId) q = q.eq('id', feedId)
-    const { data: feeds, error } = await q
+    const { data: feeds, error } = await selectSyncFeeds(req.supabase, req.user.id, feedId)
     if (error) throw error
     if (!feeds || feeds.length === 0) {
-      return res.json({ success: true, syncedFeeds: 0, results: [] })
+      return res.json({ success: true, syncedFeeds: 0, changed: false, totals: { ...ZERO_TOTALS }, results: [], feeds: [] })
     }
 
     // Use the service-role client for writes when available; fall back to
@@ -355,14 +509,35 @@ router.post('/api/ics/sync', requireUser, syncLimiter, async (req, res) => {
         }
         return acc
       },
-      { coursesInserted: 0, coursesUpdated: 0, assignmentsInserted: 0, assignmentsUpdated: 0 }
+      { ...ZERO_TOTALS }
     )
+
+    // True when the DB actually changed — lets the client skip a re-hydration
+    // round-trip (getUser + 3 table selects) on the common no-op sync.
+    const changed =
+      totals.coursesInserted + totals.coursesUpdated + totals.assignmentsInserted + totals.assignmentsUpdated > 0
+
+    // Return refreshed feed rows so the client doesn't need a follow-up GET
+    // /api/ics/feeds (which would re-validate the token and re-select).
+    let feedRows = []
+    try {
+      const { data, error: feedsErr } = await req.supabase
+        .from('ics_feeds')
+        .select('id, url, label, last_synced_at, last_sync_status, last_sync_error, created_at')
+        .eq('user_id', req.user.id)
+        .order('created_at', { ascending: true })
+      if (!feedsErr) feedRows = data || []
+    } catch {
+      // Non-fatal — the client keeps its cached feed list.
+    }
 
     res.json({
       success: true,
       syncedFeeds: results.length,
+      changed,
       totals,
       results,
+      feeds: feedRows,
     })
   } catch (e) {
     console.error('[POST /api/ics/sync]', e)

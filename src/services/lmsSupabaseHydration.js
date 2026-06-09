@@ -125,6 +125,17 @@ export async function hydrateLmsStoresFromSupabase() {
   const assignmentsStore = useAssignmentsStore()
   const tasksStore = useTasksStore()
 
+  // Let any in-flight optimistic creates land in Supabase before we snapshot.
+  // Otherwise the SELECTs below can race an INSERT (classic on tab refocus, when
+  // the ICS auto-sync hydrates right as a just-created assignment is still being
+  // persisted) and the new row would be dropped by the replace. Pairs with the
+  // merge in each store's replaceFromHydration, which additionally preserves
+  // creates that never persisted (e.g. an orphaned, course-less assignment).
+  await Promise.allSettled([
+    coursesStore.flushPendingPersists(),
+    assignmentsStore.flushPendingPersists(),
+  ])
+
   // Pull tables in series — assignments need courses for courseName; tasks need assignments.
   const { data: courseRows, error: cErr } = await supabase
     .from('courses')
