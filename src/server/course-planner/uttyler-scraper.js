@@ -8,17 +8,22 @@
  * in the jar the class-search form loads with no login. See bannerSessionForTerm
  * in banner-ssb.js for the analogous "warm-up then work" pattern.
  *
- * Three further quirks vs UH/UTA:
+ * Several quirks vs UH/UTA:
  *   1. The form is <form name="win0" id="CLASS_SEARCH">, so fields must be scoped
  *      by name (form[name="win0"]) — the peoplesoft.js helpers key off #win0 and
  *      would collect nothing here, which is why this file is self-contained.
  *   2. The Subject dropdown is empty until an Academic Career is chosen, and is
  *      filtered by it. Careers: UGRD/GRAD/MEDS/PHAR/HSCT. So a search is a stateful
- *      sequence of full-page postbacks: term -> career -> subject -> Search.
+ *      sequence of full-page postbacks: term -> career -> Search.
  *      Terms suffixed "- SOM" are School-of-Medicine terms (medical subjects only);
  *      the plain terms (e.g. "2026 Fall") carry the ~80-subject general catalog.
- *   3. Like UTA it demands >=2 search criteria; Subject counts as one, so we pair
- *      it with catalog-number >= 0001 (matches every course in the subject).
+ *   3. Like UTA it demands >=2 search criteria; we pair the Subject with catalog
+ *      number >= 0 (which matches every course in the subject).
+ *   4. The Search button must post with ICAJAX=1 (a full-page post silently
+ *      swallows the query). The form's pushbutton inputs must NOT be submitted —
+ *      their values ("Search"/"Clear") overflow a maxlen-1 field and abort the run.
+ *   5. A broad search returns a "your search will return over 50 classes, continue?"
+ *      soft warning that must be acknowledged (#ICSave) to load the results.
  *
  * Only open/closed status is exposed — no seat counts.
  */
@@ -100,6 +105,10 @@ class GuestSession {
         if (!name || /SSR_CLSRCH_WRK_SSR_OPEN_ONLY/.test(name)) return // never restrict to open
         const tag = el.tagName.toLowerCase()
         const type = (this.$(el).attr('type') || tag).toLowerCase()
+        // Pushbuttons carry their label as a value ("Search"/"Clear") but their DB
+        // field max length is 1, so submitting it trips a length error that silently
+        // aborts the search. The clicked button is identified by ICAction, not value.
+        if (['button', 'submit', 'image', 'reset'].includes(type)) return
         if (type === 'checkbox' || type === 'radio') {
           if (this.$(el).attr('checked') !== undefined) body.set(name, this.$(el).attr('value') || 'Y')
           return
@@ -113,11 +122,16 @@ class GuestSession {
     return body
   }
 
-  /** Replay one ICAJAX=0 postback (ICAction=`action`), applying `values` overrides. */
-  async post(action, values = {}) {
+  /**
+   * Replay one postback (ICAction=`action`) applying `values` overrides.
+   * Navigation steps use ICAJAX=0 (a full page we can re-snapshot); the Search and
+   * its warning-acknowledge pass icajax:'1' + changed:true so the component
+   * actually runs the query and surfaces its soft warning.
+   */
+  async post(action, values = {}, { icajax = '0', changed = false } = {}) {
     const body = this.snapshot()
     for (const [k, v] of Object.entries(values)) if (k) body.set(k, v)
-    body.set('ICAJAX', '0')
+    body.set('ICAJAX', icajax)
     body.set('ICNAVTYPEDROPDOWN', '0')
     body.set('ICType', 'Panel')
     body.set('ICElementNum', '0')
@@ -126,6 +140,7 @@ class GuestSession {
     body.set('ICStateNum', this.$('input[name="ICStateNum"]').attr('value') || '2')
     body.set('ICSID', this.$('input[name="ICSID"]').attr('value') || '')
     body.set('ICAction', action)
+    if (changed) body.set('ICChanged', '1')
     const html = await (
       await this.cFetch(CLASS_SEARCH, {
         method: 'POST',
@@ -147,6 +162,10 @@ async function sessionForTermCareer(termCode, career) {
   if (s.selected(SEL.term) !== termCode) throw new Error('term did not bind')
   const careerField = s.name(SEL.career)
   await s.post(careerField, { [inst]: INSTITUTION, [term]: termCode, [careerField]: career })
+  // The career must actually bind: on a transient miss PeopleSoft keeps the prior
+  // career's (often full) Subject list, which would mis-attribute every subject to
+  // this career and make later searches bounce. Reject it so callers retry.
+  if (s.selected(SEL.career) !== career) throw new Error('career did not bind')
   return s
 }
 
@@ -217,18 +236,29 @@ async function searchCareer({ termCode, subjectCode, career, termLabel, subjectL
     const subject = s.name(SEL.subject)
     const ctx = { [inst]: INSTITUTION, [term]: termCode, [careerField]: career }
 
-    // Select the subject (FieldChange) — this registers it as search criterion #1.
-    await s.post(subject, { ...ctx, [subject]: subjectCode })
-    if (s.selected(SEL.subject) !== subjectCode) continue // didn't take — retry clean
+    // Two criteria in one Search submit: Subject + catalog number >= 0 (which
+    // matches every course in the subject). icajax:'1' + changed make the
+    // component actually run the query — a plain full-page post silently swallows
+    // it — and return its soft warning.
+    const catName = s.name(SEL.catalog)
+    const matchName = s.name(SEL.match)
+    let html = await s.post(
+      SEARCH_BTN,
+      { ...ctx, [subject]: subjectCode, [matchName]: 'G', [catName]: '0' },
+      { icajax: '1', changed: true }
+    )
 
-    // Criterion #2: catalog number >= 0001 matches every course in the subject.
-    const html = await s.post(SEARCH_BTN, {
-      ...ctx,
-      [subject]: subjectCode,
-      [s.name(SEL.catalog)]: '0001',
-      [s.name(SEL.match)]: 'G',
-    })
-    if (/at least \d+ search criteria/i.test(html)) continue // flaky bounce — retry
+    // A broad search trips "Your search will return over 50 classes, continue?";
+    // acknowledge it (#ICSave = the OK button) to load the full results page.
+    if (/return over \d+ class|Student SS Warning|SSR_SS_WARNING/i.test(html)) {
+      html = await s.post('#ICSave', {}, { icajax: '1' })
+    }
+
+    // A results page (or a legit "no classes found") vs a transient bounce back to
+    // the entry form — only the former is parseable; retry the latter.
+    if (!/SSR_CLSRSLT_WRK_GROUPBOX|SSR_CLSRCH_RSLT|did not return any|no classes found/i.test(html)) {
+      continue
+    }
 
     return parseSearchResults(html, {
       school: SCHOOL,
@@ -248,10 +278,17 @@ export async function getSections({ termCode, subjectCode, termLabel, subjectLab
     const careers = known && known.size ? [...known] : CAREERS
 
     const byCrn = new Map()
+    let lastErr = null
     for (const career of careers) {
-      const sections = await searchCareer({ termCode, subjectCode, career, termLabel, subjectLabel })
-      for (const sec of sections) byCrn.set(sec.crn, sec) // dedup across careers
+      try {
+        const sections = await searchCareer({ termCode, subjectCode, career, termLabel, subjectLabel })
+        for (const sec of sections) byCrn.set(sec.crn, sec) // dedup across careers
+      } catch (e) {
+        lastErr = e // one flaky/over-broad career shouldn't sink the others
+      }
     }
+    // Surface an error only if every career failed and none produced sections.
+    if (!byCrn.size && lastErr) throw lastErr
     return [...byCrn.values()]
   })
 }

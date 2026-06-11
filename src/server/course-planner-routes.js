@@ -22,6 +22,12 @@ import * as txst from './course-planner/txst-scraper.js'
 import * as baylor from './course-planner/baylor-scraper.js'
 import * as uh from './course-planner/uh-scraper.js'
 import * as uta from './course-planner/uta-scraper.js'
+import * as uttyler from './course-planner/uttyler-scraper.js'
+import * as utrgv from './course-planner/utrgv-scraper.js'
+import * as utsa from './course-planner/utsa-scraper.js'
+import * as utep from './course-planner/utep-scraper.js'
+import * as stmarys from './course-planner/stmarys-scraper.js'
+import * as tcu from './course-planner/tcu-scraper.js'
 
 const router = Router()
 
@@ -99,6 +105,48 @@ const SCHOOLS = {
     // PeopleSoft public class search shows only open/closed, not seat counts.
     enrollmentDataAvailable: false,
     scraper: uta,
+  },
+  uttyler: {
+    code: 'uttyler',
+    name: 'University of Texas at Tyler',
+    // PeopleSoft guest class search shows only open/closed, not seat counts.
+    enrollmentDataAvailable: false,
+    scraper: uttyler,
+  },
+  utrgv: {
+    code: 'utrgv',
+    name: 'University of Texas Rio Grande Valley',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: utrgv,
+  },
+  utsa: {
+    code: 'utsa',
+    name: 'University of Texas at San Antonio',
+    // Banner classic schedule listing has meeting times but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: utsa,
+  },
+  utep: {
+    code: 'utep',
+    name: 'University of Texas at El Paso',
+    // Banner classic schedule listing has meeting times but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: utep,
+  },
+  stmarys: {
+    code: 'stmarys',
+    name: "St. Mary's University",
+    // Banner classic schedule listing has meeting times but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: stmarys,
+  },
+  tcu: {
+    code: 'tcu',
+    name: 'Texas Christian University',
+    // ASP.NET class search exposes enrolled + max seats per section.
+    enrollmentDataAvailable: true,
+    scraper: tcu,
   },
 }
 
