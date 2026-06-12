@@ -94,7 +94,6 @@ const userInitials = computed(() => {
 })
 
 const userSubtitle = computed(() => {
-  if (profileStore.profile.school?.trim()) return profileStore.profile.school.trim()
   if (isSupabaseConfigured && authStore.user?.email) return authStore.user.email
   return profileStore.profile.email || 'Student planner'
 })
@@ -120,7 +119,7 @@ const isActive = (path) => {
 
   <!-- Sidebar -->
   <aside
-    class="fixed top-0 left-0 z-50 h-screen w-64 bg-paper dark:bg-gray-900/95 backdrop-blur-xl border-r border-paper-line dark:border-gray-700/80 flex flex-col transition-transform duration-300 ease-in-out"
+    class="app-sidebar fixed top-0 left-0 z-50 h-screen w-64 bg-paper dark:bg-gray-900/95 backdrop-blur-xl border-r border-paper-line dark:border-gray-700/80 flex flex-col transition-transform duration-300 ease-in-out"
     :class="mobileOpen ? 'w-72 translate-x-0' : '-translate-x-full lg:translate-x-0'"
   >
     <!-- Logo -->

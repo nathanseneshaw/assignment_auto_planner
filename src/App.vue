@@ -2,6 +2,7 @@
 import { onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import MainLayout from './components/layouts/MainLayout.vue'
+import TitleBar from './components/common/TitleBar.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import { useCoursesStore } from './stores/courses'
 import { useAssignmentsStore } from './stores/assignments'
@@ -9,11 +10,18 @@ import { useTasksStore } from './stores/tasks'
 import { useAuthStore } from './stores/auth'
 import { useProfileStore } from './stores/profile'
 import { isSupabaseConfigured } from './lib/supabase'
+import { isElectron } from './lib/platform'
 import { hydrateLmsStoresFromSupabase } from './services/lmsSupabaseHydration'
 import { useSupabaseStoreSync } from './composables/useSupabaseStoreSync'
 import { useIcsAutoSync } from './composables/useIcsAutoSync'
 
 const route = useRoute()
+
+// Desktop only: tag <html> so the Electron title-bar drag styles activate
+// (the web build never gets this class, so the browser app is untouched).
+if (isElectron && typeof document !== 'undefined') {
+  document.documentElement.classList.add('is-electron')
+}
 
 const coursesStore = useCoursesStore()
 const assignmentsStore = useAssignmentsStore()
@@ -59,6 +67,10 @@ watch(
 </script>
 
 <template>
+  <!-- Electron only: custom title bar with our own min/max/close buttons. The
+       app layout below is offset by its height (--titlebar-h) in style.css. -->
+  <TitleBar v-if="isElectron" />
+
   <template v-if="route.meta.authPage || route.meta.landingPage">
     <RouterView v-slot="{ Component, route: r }">
       <Transition name="page" mode="out-in">
