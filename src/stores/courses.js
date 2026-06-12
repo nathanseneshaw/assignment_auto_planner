@@ -55,7 +55,7 @@ export const useCoursesStore = defineStore('courses', () => {
     if (!initial) return null
     if (initial.supabaseCourseId) return initial.supabaseCourseId
 
-    // A concurrent caller is already persisting this row — reuse their promise.
+    // A concurrent caller is already persisting this row  reuse their promise.
     if (coursePersistPromises.has(localCourseId)) {
       return coursePersistPromises.get(localCourseId)
     }
@@ -113,7 +113,7 @@ export const useCoursesStore = defineStore('courses', () => {
       const hasExtId =
         (merged.canvasCourseId != null && String(merged.canvasCourseId).trim() !== '') ||
         (merged.blackboardId != null && String(merged.blackboardId).trim() !== '')
-      // Skip persistence for purely-local courses that have never reached Supabase yet —
+      // Skip persistence for purely-local courses that have never reached Supabase yet
       // the background sync (useSupabaseStoreSync) will pick them up.
       if (!merged.supabaseCourseId && !hasExtId) return
 

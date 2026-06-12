@@ -3,7 +3,7 @@
  *
  * Supports PDF (`application/pdf`) and DOCX
  * (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`).
- * Returns `{ text, truncated }` — the caller passes `text` to the LLM.
+ * Returns `{ text, truncated }`  the caller passes `text` to the LLM.
  *
  * Notes
  * - We import the inner pdf-parse module instead of the package index because
@@ -19,7 +19,7 @@ import mammoth from 'mammoth'
 const PDF_MIME = 'application/pdf'
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
-// Hard cap on what we send to the LLM. ~60k chars ≈ ~15k tokens — well under
+// Hard cap on what we send to the LLM. ~60k chars ≈ ~15k tokens  well under
 // Claude's context window but enough for a 20-page syllabus.
 const MAX_CHARS = 60000
 const HEAD_KEEP = 50000
@@ -35,7 +35,7 @@ function normalize(text) {
 /**
  * @param {Buffer} buffer raw file bytes
  * @param {string} mimetype the browser-reported mimetype
- * @param {string} [filename] original filename — used as fallback when the
+ * @param {string} [filename] original filename  used as fallback when the
  *   browser sends a generic `application/octet-stream`
  * @returns {Promise<{ text: string, truncated: boolean }>}
  */
@@ -60,7 +60,7 @@ export async function extractText(buffer, mimetype, filename = '') {
 
   const text = normalize(raw)
   if (text.length < 80) {
-    throw new Error('Could not extract text — the file may be a scanned image or empty.')
+    throw new Error('Could not extract text  the file may be a scanned image or empty.')
   }
 
   if (text.length <= MAX_CHARS) {

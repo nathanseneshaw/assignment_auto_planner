@@ -73,7 +73,7 @@ export async function fetchIcsFeed(url) {
   let res
   try {
     // Walk redirects manually so we can re-validate each hop against the SSRF
-    // guard — otherwise a public host could 302 us to 127.0.0.1 or cloud
+    // guard  otherwise a public host could 302 us to 127.0.0.1 or cloud
     // metadata (169.254.169.254) which assertPublicUrl on the original URL
     // would never catch.
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {

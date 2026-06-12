@@ -8,12 +8,12 @@ export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref([])
   const loading = ref(false)
 
-  /** Local-timezone `YYYY-MM-DD` key — avoid `toISOString` here (UTC drift). */
+  /** Local-timezone `YYYY-MM-DD` key  avoid `toISOString` here (UTC drift). */
   function localDateKey(d = new Date()) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
-  /** `{ [yyyy-mm-dd]: Task[] }` — drives the planner calendar grid. */
+  /** `{ [yyyy-mm-dd]: Task[] }`  drives the planner calendar grid. */
   const tasksByDate = computed(() => {
     const grouped = {}
     tasks.value.forEach(task => {
@@ -57,7 +57,7 @@ export const useTasksStore = defineStore('tasks', () => {
       return true
     }
     if (result.status === 'error' && !silent) {
-      useToast().error("Couldn't save your task — we'll retry automatically.")
+      useToast().error("Couldn't save your task  we'll retry automatically.")
     }
     return false // 'skipped' (local-only mode) or 'error'
   }
@@ -112,7 +112,7 @@ export const useTasksStore = defineStore('tasks', () => {
   /**
    * Re-attempt any tasks whose insert never confirmed (offline at create time,
    * or a transient error). Called after hydration; idempotent upsert keyed on
-   * id means this can't create duplicates. Silent — it's a background self-heal.
+   * id means this can't create duplicates. Silent  it's a background self-heal.
    */
   async function retryPendingPersists() {
     const pendingNow = tasks.value.filter(t => !t.supabaseTaskId)
@@ -121,7 +121,7 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  /** Wipe all tasks — used when signing out or switching accounts. */
+  /** Wipe all tasks  used when signing out or switching accounts. */
   function clearAll() {
     tasks.value = []
   }

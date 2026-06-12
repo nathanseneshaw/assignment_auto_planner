@@ -26,7 +26,7 @@ export function parseIcsBuffer(text) {
   return { calendarName, events }
 }
 
-/** Pull X-WR-CALNAME from the raw text — node-ical exposes it inconsistently. */
+/** Pull X-WR-CALNAME from the raw text  node-ical exposes it inconsistently. */
 function readCalendarName(text) {
   const m = text.match(/^X-WR-CALNAME:(.+)$/m)
   if (!m) return ''

@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Custom date picker — a styled, in-app replacement for `<input type="date">`,
+ * Custom date picker  a styled, in-app replacement for `<input type="date">`,
  * whose native popup can't be themed. Drop-in compatible: v-models a
  * `YYYY-MM-DD` string (same value the native input produces) or '' when empty.
  *

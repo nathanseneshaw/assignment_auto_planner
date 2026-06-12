@@ -152,7 +152,7 @@ function toggleFaq(i) {
         <div
           class="mt-16 sm:mt-20 rounded-3xl border border-gray-200/80 bg-surface shadow-xl shadow-gray-900/[0.06] overflow-hidden"
         >
-          <!-- Abstract illustration of the planner's week view — not a literal screenshot. -->
+          <!-- Abstract illustration of the planner's week view  not a literal screenshot. -->
           <div
             class="aspect-[4/3] sm:aspect-[16/9] bg-gradient-to-br from-gray-50 via-white to-primary-100/50 p-4 sm:p-6"
           >
@@ -245,7 +245,7 @@ function toggleFaq(i) {
               Take Plannr off the browser tab
             </h2>
             <p class="mt-3 text-gray-600 max-w-xl mx-auto">
-              Install the desktop app to keep your planner one click away — independent of your browser and always at hand during study sessions.
+              Install the desktop app to keep your planner one click away  independent of your browser and always at hand during study sessions.
             </p>
           </div>
 

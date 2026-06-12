@@ -52,7 +52,7 @@ export function useToast() {
     }
   }
 
-  // Convenience wrappers — pass-through to `show` with a fixed `type`.
+  // Convenience wrappers  pass-through to `show` with a fixed `type`.
   function success(message, duration) {
     return show(message, 'success', duration)
   }

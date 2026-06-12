@@ -4,7 +4,7 @@
  *
  * Mirrors the mockup: a soft rounded icon tile, a bold title, a muted mono
  * subtitle, and a right-aligned action slot (a "Connected" pill or a
- * "Connect →" button). Purely visual — all behaviour lives in the parent.
+ * "Connect →" button). Purely visual  all behaviour lives in the parent.
  */
 defineProps({
   icon: { type: String, default: '' },

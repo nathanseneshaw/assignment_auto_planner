@@ -1,7 +1,7 @@
 /**
  * In-memory TTL cache shared across scrapers.
  *
- * The user picked "on-demand scraping" — but firing 4 universities' worth of
+ * The user picked "on-demand scraping"  but firing 4 universities' worth of
  * HTML/CSV/XLSX on every keystroke would be both slow and rude. A 5-minute
  * cache flattens repeat clicks without making the data feel stale.
  */

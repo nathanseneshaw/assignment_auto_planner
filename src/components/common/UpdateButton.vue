@@ -33,13 +33,13 @@ function apply(payload) {
       if (typeof payload.percent === 'number') percent.value = payload.percent
       break
     case 'downloaded':
-      // Don't auto-install here — the main process shows a native "Restart now?"
+      // Don't auto-install here  the main process shows a native "Restart now?"
       // dialog, and the button below offers the same. Avoids a double restart.
       status.value = 'downloaded'
       break
     case 'error':
       // Only surface errors the user can act on (i.e. a download they started).
-      // Check-time errors (offline, no release yet) stay silent — button hidden.
+      // Check-time errors (offline, no release yet) stay silent  button hidden.
       if (status.value === 'downloading') status.value = 'error'
       break
     default:
@@ -86,7 +86,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div v-if="show">
-    <!-- Update available — click to download -->
+    <!-- Update available  click to download -->
     <button
       v-if="status === 'available'"
       type="button"
@@ -112,7 +112,7 @@ onBeforeUnmount(() => {
       <span class="hidden sm:inline">Downloading {{ percent }}%</span>
     </div>
 
-    <!-- Downloaded — click to restart into the new version -->
+    <!-- Downloaded  click to restart into the new version -->
     <button
       v-else-if="status === 'downloaded'"
       type="button"
@@ -126,18 +126,18 @@ onBeforeUnmount(() => {
       <span class="hidden sm:inline">Restart to update</span>
     </button>
 
-    <!-- Download failed — retry -->
+    <!-- Download failed  retry -->
     <button
       v-else-if="status === 'error'"
       type="button"
       @click="retry"
-      title="Update failed — click to retry"
+      title="Update failed  click to retry"
       class="inline-flex items-center gap-2 h-9 px-3.5 rounded-lg text-sm font-semibold text-danger-700 dark:text-danger-300 bg-danger-100 dark:bg-danger-900/30 hover:bg-danger-200 dark:hover:bg-danger-900/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-danger-500/40"
     >
       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z" />
       </svg>
-      <span class="hidden sm:inline">Update failed — retry</span>
+      <span class="hidden sm:inline">Update failed  retry</span>
     </button>
   </div>
 </template>

@@ -8,7 +8,7 @@
  */
 import { fetchApiJson } from './fetchApiJson.js'
 
-/** Schools dropdown — entirely server-driven now. */
+/** Schools dropdown  entirely server-driven now. */
 export async function listSchools() {
   const data = await fetchApiJson('/api/course-planner/schools')
   return data.schools || []

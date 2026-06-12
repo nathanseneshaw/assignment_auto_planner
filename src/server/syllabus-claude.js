@@ -5,7 +5,7 @@
  * Strategy: force a single tool call with a strict input schema. This guarantees
  * we get well-typed JSON back without having to parse a free-form response.
  *
- * Model: claude-haiku-4-5 — extraction is structured and short; haiku is fast
+ * Model: claude-haiku-4-5  extraction is structured and short; haiku is fast
  * and ~10x cheaper than sonnet. Promote to sonnet only if accuracy is poor.
  */
 import Anthropic from '@anthropic-ai/sdk'
@@ -143,7 +143,7 @@ export async function extractSyllabus(text) {
   }
 
   const draft = block.input
-  // Defensive normalization — schema enforces these but the SDK may return
+  // Defensive normalization  schema enforces these but the SDK may return
   // extra keys or omit optional ones depending on the model's strictness.
   const course = {
     name: String(draft?.course?.name || '').trim(),

@@ -7,7 +7,7 @@
  *
  * Important caveats:
  * - **Deletes are not propagated.** Removing a course or assignment locally
- *   leaves the Supabase row intact (intentional — protects against accidental
+ *   leaves the Supabase row intact (intentional  protects against accidental
  *   wipes; cleanup happens separately).
  * - `suppressWatch` is flipped while we patch local rows with the returned
  *   Supabase IDs so the resulting deep-watch trigger does not recurse into a
@@ -76,7 +76,7 @@ export function useSupabaseStoreSync() {
 
     suppressWatch = true
     try {
-      // Pass 1 — courses. Patch each local row with its Supabase UUID so
+      // Pass 1  courses. Patch each local row with its Supabase UUID so
       // future updates can target it without another lookup.
       const courses = [...coursesStore.courses]
       for (const course of courses) {
@@ -92,7 +92,7 @@ export function useSupabaseStoreSync() {
         }
       }
 
-      // Pass 2 — assignments. `ensureSupabaseCourseRow` resolves the parent
+      // Pass 2  assignments. `ensureSupabaseCourseRow` resolves the parent
       // FK; rows whose parent has no Supabase row yet are skipped this round.
       const assignments = [...assignmentsStore.assignments]
       for (const a of assignments) {

@@ -46,7 +46,7 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     return savedSectionsBySchool.value[schoolCode.value] || []
   })
 
-  // Persisted: weekly work shifts. Global (not per-school) — a job doesn't
+  // Persisted: weekly work shifts. Global (not per-school)  a job doesn't
   // change when you switch which catalog you're browsing.
   // Shape: [{ id, days: ['M','W'], startTime: '09:00', endTime: '17:00' }]
   const workShifts = ref(loadWork())
@@ -122,7 +122,7 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     if (code) loadSections()
   }
 
-  /** Wipe state — called when the user switches their primary school in profile. */
+  /** Wipe state  called when the user switches their primary school in profile. */
   function resetForSchoolChange() {
     terms.value = []
     subjects.value = []

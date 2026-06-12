@@ -69,8 +69,8 @@ const railDeadlines = computed(() => assignmentsStore.upcomingAssignments.slice(
 const slateLine = computed(() => {
   const n = agenda.value.length
   if (n > 0) return `You have ${n} task${n === 1 ? '' : 's'} lined up for today.`
-  if (overdueCount.value > 0) return "Today's slate is clear — a good moment to catch up."
-  return "Today's slate is clear — a good moment to plan ahead."
+  if (overdueCount.value > 0) return "Today's slate is clear  a good moment to catch up."
+  return "Today's slate is clear  a good moment to plan ahead."
 })
 
 // ── Stat-card sub-labels ─────────────────────────────────────────────────
@@ -144,7 +144,7 @@ const activity = computed(() => {
 })
 
 function cellClass(day) {
-  // Days later this week (after today) have no activity yet — render them as
+  // Days later this week (after today) have no activity yet  render them as
   // empty tiles rather than hiding them, so the current week's column stays a
   // full rectangle instead of leaving cells dangling off the top-right.
   return LEVEL_CLASS[day.level]

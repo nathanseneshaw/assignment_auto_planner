@@ -53,7 +53,7 @@ function parseDateLocal(dateString) {
   return new Date(y, m - 1, d)
 }
 
-/** "May 15" — month abbreviation + day, no year (matches the editorial layout). */
+/** "May 15"  month abbreviation + day, no year (matches the editorial layout). */
 function shortDate(dateString) {
   const d = parseDateLocal(dateString)
   return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`
@@ -117,7 +117,7 @@ const sections = computed(() => {
 const emptyCopy = computed(() => {
   switch (activeTab.value) {
     case 'overdue':
-      return { title: 'Nothing overdue — nicely done.', sub: 'You’re all caught up here.' }
+      return { title: ‘Nothing overdue  nicely done.’, sub: ‘You’re all caught up here.’ }
     case 'upcoming':
       return { title: 'Nothing on the horizon yet.', sub: 'New deadlines will appear here as they arrive.' }
     case 'completed':
@@ -351,7 +351,7 @@ onMounted(() => {
               :class="section.tone === 'rust' ? 'text-rust-600 dark:text-rust-500' : 'text-gray-400'"
             >
               {{ section.label }}
-              <span class="text-gray-300 dark:text-gray-600">— {{ section.items.length }}</span>
+              <span class="text-gray-300 dark:text-gray-600"> {{ section.items.length }}</span>
             </p>
 
             <div>
@@ -520,7 +520,7 @@ onMounted(() => {
           </div>
           <p class="mt-2 font-serif text-[13.5px] leading-relaxed text-gray-600 dark:text-gray-300">
             <template v-if="heaviestUpcoming">
-              Catch up before <span class="font-medium text-rust-600 dark:text-rust-500">{{ shortDate(heaviestUpcoming.date) }}</span> hits — that's when your heaviest batch lands.
+              Catch up before <span class="font-medium text-rust-600 dark:text-rust-500">{{ shortDate(heaviestUpcoming.date) }}</span> hits  that's when your heaviest batch lands.
             </template>
             <template v-else>
               You have <span class="font-medium text-rust-600 dark:text-rust-500">{{ counts.overdue }}</span> past due. Let's clear them to get back on track.

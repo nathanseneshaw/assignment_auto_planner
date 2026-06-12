@@ -124,7 +124,7 @@ function isoToDateInput(iso) {
 
 /**
  * Convert a `YYYY-MM-DD` string from <input type="date"> back to an ISO string.
- * Anchors at 23:59:00 local time — assignments are typically due end-of-day,
+ * Anchors at 23:59:00 local time  assignments are typically due end-of-day,
  * and the underlying `assignments.due_at` column is timestamptz so it needs a time.
  */
 function dateInputToIso(value) {
@@ -259,7 +259,7 @@ function handleModalClose() {
     </template>
   </IntegrationRow>
 
-  <!-- Review modal — appears after a successful parse ----------------------- -->
+  <!-- Review modal  appears after a successful parse ----------------------- -->
   <Modal
     v-model="reviewOpen"
     title="Review syllabus"
@@ -270,7 +270,7 @@ function handleModalClose() {
     <div v-if="draft" class="space-y-6">
       <div v-if="parseMeta?.truncated" class="text-xs text-warning-800 dark:text-warning-300 bg-warning-50 dark:bg-warning-900/30 border border-warning-200 dark:border-warning-800/60 rounded-xl p-3">
         This syllabus was long. We sent the first ~50 000 characters plus the last 5 000 to the parser, so a few
-        middle items may be missing — add any missing rows below before saving.
+        middle items may be missing  add any missing rows below before saving.
       </div>
 
       <section>
@@ -289,7 +289,7 @@ function handleModalClose() {
           <Button size="sm" variant="secondary" @click="addAssignmentRow">+ Add row</Button>
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          Assignments without a due date can't be saved — fill one in or remove the row.
+          Assignments without a due date can't be saved  fill one in or remove the row.
         </p>
 
         <div v-if="draft.assignments.length === 0" class="text-sm text-gray-500 dark:text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4 text-center">

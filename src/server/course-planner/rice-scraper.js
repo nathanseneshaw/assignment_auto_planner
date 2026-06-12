@@ -2,9 +2,9 @@
  * Rice University scraper.
  *
  * Two endpoints, joined by CRN:
- *   1. `!swkenrc.main` (Enrollment Counts) — bulk CSV with max / current / available
+ *   1. `!swkenrc.main` (Enrollment Counts)  bulk CSV with max / current / available
  *      seats per section. Does NOT include meeting times.
- *   2. `!SWKSCAT.cat` (Schedule) — HTML list of all sections for a subject with
+ *   2. `!SWKSCAT.cat` (Schedule)  HTML list of all sections for a subject with
  *      meeting times, instructor, etc. No enrollment counts in the list view.
  *
  * We fire both in parallel and merge so the unified Section shape has both
@@ -54,7 +54,7 @@ async function loadForm() {
       })
       return { asFid, terms, subjects }
     },
-    60 * 60 * 1000 // 1 hour — terms/subjects barely change
+    60 * 60 * 1000 // 1 hour  terms/subjects barely change
   )
 }
 
@@ -162,7 +162,7 @@ function toInt(v) {
 
 function splitInstructors(raw) {
   if (!raw) return []
-  // Rice usually has "Last, First" — comma is inside the name so split on ';' or ' / '.
+  // Rice usually has "Last, First"  comma is inside the name so split on ';' or ' / '.
   return String(raw)
     .split(/\s*;\s*|\s+\/\s+/)
     .map((s) => s.trim())

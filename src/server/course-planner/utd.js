@@ -1,5 +1,5 @@
 /**
- * UT Dallas scraper — server-side, runs in Express for both web and Electron clients.
+ * UT Dallas scraper  server-side, runs in Express for both web and Electron clients.
  *
  * NOTE: Browser-based section search (playwright-extra + puppeteer-extra-plugin-stealth)
  * has been removed. CourseBook's search endpoint is reCAPTCHA v3 gated and cannot be
@@ -8,9 +8,9 @@
  * Still functional:
  *   getTerms()    -> [{ code, label }]
  *   getSubjects() -> [{ code, label }]    (term-independent on UTD)
- *   getSections() -> []                   (stubbed — browser automation removed)
+ *   getSections() -> []                   (stubbed  browser automation removed)
  *
- * Caching is handled by the shared `cacheMemo` — 1 h for the static term/subject dropdowns.
+ * Caching is handled by the shared `cacheMemo`  1 h for the static term/subject dropdowns.
  */
 import * as cheerio from 'cheerio'
 import { cacheMemo } from './cache.js'
@@ -84,7 +84,7 @@ async function findCpValue(subjectCode) {
 
 export async function getSections({ termCode, subjectCode }) {
   console.warn(
-    `[utd] getSections(${termCode}, ${subjectCode}) — UTD browser scraping is disabled ` +
+    `[utd] getSections(${termCode}, ${subjectCode})  UTD browser scraping is disabled ` +
     '(playwright-extra / puppeteer-extra-plugin-stealth removed). Returning [].'
   )
   return []
@@ -92,7 +92,7 @@ export async function getSections({ termCode, subjectCode }) {
 
 // ── HTML parser ─────────────────────────────────────────────────────────────
 //
-// Row shape (one per section) — CourseBook 11:
+// Row shape (one per section)  CourseBook 11:
 //   <tr class="cb-row" data-id="cs1325.001.26f">
 //     <td>26F<br><span class="section-open">Open</span></td>      ← term + status
 //     <td><a href="/search/cs1325.001.26f">CS 1325.001</a></td>    ← class address
@@ -172,7 +172,7 @@ function parseInstructors($td) {
   })
   if (!out.length) {
     const text = $td.text().replace(/\s+/g, ' ').trim()
-    if (text && text !== '—') out.push(text)
+    if (text && text !== '') out.push(text)
   }
   return out
 }
@@ -221,7 +221,7 @@ function to24h(raw) {
 
 function parseFillPercent($td) {
   if (!$td) return null
-  // Tooltip looks like "{status} - 10% Filled" — the literal "{status}" is
+  // Tooltip looks like "{status} - 10% Filled"  the literal "{status}" is
   // unsubstituted on UTD's side. Just extract the number.
   const title = $td.find('[title]').attr('title') || $td.attr('title') || ''
   const m = title.match(/(\d{1,3})\s*%/)
@@ -234,5 +234,5 @@ function parseClassAddress(addr) {
   return { subject: m[1], number: m[2], section: m[3], term: m[4] }
 }
 
-/** No-op — browser singleton was removed along with playwright-extra. */
+/** No-op  browser singleton was removed along with playwright-extra. */
 export async function close() {}

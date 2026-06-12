@@ -9,7 +9,7 @@ const feedsStore = useIcsFeedsStore()
 const authStore = useAuthStore()
 
 // One calendar feed per account: the "Connect" affordance only appears while
-// no feed exists, and once connected the row stays — clickable to re-sync.
+// no feed exists, and once connected the row stays  clickable to re-sync.
 const adding = ref(false)
 const newUrl = ref('')
 const formError = ref('')
@@ -39,7 +39,7 @@ function relativeTime(ts) {
 
 function feedSubtitle(feed) {
   if (feed.last_sync_status === 'error') {
-    return feed.last_sync_error || 'Last sync failed — click Retry'
+    return feed.last_sync_error || 'Last sync failed  click Retry'
   }
   const rel = relativeTime(feed.last_synced_at)
   if (!rel) return 'Subscribed via URL · not synced yet'
