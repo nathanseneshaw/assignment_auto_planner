@@ -4,18 +4,18 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* Primary  emerald: the brand across buttons, active states & highlights */
-  --color-primary-50: #ecfdf5;
-  --color-primary-100: #d1fae5;
-  --color-primary-200: #a7f3d0;
-  --color-primary-300: #6ee7b7;
-  --color-primary-400: #34d399;
-  --color-primary-500: #10b981;
-  --color-primary-600: #059669;
-  --color-primary-700: #047857;
-  --color-primary-800: #065f46;
-  --color-primary-900: #064e3b;
-  --color-primary-950: #022c22;
+  /* Primary  forest green: the brand across buttons, active states & highlights */
+  --color-primary-50:  #eef7f0;
+  --color-primary-100: #d1e9d8;
+  --color-primary-200: #a4d4b4;
+  --color-primary-300: #6cb98a;
+  --color-primary-400: #3a9d63;
+  --color-primary-500: #1f7f49;
+  --color-primary-600: #196639;
+  --color-primary-700: #135030;
+  --color-primary-800: #0e3e25;
+  --color-primary-900: #0a2e1c;
+  --color-primary-950: #061b10;
 
   /* Accent  teal: secondary highlight that pairs with the emerald primary */
   --color-accent-50: #f0fdfa;
@@ -67,13 +67,13 @@
   --color-gray-950: #0c0a09;
 
   /* Paper  the warm cream "journal" canvas behind everything in light mode */
-  --color-paper: #f4f1e8;
-  --color-paper-line: #e6e1d3;
+  --color-paper: #e9e6dd;
+  --color-paper-line: #d8d5cb;
 
   /* Surface  soft warm ivory for cards, inputs & panels. Sits just above the
      cream paper canvas so data containers still lift, but reads far gentler
      than stark white in light mode. (Dark mode keeps its gray-800 surfaces.) */
-  --color-surface: #faf7ef;
+  --color-surface: #f2efe5;
 
   /* Rust  terracotta accent for "now"/time markers (pairs with emerald) */
   --color-rust-50: #faf0ea;

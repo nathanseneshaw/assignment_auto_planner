@@ -310,7 +310,7 @@ onMounted(() => {
                 :key="opt.value"
                 type="button"
                 @click="filterDate = opt.value"
-                class="eyebrow pb-1 border-b-2 transition-colors"
+                class="eyebrow pb-1 border-b-2 whitespace-nowrap transition-colors"
                 :class="filterDate === opt.value
                   ? 'border-gray-900 dark:border-gray-100 text-gray-900 dark:text-gray-100'
                   : 'border-transparent text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
