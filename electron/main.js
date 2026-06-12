@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, session } from 'electron'
+import { app, BrowserWindow, Menu, session, ipcMain } from 'electron'
 import path from 'path'
 import { fileURLToPath, URL } from 'url'
 import logger from './logger.js'
@@ -138,6 +138,13 @@ function createWindow() {
     height: 820,
     minWidth: 900,
     minHeight: 600,
+    // Custom title bar: hide the native caption bar (and its buttons) while
+    // keeping the standard window frame behaviors — resize, Aero Snap, drop
+    // shadow, Win11 rounded corners. We draw our own min/max/close buttons in
+    // the renderer (see TitleBar.vue), wired through the window:* IPC below.
+    // `backgroundColor` matches light paper to avoid a white flash on load.
+    titleBarStyle: 'hidden',
+    backgroundColor: '#f4f1e8',
     // Runtime taskbar/window icon. `build.icon` in package.json only sets the
     // packaged-app icon resource; during `electron:dev` the BrowserWindow
     // needs this explicit option or it falls back to the default Electron icon.
@@ -155,12 +162,40 @@ function createWindow() {
 
   installNavigationGuards(win)
 
+  // Keep the renderer's maximize/restore button icon in sync when the window is
+  // maximized by any means (our button, double-click on the bar, Aero Snap).
+  const sendMaxState = () => {
+    if (!win.isDestroyed()) win.webContents.send('window:maximized-changed', win.isMaximized())
+  }
+  win.on('maximize', sendMaxState)
+  win.on('unmaximize', sendMaxState)
+
   if (isDev) {
     win.loadURL('http://localhost:5173')
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 }
+
+// Custom title-bar window controls, driven by the renderer's TitleBar.vue.
+// Each resolves the calling window from its WebContents so it stays correct
+// even if a second window is ever opened.
+ipcMain.handle('window:minimize', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.minimize()
+})
+ipcMain.handle('window:toggleMaximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return false
+  if (win.isMaximized()) win.unmaximize()
+  else win.maximize()
+  return win.isMaximized()
+})
+ipcMain.handle('window:close', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.close()
+})
+ipcMain.handle('window:isMaximized', (event) => {
+  return Boolean(BrowserWindow.fromWebContents(event.sender)?.isMaximized())
+})
 
 app.whenReady().then(() => {
   installResponseHooks()

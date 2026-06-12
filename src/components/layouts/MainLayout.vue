@@ -39,7 +39,7 @@ onUnmounted(() => {
       @close-mobile="closeMobileSidebar"
     />
 
-    <div class="min-h-screen flex flex-col lg:pl-64">
+    <div class="app-content min-h-screen flex flex-col lg:pl-64">
       <TopBar @open-mobile-sidebar="openMobileSidebar" />
 
       <main class="flex-1 px-4 sm:px-8 lg:px-12 pb-24 lg:pb-12">

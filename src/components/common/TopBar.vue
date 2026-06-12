@@ -150,7 +150,7 @@ function goToTask() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 bg-paper/75 dark:bg-gray-900/75 backdrop-blur-xl">
+  <header class="app-topbar sticky top-0 z-30 bg-paper/75 dark:bg-gray-900/75 backdrop-blur-xl">
     <div class="flex items-center justify-between h-14 px-4 sm:px-8 lg:px-12">
       <div class="flex items-center gap-3 min-w-0">
         <!-- Mobile menu button -->
