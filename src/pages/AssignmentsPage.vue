@@ -117,7 +117,7 @@ const sections = computed(() => {
 const emptyCopy = computed(() => {
   switch (activeTab.value) {
     case 'overdue':
-      return { title: ‘Nothing overdue  nicely done.’, sub: ‘You’re all caught up here.’ }
+      return { title: 'Nothing overdue — nicely done.', sub: 'You’re all caught up here.' }
     case 'upcoming':
       return { title: 'Nothing on the horizon yet.', sub: 'New deadlines will appear here as they arrive.' }
     case 'completed':
