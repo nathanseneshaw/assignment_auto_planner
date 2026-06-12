@@ -50,7 +50,7 @@ function weekEndKey() {
   return localDateKey(d)
 }
 
-/** "Mon, Jun 8" — weekday + month + day, matching the editorial row layout. */
+/** "Mon, Jun 8"  weekday + month + day, matching the editorial row layout. */
 function taskDateLabel(dateStr) {
   if (!dateStr) return ''
   const [y, m, d] = dateStr.split('-').map(Number)

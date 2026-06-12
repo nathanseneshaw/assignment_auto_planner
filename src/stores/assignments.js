@@ -2,9 +2,9 @@
  * Assignments Pinia store.
  *
  * Each assignment is keyed by a local UUID (`id`) and may also carry:
- *   - `supabaseAssignmentId` — the server-side row id once persisted.
- *   - `canvasAssignmentId` / `blackboardId` — external LMS identifiers.
- *   - `tasks` — nested subtasks used to compute `progress`.
+ *   - `supabaseAssignmentId`  the server-side row id once persisted.
+ *   - `canvasAssignmentId` / `blackboardId`  external LMS identifiers.
+ *   - `tasks`  nested subtasks used to compute `progress`.
  *
  * Like courses, mutations attempt a best-effort upsert to Supabase but never
  * block the UI; the background sync composable handles retries / catch-up.
@@ -39,7 +39,7 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     return assignmentsByDueDate.value.filter(a => a.dueDate >= today && a.status !== 'completed')
   })
 
-  /** Past-due and still incomplete — surfaced as warnings in the UI. */
+  /** Past-due and still incomplete  surfaced as warnings in the UI. */
   const overdueAssignments = computed(() => {
     const today = localDateKey()
     return assignments.value.filter(a => a.dueDate < today && a.status !== 'completed')
@@ -74,7 +74,7 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     assignments.value.push(newAssignment)
 
     // Fire-and-forget persist. Requires the parent course to already exist
-    // (or to be persistable) — orphan assignments are skipped here.
+    // (or to be persistable)  orphan assignments are skipped here.
     void (async () => {
       const coursesStore = useCoursesStore()
       const parent = coursesStore.getCourseById(assignment.courseId)

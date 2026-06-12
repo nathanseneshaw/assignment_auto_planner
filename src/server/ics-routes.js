@@ -3,7 +3,7 @@
  *
  * All routes require the caller to send a Supabase JWT in `Authorization:
  * Bearer <token>`. The middleware {@link requireUser} verifies the token and
- * attaches a per-request, JWT-scoped Supabase client (`req.supabase`) — the
+ * attaches a per-request, JWT-scoped Supabase client (`req.supabase`)  the
  * database's Row-Level Security policies then enforce that the user can only
  * see and modify their own rows.
  *
@@ -14,10 +14,10 @@
  * embedding a service-role key would be unsafe).
  *
  * Routes:
- *   GET    /api/ics/feeds       — list the caller's feeds.
- *   POST   /api/ics/feeds       — subscribe to a feed (validates URL by fetching once).
- *   DELETE /api/ics/feeds/:id   — unsubscribe (DB row only; no Supabase storage purge).
- *   POST   /api/ics/sync        — fetch + parse + write for one feed (or all of the user's).
+ *   GET    /api/ics/feeds        list the caller's feeds.
+ *   POST   /api/ics/feeds        subscribe to a feed (validates URL by fetching once).
+ *   DELETE /api/ics/feeds/:id    unsubscribe (DB row only; no Supabase storage purge).
+ *   POST   /api/ics/sync         fetch + parse + write for one feed (or all of the user's).
  */
 import { Router } from 'express'
 import { createClient } from '@supabase/supabase-js'
@@ -54,13 +54,13 @@ function clientFor(req) {
     global: { headers: { Authorization: auth } },
     auth: { persistSession: false, autoRefreshToken: false },
     // Electron 34 bundles Node 20, which lacks native WebSocket. We don't use
-    // realtime, but supabase-js still probes for a transport — provide `ws`
+    // realtime, but supabase-js still probes for a transport  provide `ws`
     // so it doesn't warn on every client construction.
     realtime: { transport: WebSocket },
   })
 }
 
-// Lazily created — only used when SUPABASE_SERVICE_ROLE_KEY is present.
+// Lazily created  only used when SUPABASE_SERVICE_ROLE_KEY is present.
 let _serviceClient = null
 function getServiceClient() {
   if (_serviceClient) return _serviceClient
@@ -94,7 +94,7 @@ async function requireUser(req, res, next) {
 }
 
 /**
- * Per-user rate limiter — applied after requireUser so req.user.id is
+ * Per-user rate limiter  applied after requireUser so req.user.id is
  * available. Sync gets a tighter window; CRUD uses the generous default.
  */
 function makeIcsLimiter(max, windowMs) {
@@ -105,14 +105,14 @@ function makeIcsLimiter(max, windowMs) {
     standardHeaders: true,
     legacyHeaders: false,
     handler: (_req, res) => {
-      res.status(429).json({ success: false, error: 'Too many requests — please slow down.' })
+      res.status(429).json({ success: false, error: 'Too many requests  please slow down.' })
     },
   })
 }
 
 // 60 CRUD requests per 15 min per user.
 const crudLimiter = makeIcsLimiter(60, 15 * 60 * 1000)
-// 20 sync requests per 5 min per user — syncs hit Supabase heavily.
+// 20 sync requests per 5 min per user  syncs hit Supabase heavily.
 const syncLimiter = makeIcsLimiter(20, 5 * 60 * 1000)
 
 /**
@@ -319,7 +319,7 @@ async function syncOneFeed(userSupabase, writeClient, userId, feed) {
 /**
  * Sync one feed (when `feedId` is supplied) or every feed the user owns.
  *
- * Feeds are processed serially — the Supabase free tier limits concurrent
+ * Feeds are processed serially  the Supabase free tier limits concurrent
  * inserts and we'd rather take a few extra seconds than have one feed's
  * burst starve the others. Per-feed results are aggregated into `totals`.
  */
@@ -338,7 +338,7 @@ router.post('/api/ics/sync', requireUser, syncLimiter, async (req, res) => {
     // the user-scoped client so Electron builds (no service key) still work.
     const writeClient = getServiceClient() || req.supabase
 
-    // Serial loop on purpose — see route header comment.
+    // Serial loop on purpose  see route header comment.
     const results = []
     for (const f of feeds) {
       const r = await syncOneFeed(req.supabase, writeClient, req.user.id, f)

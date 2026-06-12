@@ -80,7 +80,7 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
       try {
         feeds.value = await icsService.listFeeds()
       } catch {
-        // non-fatal — sync result already captured.
+        // non-fatal  sync result already captured.
       }
       // Pull the upserted courses/assignments into the existing Pinia stores.
       await hydrateLmsStoresFromSupabase()
@@ -116,7 +116,7 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     }
   }
 
-  /** Clear in-memory state — called on sign-out so the next user starts clean. */
+  /** Clear in-memory state  called on sign-out so the next user starts clean. */
   function reset() {
     feeds.value = []
     lastSyncResult.value = null

@@ -114,7 +114,7 @@ test('mergeTaskLists: dedups legacy task matched via supabaseTaskId (client id !
   assert.equal(merged[0].id, 'DB1')
 })
 
-test('mergeTaskLists: empty db snapshot keeps all local tasks (no wipe — original regression)', () => {
+test('mergeTaskLists: empty db snapshot keeps all local tasks (no wipe  original regression)', () => {
   const localTasks = [
     { id: 'A', supabaseTaskId: null },
     { id: 'B', supabaseTaskId: 'B' },

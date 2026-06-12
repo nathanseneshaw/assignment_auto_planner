@@ -7,9 +7,9 @@ import { buildTaskRow } from './taskSyncCore'
  * Upsert a task to Supabase, keyed on the task's own `id` (idempotent).
  *
  * Returns a result object so callers can tell apart the three outcomes:
- *   - { status: 'ok', id }      — written (insert or update)
- *   - { status: 'skipped' }     — no backend / not signed in (local-only mode)
- *   - { status: 'error', error }— the write was attempted and failed
+ *   - { status: 'ok', id }       written (insert or update)
+ *   - { status: 'skipped' }      no backend / not signed in (local-only mode)
+ *   - { status: 'error', error } the write was attempted and failed
  *
  * Resolves Supabase FK ids for assignment_id / course_id from local Pinia state.
  */

@@ -3,7 +3,7 @@
  *
  * On demand (e.g. after sign-in or after an ICS sync), pull the user's
  * courses + assignments from Supabase and **fully replace** the local Pinia
- * state with the result. This is intentionally not merged — Supabase is the
+ * state with the result. This is intentionally not merged  Supabase is the
  * source of truth here, and any local-only edits would have been pushed up
  * by the background sync first.
  */
@@ -71,7 +71,7 @@ function mapCourseRow(row, index) {
 
 /**
  * Map a Supabase `assignments` row → the shape `useAssignmentsStore` expects.
- * Defaults `status='pending'`, no subtasks, 0% progress — local task state is
+ * Defaults `status='pending'`, no subtasks, 0% progress  local task state is
  * not stored server-side yet, so hydration always starts these fresh.
  */
 function mapAssignmentRow(row, course) {
@@ -108,7 +108,7 @@ function mapAssignmentRow(row, course) {
 /**
  * Replace courses and assignments in Pinia from the signed-in user's Supabase rows.
  *
- * No-ops when Supabase is unconfigured or the user is signed out — callers
+ * No-ops when Supabase is unconfigured or the user is signed out  callers
  * can safely invoke this on every navigation or after every sync without
  * guarding themselves.
  */
@@ -125,7 +125,7 @@ export async function hydrateLmsStoresFromSupabase() {
   const assignmentsStore = useAssignmentsStore()
   const tasksStore = useTasksStore()
 
-  // Pull tables in series — assignments need courses for courseName; tasks need assignments.
+  // Pull tables in series  assignments need courses for courseName; tasks need assignments.
   const { data: courseRows, error: cErr } = await supabase
     .from('courses')
     .select('*')
@@ -169,7 +169,7 @@ export async function hydrateLmsStoresFromSupabase() {
   coursesStore.replaceFromHydration(courses)
   assignmentsStore.replaceFromHydration(assignments)
 
-  // Only update tasks when the query succeeded — a failed query must not wipe
+  // Only update tasks when the query succeeded  a failed query must not wipe
   // the local store. The merge dedups by id and preserves any local task whose
   // insert hasn't landed in this snapshot yet (in-flight or failed), so neither
   // a query failure nor a create/sync race can drop tasks.

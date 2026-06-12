@@ -28,30 +28,38 @@ const accountDisplayName = computed(() => {
       (typeof meta.full_name === 'string' && meta.full_name) ||
       (typeof meta.name === 'string' && meta.name) ||
       profileStore.profile.name ||
-      '—'
+      ''
     )
   }
-  return profileStore.profile.name || '—'
+  return profileStore.profile.name || ''
 })
 
 const accountDisplayEmail = computed(() => {
   if (isSupabaseConfigured && authStore.user?.email) return authStore.user.email
-  return profileStore.profile.email || '—'
+  return profileStore.profile.email || ''
 })
 
 function getInitials(name) {
   const n = String(name || '').trim()
-  if (!n || n === '—') return '?'
+  if (!n || n === '') return '?'
   return n.split(/\s+/).map((p) => p[0]).join('').toUpperCase().slice(0, 2)
 }
 
-// Header metadata chips — only the bits we actually have a source for. Optional
-// profile fields (year / major) render when present; term is derived; school /
-// email are the reliable fallbacks.
+// Resolve the stored school *code* (e.g. "rice") to its catalog name. Returns
+// '' for an empty or unrecognized code so stray values never surface as a chip.
+const schoolLabel = computed(() => {
+  const code = profileStore.profile.school?.trim()
+  if (!code) return ''
+  return supportedSchools.value.find((s) => s.code === code)?.name || ''
+})
+
+// Header metadata chips  only the bits we actually have a source for. Optional
+// profile fields (year / major) render when present; term is derived; school
+// name / email are the reliable fallbacks.
 const identityChips = computed(() => {
   const p = profileStore.profile
-  return [p.year, currentTerm.value.label, p.major, p.school, accountDisplayEmail.value]
-    .filter((v) => v && v !== '—')
+  return [p.year, currentTerm.value.label, p.major, schoolLabel.value, accountDisplayEmail.value]
+    .filter((v) => v && v !== '')
 })
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -341,7 +349,7 @@ async function loadSupportedSchools() {
 }
 
 const schoolOptions = computed(() =>
-  [{ value: '', label: 'Not set — pick later' }].concat(
+  [{ value: '', label: 'Not set  pick later' }].concat(
     supportedSchools.value.map((s) => ({ value: s.code, label: s.name }))
   )
 )
@@ -427,7 +435,7 @@ onMounted(loadSupportedSchools)
         <template v-if="semester.courses.length >= 2">Balancing <em class="text-gray-800 dark:text-gray-200">{{ semester.courses[0] }}</em> and <em class="text-gray-800 dark:text-gray-200">{{ semester.courses[1] }}</em> this term.</template>
         <template v-else>Focused on <em class="text-gray-800 dark:text-gray-200">{{ semester.courses[0] }}</em> this term.</template>
         <template v-if="semester.streak > 0"> <span class="font-medium text-gray-800 dark:text-gray-200">{{ semester.streak }} day{{ semester.streak === 1 ? '' : 's' }} into a planning streak.</span></template>
-        <template v-if="semester.total"> Aiming to keep all {{ semester.total }} course{{ semester.total === 1 ? '' : 's' }} on track — {{ semester.onTrack }} {{ semester.onTrack === 1 ? 'is' : 'are' }} there now.</template>
+        <template v-if="semester.total"> Aiming to keep all {{ semester.total }} course{{ semester.total === 1 ? '' : 's' }} on track  {{ semester.onTrack }} {{ semester.onTrack === 1 ? 'is' : 'are' }} there now.</template>
       </p>
     </section>
 
@@ -461,7 +469,7 @@ onMounted(loadSupportedSchools)
         <!-- On-time completion rate -->
         <div class="p-4 sm:border-l border-paper-line dark:border-gray-700/60">
           <div class="flex items-baseline gap-0.5">
-            <span class="display text-[28px] leading-none text-gray-900 dark:text-gray-100">{{ onTimeRate !== null ? onTimeRate : '—' }}</span>
+            <span class="display text-[28px] leading-none text-gray-900 dark:text-gray-100">{{ onTimeRate !== null ? onTimeRate : '' }}</span>
             <span v-if="onTimeRate !== null" class="text-[11px] text-gray-400 font-medium">%</span>
           </div>
           <p class="mt-2 text-[11px] text-gray-500 dark:text-gray-400 leading-snug">On-time completion rate</p>

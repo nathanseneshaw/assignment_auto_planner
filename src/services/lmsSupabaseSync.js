@@ -63,7 +63,7 @@ export function resolveImportSource(assignment) {
 /**
  * Coerce any accepted date input (ISO string, Date, epoch ms) into an ISO
  * string. Falls back to "now" on garbage input so Supabase NOT NULL still
- * succeeds — the user can fix the date later.
+ * succeeds  the user can fix the date later.
  */
 function normalizeDueAt(due) {
   if (!due) return new Date().toISOString()
@@ -76,9 +76,9 @@ function normalizeDueAt(due) {
  * Upsert a course row for the signed-in user. Returns Supabase course UUID or null.
  *
  * Tries three paths in order:
- *   1. **Known id** — update by `supabaseCourseId` (fast path on subsequent syncs).
- *   2. **External match** — look up `(source, external_course_id)` and update if found.
- *   3. **Fresh insert** — no match anywhere; create a new row.
+ *   1. **Known id**  update by `supabaseCourseId` (fast path on subsequent syncs).
+ *   2. **External match**  look up `(source, external_course_id)` and update if found.
+ *   3. **Fresh insert**  no match anywhere; create a new row.
  * Errors are swallowed and logged; the caller treats `null` as "try again later".
  */
 export async function persistCourseToSupabase(course) {
@@ -148,7 +148,7 @@ export async function persistCourseToSupabase(course) {
       }
     }
 
-    // No match — insert a fresh row.
+    // No match  insert a fresh row.
     const { data, error } = await supabase
       .from('courses')
       .insert(row)
@@ -169,7 +169,7 @@ export async function persistCourseToSupabase(course) {
  *
  * Mirrors the three-path pattern from {@link persistCourseToSupabase}. The
  * "title + due_at" fallback dedupes manually-entered rows that have no stable
- * external id — accept the small risk of two genuinely-identical assignments
+ * external id  accept the small risk of two genuinely-identical assignments
  * collapsing in exchange for not duplicating on re-sync.
  */
 export async function persistAssignmentToSupabase(assignment, supabaseCourseId) {
@@ -200,7 +200,7 @@ export async function persistAssignmentToSupabase(assignment, supabaseCourseId) 
   }
 
   try {
-    // Fast path — already mapped to a Supabase row.
+    // Fast path  already mapped to a Supabase row.
     if (assignment.supabaseAssignmentId) {
       const { data, error } = await supabase
         .from('assignments')
@@ -237,7 +237,7 @@ export async function persistAssignmentToSupabase(assignment, supabaseCourseId) 
       return data.id
     }
 
-    // No match — insert.
+    // No match  insert.
     const { data, error } = await supabase.from('assignments').insert(row).select('id').single()
     if (error) throw error
     return data.id

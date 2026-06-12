@@ -15,7 +15,7 @@ onMounted(async () => {
   try {
     supportedSchools.value = await listSchools()
   } catch {
-    // Falls back to the bare school code in the header — non-fatal.
+    // Falls back to the bare school code in the header  non-fatal.
   }
   if (planner.schoolCode) {
     planner.loadTerms()
@@ -47,7 +47,7 @@ const termOptions = computed(() => [
 
 const subjectOptions = computed(() => [
   { value: '', label: 'Select a subject' },
-  ...planner.subjects.map((s) => ({ value: s.code, label: `${s.code} — ${s.label}` })),
+  ...planner.subjects.map((s) => ({ value: s.code, label: `${s.code}  ${s.label}` })),
 ])
 
 // --- Section list filtering ---
@@ -249,7 +249,7 @@ const PALETTE = [
 ]
 
 function colorFor(section) {
-  // Deterministic per-CRN — switching subjects doesn't reshuffle saved blocks.
+  // Deterministic per-CRN  switching subjects doesn't reshuffle saved blocks.
   let hash = 0
   const key = `${section.school}:${section.crn}`
   for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0
@@ -343,7 +343,7 @@ function saveWork() {
         <h1 class="text-2xl font-bold text-gray-900">Course Planner</h1>
         <p class="text-gray-500 mt-1">
           Search live course offerings and build your weekly schedule.
-          <span v-if="schoolName" class="font-medium text-gray-700">— {{ schoolName }}</span>
+          <span v-if="schoolName" class="font-medium text-gray-700"> {{ schoolName }}</span>
         </p>
       </div>
       <div class="text-sm text-gray-500">
@@ -401,7 +401,7 @@ function saveWork() {
           />
         </div>
         <p v-if="currentSchoolMeta && !currentSchoolMeta.enrollmentDataAvailable" class="text-xs text-gray-500 mt-3">
-          {{ currentSchoolMeta.name }} does not expose exact seat counts publicly —
+          {{ currentSchoolMeta.name }} does not expose exact seat counts publicly
           only open / closed status is shown.
         </p>
       </Card>

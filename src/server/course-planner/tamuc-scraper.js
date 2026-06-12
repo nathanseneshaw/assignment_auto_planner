@@ -67,7 +67,7 @@ export async function getSubjects(termCode) {
       if (!seedCodes.length) return []
 
       // Non-academic categories (Honors, QEP, PO, DC, PP) render their own
-      // tiny navSubj. Academic depts render the full ~18-entry sidebar — so
+      // tiny navSubj. Academic depts render the full ~18-entry sidebar  so
       // try several seeds in parallel and keep the largest payload.
       const candidates = seedCodes.slice(0, 8)
       const results = await Promise.all(

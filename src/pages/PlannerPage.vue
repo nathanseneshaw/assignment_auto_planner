@@ -6,6 +6,7 @@ import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
 import { Modal, Input, Dropdown, DatePicker, Button } from '../components/ui'
 import TaskFormModal from '../components/features/TaskFormModal.vue'
+import MonthCalendar from '../components/features/MonthCalendar.vue'
 import { resolveAssignmentCourseName } from '../utils/assignmentDisplay.js'
 
 const router = useRouter()
@@ -13,7 +14,23 @@ const tasksStore = useTasksStore()
 const coursesStore = useCoursesStore()
 const assignmentsStore = useAssignmentsStore()
 
-// ── Date helpers (all local-timezone; never toISOString → avoids UTC drift) ──
+// ── View mode: 'day' (focused agenda) or 'month' (full calendar). The choice
+// is remembered across sessions so the planner reopens the way the user left it.
+const VIEW_STORAGE_KEY = 'plannr.plannerView'
+function loadViewMode() {
+  try {
+    return localStorage.getItem(VIEW_STORAGE_KEY) === 'month' ? 'month' : 'day'
+  } catch {
+    return 'day'
+  }
+}
+const viewMode = ref(loadViewMode())
+function setViewMode(mode) {
+  viewMode.value = mode
+  try { localStorage.setItem(VIEW_STORAGE_KEY, mode) } catch { /* storage unavailable  ignore */ }
+}
+
+// ── Date helpers (all local-timezone; never toISOString  avoids UTC drift) ──
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -352,12 +369,49 @@ function saveEditedAssignment() {
 <template>
   <div>
     <!-- Single root ELEMENT required by <Transition mode="out-in"> in App.vue.
-         This comment MUST stay inside the root <div>, never beside it — a stray
+         This comment MUST stay inside the root <div>, never beside it  a stray
          comment (or any second node) at the template root makes this a fragment
          component, which stalls the leave transition so the next page never
          mounts (symptom: navigate away from Planner → blank page). Keep the
          modals inside this wrapper too. -->
-    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-x-10 gap-y-10 pt-1 pb-12">
+    <!-- View switch: Day (focused agenda) ⇄ Month (full calendar). Persisted. -->
+    <div class="flex justify-end pt-1 mb-5 sm:mb-6">
+      <div
+        class="inline-flex items-center p-0.5 rounded-lg border border-paper-line dark:border-gray-700 bg-surface/60 dark:bg-gray-800/40"
+        role="tablist"
+        aria-label="Planner view"
+      >
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="viewMode === 'day'"
+          @click="setViewMode('day')"
+          class="inline-flex items-center gap-1.5 px-3 h-8 rounded-md text-[12.5px] font-semibold transition-colors"
+          :class="viewMode === 'day'
+            ? 'bg-primary-900 text-white shadow-sm shadow-primary-900/15'
+            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>
+          Day
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="viewMode === 'month'"
+          @click="setViewMode('month')"
+          class="inline-flex items-center gap-1.5 px-3 h-8 rounded-md text-[12.5px] font-semibold transition-colors"
+          :class="viewMode === 'month'
+            ? 'bg-primary-900 text-white shadow-sm shadow-primary-900/15'
+            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          Month
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ Day view · focused agenda ═══════════════════════════════════════ -->
+    <div v-if="viewMode === 'day'" class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-x-10 gap-y-10 pb-12">
 
       <!-- ══ Center column · the day ════════════════════════════════════════ -->
       <div class="min-w-0 space-y-9">
@@ -406,12 +460,12 @@ function saveEditedAssignment() {
           <p class="mt-4 max-w-2xl font-serif text-lg sm:text-xl leading-relaxed text-gray-600 dark:text-gray-300">
             {{ dayMood }}
             <template v-if="dueCount === 0">
-              Nothing’s due{{ isToday ? ' today' : ' this day' }}<template v-if="isToday && overdueCount"> —
+              Nothing’s due{{ isToday ? ' today' : ' this day' }}<template v-if="isToday && overdueCount">
                 <span class="italic text-rust-600 dark:text-rust-500">{{ overdueCount }} overdue {{ overdueNoun }}</span>
                 {{ overdueCount === 1 ? 'is' : 'are' }} waiting to be cleared.</template><template v-else>.</template>
             </template>
             <template v-else-if="remainingCount === 0">
-              All {{ dueCount }} {{ dueCount === 1 ? 'item' : 'items' }} done{{ isToday ? ' for today' : '' }} — nicely cleared.
+              All {{ dueCount }} {{ dueCount === 1 ? 'item' : 'items' }} done{{ isToday ? ' for today' : '' }}  nicely cleared.
             </template>
             <template v-else>
               {{ remainingCount }} {{ remainingCount === 1 ? 'thing' : 'things' }} to work
@@ -600,7 +654,7 @@ function saveEditedAssignment() {
           </div>
           <p class="mt-2 font-serif text-[13.5px] leading-relaxed text-gray-600 dark:text-gray-300">
             Clear {{ overdueCount === 1 ? 'it' : 'these' }} before
-            <template v-if="nextDeadline">{{ weekdayName(nextDeadline.dueDate) }} — {{ shortDate(nextDeadline.dueDate) }} brings your next deadline.</template><template v-else>the week gets heavier.</template>
+            <template v-if="nextDeadline">{{ weekdayName(nextDeadline.dueDate) }}  {{ shortDate(nextDeadline.dueDate) }} brings your next deadline.</template><template v-else>the week gets heavier.</template>
           </p>
           <button
             type="button"
@@ -613,6 +667,9 @@ function saveEditedAssignment() {
       </aside>
 
     </div>
+
+    <!-- ══ Month view · full interactive calendar ══════════════════════════ -->
+    <MonthCalendar v-else />
 
     <!-- Edit / Add Task Modal -->
     <TaskFormModal

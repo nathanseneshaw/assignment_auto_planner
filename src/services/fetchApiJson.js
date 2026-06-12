@@ -12,7 +12,7 @@ export async function fetchApiJson(url, init) {
     throw new Error(
       'The app got a web page instead of API data (usually index.html). ' +
         'Start the backend: cd src/server && npm start (port 3001). ' +
-        'In development, API calls go to http://127.0.0.1:3001 automatically — if you still see this, ' +
+        'In development, API calls go to http://127.0.0.1:3001 automatically  if you still see this, ' +
         'the server is not running or is on another port (set VITE_API_PORT or VITE_API_BASE in .env). ' +
         'For vite preview or production static hosting, configure /api proxy or VITE_API_BASE.'
     )

@@ -28,7 +28,7 @@ export function normalizeScheduledDate(input) {
 /**
  * Build the Supabase `tasks` row for an upsert. Includes the client-generated
  * `id` as the primary key so inserts are idempotent and the local row and its
- * DB row always share one id — which is what kills the duplicate-on-hydration
+ * DB row always share one id  which is what kills the duplicate-on-hydration
  * race (a not-yet-confirmed local task dedups against its own DB row by id).
  */
 export function buildTaskRow(
@@ -74,7 +74,7 @@ export function mapDbTaskRow(row, { assignment = null, courseName = null } = {})
  * Merge DB tasks with local tasks, deduping by id.
  *
  * A local task is kept only when neither its `id` nor its `supabaseTaskId`
- * matches any DB row — i.e. it's a create that hasn't landed in this DB
+ * matches any DB row  i.e. it's a create that hasn't landed in this DB
  * snapshot yet (insert in-flight or failed). Two guards:
  *   - `id` match: new tasks are inserted under their own id, so a pending local
  *     copy and its freshly-written DB row share an id and collapse to one

@@ -3,7 +3,7 @@
  * Custom window title bar for the Electron (frameless) build. The bar itself is
  * a drag region (move the window by it; double-click maximizes); the buttons
  * opt out of dragging via the global `no-drag` rule in style.css. Inert in the
- * browser build — App.vue only mounts this when `isElectron` is true.
+ * browser build  App.vue only mounts this when `isElectron` is true.
  */
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 

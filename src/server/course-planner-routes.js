@@ -6,7 +6,7 @@
  *   getSubjects(termCode) -> [{ code, label }]
  *   getSections({ termCode, subjectCode, termLabel?, subjectLabel? }) -> [Section]
  *
- * All routes are PUBLIC — no auth required — because course catalogs are open
+ * All routes are PUBLIC  no auth required  because course catalogs are open
  * data and the user picked "on-demand per click" with no per-user state. The
  * scrapers themselves cache for ~5–60 min so repeat clicks don't hammer the
  * universities.
@@ -29,7 +29,7 @@ const coursePlannerLimiter = rateLimit({
   max: 30,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: { success: false, error: 'Too many requests — please wait a moment and try again.' },
+  message: { success: false, error: 'Too many requests  please wait a moment and try again.' },
 })
 
 router.use('/api/course-planner', coursePlannerLimiter)

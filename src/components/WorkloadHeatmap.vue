@@ -105,7 +105,7 @@ const LEGEND_CELLS  = ['bg-gray-100 dark:bg-surface/8', 'bg-accent-200', 'bg-war
     <!-- Header -->
     <div class="mb-4">
       <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Workload heatmap</h3>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ year }} — assignments due + tasks scheduled per day</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ year }}  assignments due + tasks scheduled per day</p>
     </div>
 
     <!-- Grid -->
@@ -163,7 +163,7 @@ const LEGEND_CELLS  = ['bg-gray-100 dark:bg-surface/8', 'bg-accent-200', 'bg-war
         <transition name="fade" mode="out-in">
           <p v-if="hoveredCell" :key="hoveredCell.dateKey" class="text-[13px] text-gray-600 dark:text-gray-300 truncate">
             <span class="font-semibold text-gray-900 dark:text-gray-100">{{ hoveredDateLabel }}</span>
-            &nbsp;—&nbsp;
+            &nbsp;&nbsp;
             <span>{{
               hoveredCell.count === 0
                 ? 'Nothing scheduled'

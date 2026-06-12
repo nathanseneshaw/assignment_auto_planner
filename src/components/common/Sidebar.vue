@@ -30,7 +30,7 @@ watch(() => route.path, () => {
   emit('closeMobile')
 })
 
-/** Local `YYYY-MM-DD` key (timezone-safe — never toISOString). */
+/** Local `YYYY-MM-DD` key (timezone-safe  never toISOString). */
 function localDateKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -49,7 +49,7 @@ const weekTaskCount = computed(() => {
 })
 
 // Sidebar items grouped exactly like the mockup, but limited to routes that
-// actually exist in the app (no Inbox / Syllabi / Archive — those have no page).
+// actually exist in the app (no Inbox / Syllabi / Archive  those have no page).
 const sections = computed(() => [
   {
     label: 'Today',
