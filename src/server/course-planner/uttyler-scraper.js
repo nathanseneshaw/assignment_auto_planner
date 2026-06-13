@@ -194,17 +194,21 @@ export async function getSubjects(termCode) {
     `${SCHOOL}:subjects:${termCode}`,
     async () => {
       const merged = new Map()
-      for (const career of CAREERS) {
-        let subs = []
-        // A fresh session per career keeps PeopleSoft's component state clean.
-        for (let attempt = 0; attempt < 3 && !subs.length; attempt++) {
-          try {
-            const s = await sessionForTermCareer(termCode, career)
-            subs = s.options(SEL.subject)
-          } catch {
-            /* transient state hiccup — retry */
+      const careerResults = await Promise.all(
+        CAREERS.map(async (career) => {
+          let subs = []
+          for (let attempt = 0; attempt < 3 && !subs.length; attempt++) {
+            try {
+              const s = await sessionForTermCareer(termCode, career)
+              subs = s.options(SEL.subject)
+            } catch {
+              /* transient state hiccup — retry */
+            }
           }
-        }
+          return { career, subs }
+        })
+      )
+      for (const { career, subs } of careerResults) {
         for (const sub of subs) {
           if (!merged.has(sub.code)) merged.set(sub.code, sub.label)
           rememberCareer(termCode, sub.code, career)
@@ -278,13 +282,17 @@ export async function getSections({ termCode, subjectCode, termLabel, subjectLab
     const careers = known && known.size ? [...known] : CAREERS
 
     const byCrn = new Map()
+    const settled = await Promise.allSettled(
+      careers.map((career) =>
+        searchCareer({ termCode, subjectCode, career, termLabel, subjectLabel })
+      )
+    )
     let lastErr = null
-    for (const career of careers) {
-      try {
-        const sections = await searchCareer({ termCode, subjectCode, career, termLabel, subjectLabel })
-        for (const sec of sections) byCrn.set(sec.crn, sec) // dedup across careers
-      } catch (e) {
-        lastErr = e // one flaky/over-broad career shouldn't sink the others
+    for (const result of settled) {
+      if (result.status === 'fulfilled') {
+        for (const sec of result.value) byCrn.set(sec.crn, sec) // dedup across careers
+      } else {
+        lastErr = result.reason // one flaky career shouldn't sink the others
       }
     }
     // Surface an error only if every career failed and none produced sections.

@@ -21,6 +21,11 @@ const SCRAPERS = {
   txst: '../src/server/course-planner/txst-scraper.js',
   baylor: '../src/server/course-planner/baylor-scraper.js',
   uh: '../src/server/course-planner/uh-scraper.js',
+  uhd: '../src/server/course-planner/uhd-scraper.js',
+  uhcl: '../src/server/course-planner/uhcl-scraper.js',
+  tamuv: '../src/server/course-planner/tamuv-scraper.js',
+  lamar: '../src/server/course-planner/lamar-scraper.js',
+  msutexas: '../src/server/course-planner/msutexas-scraper.js',
   uta: '../src/server/course-planner/uta-scraper.js',
   uttyler: '../src/server/course-planner/uttyler-scraper.js',
   utrgv: '../src/server/course-planner/utrgv-scraper.js',
@@ -28,6 +33,7 @@ const SCRAPERS = {
   utep: '../src/server/course-planner/utep-scraper.js',
   stmarys: '../src/server/course-planner/stmarys-scraper.js',
   tcu: '../src/server/course-planner/tcu-scraper.js',
+  twu: '../src/server/course-planner/twu-scraper.js',
 }
 
 // Some scrapers do many sequential postbacks (PeopleSoft) or pull huge payloads
@@ -36,9 +42,15 @@ const TIMEOUT_MS = {
   default: 150_000,
   uta: 220_000,
   uttyler: 300_000,
+  // UH-System PeopleSoft does many sequential postbacks per search.
+  uhd: 220_000,
+  uhcl: 220_000,
+  tamuv: 220_000,
   tamu: 200_000,
   // ASP.NET search bounces intermittently; each section call may retry ~5×.
   tcu: 240_000,
+  // Colleague paginates 30 sections/page with sequential POSTs.
+  twu: 200_000,
 }
 
 const COMMON_SUBJECTS = [
