@@ -92,7 +92,7 @@ onBeforeUnmount(() => {
       type="button"
       @click="startUpdate"
       :title="label"
-      class="inline-flex items-center gap-2 h-9 px-3.5 rounded-lg text-sm font-semibold text-white bg-primary-800 hover:bg-primary-700 transition-colors shadow-sm shadow-primary-900/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+      class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-white bg-primary-900 hover:bg-primary-800 transition-[color,background-color,box-shadow,transform] duration-200 ease-out shadow-sm shadow-primary-900/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500/35 active:scale-[0.98]"
     >
       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
@@ -103,7 +103,7 @@ onBeforeUnmount(() => {
     <!-- Downloading -->
     <div
       v-else-if="status === 'downloading'"
-      class="inline-flex items-center gap-2 h-9 px-3.5 rounded-lg text-sm font-semibold text-primary-700 dark:text-primary-300 bg-primary-100 dark:bg-primary-900/30"
+      class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-primary-700 dark:text-primary-300 bg-primary-100 dark:bg-primary-900/30"
     >
       <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -118,7 +118,7 @@ onBeforeUnmount(() => {
       type="button"
       @click="installUpdate"
       title="Restart to finish updating"
-      class="inline-flex items-center gap-2 h-9 px-3.5 rounded-lg text-sm font-semibold text-white bg-primary-800 hover:bg-primary-700 transition-colors shadow-sm shadow-primary-900/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40"
+      class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-white bg-primary-900 hover:bg-primary-800 transition-[color,background-color,box-shadow,transform] duration-200 ease-out shadow-sm shadow-primary-900/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500/35 active:scale-[0.98]"
     >
       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
       type="button"
       @click="retry"
       title="Update failed  click to retry"
-      class="inline-flex items-center gap-2 h-9 px-3.5 rounded-lg text-sm font-semibold text-danger-700 dark:text-danger-300 bg-danger-100 dark:bg-danger-900/30 hover:bg-danger-200 dark:hover:bg-danger-900/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-danger-500/40"
+      class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-danger-700 dark:text-danger-300 bg-danger-100 dark:bg-danger-900/30 hover:bg-danger-200 dark:hover:bg-danger-900/50 transition-[color,background-color,box-shadow,transform] duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-danger-500/35 active:scale-[0.98]"
     >
       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z" />
