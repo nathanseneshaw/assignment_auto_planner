@@ -1,10 +1,9 @@
 /**
  * Unified Course Planner API the renderer talks to.
  *
- * All schools (rice, ttu, tamu, smu, utd) are fetched from the Node server's
- * `/api/course-planner/*` endpoints. UTD used to require Electron IPC because
- * CourseBook is reCAPTCHA-v3-gated; now the server runs Playwright + stealth
- * for that one, so both web and desktop clients hit the same API.
+ * Every school is fetched from the Node server's `/api/course-planner/*`
+ * endpoints, so web and desktop clients hit the same API. The schools list is
+ * entirely server-driven (see course-planner-routes.js).
  */
 import { fetchApiJson } from './fetchApiJson.js'
 

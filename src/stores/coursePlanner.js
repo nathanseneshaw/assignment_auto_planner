@@ -122,7 +122,15 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     if (code) loadSections()
   }
 
-  /** Wipe state  called when the user switches their primary school in profile. */
+  /**
+   * Reset the planner to a clean slate for a newly-picked school. Called from the
+   * profile page the moment the user changes their school. Clears the live search
+   * state (terms / subjects / sections / current selection) AND the saved weekly
+   * plan, so no courses from the previous school linger on the planner grid.
+   *
+   * Work shifts are intentionally left untouched — a job schedule isn't tied to
+   * which course catalog you're browsing.
+   */
   function resetForSchoolChange() {
     terms.value = []
     subjects.value = []
@@ -134,6 +142,9 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     errors.terms = ''
     errors.subjects = ''
     errors.sections = ''
+    // Drop every saved section so the weekly grid starts empty for the new school.
+    savedSectionsBySchool.value = {}
+    persistSaved()
   }
 
   // --- Saved sections ---
@@ -148,6 +159,13 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
 
   function addSection(section) {
     if (!section || !section.school) return
+    // Reject sections that are explicitly closed or enrollment-full.
+    if (section.status === 'closed') return
+    const enr = section.enrollment || {}
+    const atCapacity =
+      (enr.available != null && enr.available <= 0) ||
+      (enr.max != null && enr.current != null && enr.current >= enr.max)
+    if (atCapacity) return
     const list = savedSectionsBySchool.value[section.school] || []
     if (list.some((s) => sectionKey(s) === sectionKey(section))) return
     savedSectionsBySchool.value = {

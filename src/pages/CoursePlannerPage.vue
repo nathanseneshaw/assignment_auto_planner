@@ -25,7 +25,6 @@ onMounted(async () => {
 watch(
   () => planner.schoolCode,
   (school) => {
-    planner.resetForSchoolChange()
     if (school) planner.loadTerms()
   }
 )
@@ -262,6 +261,19 @@ function statusBadge(status) {
   return { variant: 'default', label: 'Status unknown' }
 }
 
+/** Returns 'closed', 'full', or null. */
+function unavailableReason(section) {
+  if (section.status === 'closed') return 'closed'
+  const enr = section.enrollment || {}
+  if (enr.available != null && enr.available <= 0) return 'full'
+  if (enr.max != null && enr.current != null && enr.current >= enr.max) return 'full'
+  return null
+}
+
+function isSectionUnavailable(section) {
+  return unavailableReason(section) !== null
+}
+
 function onTermChange(code) {
   const term = planner.terms.find((t) => t.code === code)
   planner.setTerm(code, term?.label || '')
@@ -463,12 +475,31 @@ function saveWork() {
                     </span>
                   </p>
                 </div>
+                <!-- Already saved → Remove -->
                 <Button
-                  :variant="planner.isSaved(section) ? 'secondary' : 'primary'"
+                  v-if="planner.isSaved(section)"
+                  variant="secondary"
                   size="sm"
-                  @click="planner.isSaved(section) ? planner.removeSection(section) : planner.addSection(section)"
+                  @click="planner.removeSection(section)"
                 >
-                  {{ planner.isSaved(section) ? 'Remove' : 'Add' }}
+                  Remove
+                </Button>
+                <!-- Closed or full → disabled pill -->
+                <span
+                  v-else-if="isSectionUnavailable(section)"
+                  class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-danger-50 text-danger-600 border border-danger-200 cursor-not-allowed select-none"
+                  :title="unavailableReason(section) === 'full' ? 'This section is at capacity — registration is closed.' : 'This section is closed — registration is not available.'"
+                >
+                  {{ unavailableReason(section) === 'full' ? 'Full' : 'Closed' }}
+                </span>
+                <!-- Open → Add -->
+                <Button
+                  v-else
+                  variant="primary"
+                  size="sm"
+                  @click="planner.addSection(section)"
+                >
+                  Add
                 </Button>
               </div>
             </Card>
@@ -543,7 +574,9 @@ function saveWork() {
                   v-for="block in dayBlocks[d.code]"
                   :key="block.key"
                   class="absolute rounded-md p-1.5 text-[11px] font-medium overflow-hidden border-l-4 shadow-sm"
-                  :class="[block.color.bg, block.color.text, block.color.border]"
+                  :class="block.kind === 'course' && isSectionUnavailable(block.section)
+                    ? 'bg-danger-50 text-danger-700 border-l-danger-400 opacity-80'
+                    : [block.color.bg, block.color.text, block.color.border]"
                   :style="{
                     top: block.topPx + 'px',
                     height: block.heightPx + 'px',
@@ -552,11 +585,20 @@ function saveWork() {
                   }"
                   :title="block.kind === 'work'
                     ? `Work · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`
-                    : `${block.section.subjectCode} ${block.section.courseNumber} · ${block.section.title} · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`"
+                    : isSectionUnavailable(block.section)
+                      ? `${block.section.subjectCode} ${block.section.courseNumber} · ${unavailableReason(block.section) === 'full' ? 'Full — at capacity' : 'Closed'}`
+                      : `${block.section.subjectCode} ${block.section.courseNumber} · ${block.section.title} · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`"
                 >
                   <div class="font-bold leading-tight truncate">
                     <template v-if="block.kind === 'work'">Work</template>
                     <template v-else>{{ block.section.subjectCode }} {{ block.section.courseNumber }}</template>
+                  </div>
+                  <!-- Closed/full badge on the block -->
+                  <div
+                    v-if="block.kind === 'course' && isSectionUnavailable(block.section)"
+                    class="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-danger-600 leading-none"
+                  >
+                    {{ unavailableReason(block.section) === 'full' ? 'Full' : 'Closed' }}
                   </div>
                 </div>
               </div>
@@ -574,9 +616,15 @@ function saveWork() {
                 :key="s.crn"
                 class="flex items-center justify-between gap-2 text-sm"
               >
-                <span class="truncate">
+                <span class="truncate flex items-center gap-1.5 min-w-0">
                   <span class="font-semibold">{{ s.subjectCode }} {{ s.courseNumber }}</span>
                   <span class="text-gray-500"> {{ s.sectionNumber }} · {{ s.title }}</span>
+                  <span
+                    v-if="isSectionUnavailable(s)"
+                    class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-danger-50 text-danger-600 border border-danger-200"
+                  >
+                    {{ unavailableReason(s) === 'full' ? 'Full' : 'Closed' }}
+                  </span>
                 </span>
                 <button
                   class="text-xs text-danger-600 hover:underline shrink-0"

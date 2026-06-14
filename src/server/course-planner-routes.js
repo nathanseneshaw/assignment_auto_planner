@@ -18,6 +18,22 @@ import * as ttu from './course-planner/ttu-scraper.js'
 import * as tamu from './course-planner/tamu-scraper.js'
 import * as smu from './course-planner/smu-scraper.js'
 import * as tamuc from './course-planner/tamuc-scraper.js'
+import * as txst from './course-planner/txst-scraper.js'
+import * as baylor from './course-planner/baylor-scraper.js'
+import * as uh from './course-planner/uh-scraper.js'
+import * as uhd from './course-planner/uhd-scraper.js'
+import * as uhcl from './course-planner/uhcl-scraper.js'
+import * as tamuv from './course-planner/tamuv-scraper.js'
+import * as lamar from './course-planner/lamar-scraper.js'
+import * as msutexas from './course-planner/msutexas-scraper.js'
+import * as uta from './course-planner/uta-scraper.js'
+import * as uttyler from './course-planner/uttyler-scraper.js'
+import * as utrgv from './course-planner/utrgv-scraper.js'
+import * as utsa from './course-planner/utsa-scraper.js'
+import * as utep from './course-planner/utep-scraper.js'
+import * as stmarys from './course-planner/stmarys-scraper.js'
+import * as tcu from './course-planner/tcu-scraper.js'
+import * as twu from './course-planner/twu-scraper.js'
 
 const router = Router()
 
@@ -67,6 +83,118 @@ const SCHOOLS = {
     // Schedule page exposes max + enrolled seats per section.
     enrollmentDataAvailable: true,
     scraper: tamuc,
+  },
+  txst: {
+    code: 'txst',
+    name: 'Texas State University',
+    // Banner SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: txst,
+  },
+  baylor: {
+    code: 'baylor',
+    name: 'Baylor University',
+    // Banner SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: baylor,
+  },
+  uh: {
+    code: 'uh',
+    name: 'University of Houston',
+    // PeopleSoft public class search shows only open/closed, not seat counts.
+    enrollmentDataAvailable: false,
+    scraper: uh,
+  },
+  uhd: {
+    code: 'uhd',
+    name: 'University of Houston–Downtown',
+    // Same UH-System PeopleSoft class search; only open/closed, no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: uhd,
+  },
+  uhcl: {
+    code: 'uhcl',
+    name: 'University of Houston–Clear Lake',
+    // Same UH-System PeopleSoft class search; only open/closed, no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: uhcl,
+  },
+  uta: {
+    code: 'uta',
+    name: 'University of Texas at Arlington',
+    // PeopleSoft public class search shows only open/closed, not seat counts.
+    enrollmentDataAvailable: false,
+    scraper: uta,
+  },
+  uttyler: {
+    code: 'uttyler',
+    name: 'University of Texas at Tyler',
+    // PeopleSoft guest class search shows only open/closed, not seat counts.
+    enrollmentDataAvailable: false,
+    scraper: uttyler,
+  },
+  utrgv: {
+    code: 'utrgv',
+    name: 'University of Texas Rio Grande Valley',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: utrgv,
+  },
+  utsa: {
+    code: 'utsa',
+    name: 'University of Texas at San Antonio',
+    // Banner classic schedule listing has meeting times but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: utsa,
+  },
+  utep: {
+    code: 'utep',
+    name: 'University of Texas at El Paso',
+    // Banner classic schedule listing has meeting times but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: utep,
+  },
+  stmarys: {
+    code: 'stmarys',
+    name: "St. Mary's University",
+    // Banner classic schedule listing has meeting times but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: stmarys,
+  },
+  tcu: {
+    code: 'tcu',
+    name: 'Texas Christian University',
+    // ASP.NET class search exposes enrolled + max seats per section.
+    enrollmentDataAvailable: true,
+    scraper: tcu,
+  },
+  msutexas: {
+    code: 'msutexas',
+    name: 'Midwestern State University (MSU Texas)',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: msutexas,
+  },
+  lamar: {
+    code: 'lamar',
+    name: 'Lamar University',
+    // Banner classic schedule listing has meeting times but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: lamar,
+  },
+  tamuv: {
+    code: 'tamuv',
+    name: 'Texas A&M University–Victoria',
+    // UH-System PeopleSoft class search; only open/closed, no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: tamuv,
+  },
+  twu: {
+    code: 'twu',
+    name: "Texas Woman's University",
+    // Colleague Self-Service exposes capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: twu,
   },
 }
 
