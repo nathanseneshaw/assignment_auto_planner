@@ -1,20 +1,22 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useProfileStore } from '../stores/profile'
-import { Button, Select } from '../components/ui'
+import { Button, ConfirmDialog } from '../components/ui'
 import { useAuthStore } from '../stores/auth'
 import { useAssignmentsStore } from '../stores/assignments'
 import { useCoursesStore } from '../stores/courses'
 import { isSupabaseConfigured } from '../lib/supabase'
 import IcsFeedsManager from '../components/features/IcsFeedsManager.vue'
 import SyllabusParser from '../components/SyllabusParser.vue'
+import UniversityPicker from '../components/features/UniversityPicker.vue'
 import { listSchools } from '../services/coursePlannerApi.js'
 import { COURSE_PLANNER } from '../config/featureFlags.js'
 import { useCoursePlannerStore } from '../stores/coursePlanner'
 
 const router = useRouter()
 const profileStore = useProfileStore()
+const route = useRoute()
 const authStore = useAuthStore()
 const assignmentsStore = useAssignmentsStore()
 const coursesStore = useCoursesStore()
@@ -378,7 +380,39 @@ async function signOutAccount() {
   }
 }
 
-onMounted(loadSupportedSchools)
+onMounted(async () => {
+  await loadSupportedSchools()
+  if (route.hash) {
+    await nextTick()
+    document.querySelector(route.hash)?.scrollIntoView({ behavior: 'smooth' })
+  }
+})
+
+// ── Unenroll ─────────────────────────────────────────────────────────────────
+
+const showUnenrollConfirm = ref(false)
+const courseToUnenroll = ref(null)
+const unenrollError = ref('')
+
+function promptUnenroll(course) {
+  courseToUnenroll.value = course
+  unenrollError.value = ''
+  showUnenrollConfirm.value = true
+}
+
+async function confirmUnenroll() {
+  const course = courseToUnenroll.value
+  if (!course) return
+  unenrollError.value = ''
+  try {
+    await coursesStore.unenrollCourse(course.id)
+  } catch (e) {
+    unenrollError.value = e?.message || 'Could not remove course.'
+  } finally {
+    courseToUnenroll.value = null
+    showUnenrollConfirm.value = false
+  }
+}
 </script>
 
 <template>
@@ -582,7 +616,7 @@ onMounted(loadSupportedSchools)
         <div
           v-for="course in coursesStore.coursesSorted"
           :key="course.id"
-          class="flex items-center gap-3.5 py-3.5"
+          class="group flex items-center gap-3.5 py-3.5"
         >
           <!-- Colored badge -->
           <div
@@ -610,6 +644,18 @@ onMounted(loadSupportedSchools)
               {{ courseProgress(course.id) }}%
             </span>
           </div>
+
+          <!-- Unenroll (visible on row hover) -->
+          <button
+            type="button"
+            class="opacity-0 group-hover:opacity-100 shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-danger-500 dark:text-gray-600 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 transition-[opacity,color,background-color] duration-150"
+            title="Unenroll from this course"
+            @click="promptUnenroll(course)"
+          >
+            <svg class="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2 4h10M5.5 4V2.5h3V4M5.5 6.5v4M8.5 6.5v4M3.5 4l.5 8h6l.5-8" />
+            </svg>
+          </button>
         </div>
       </div>
     </section>
@@ -631,19 +677,18 @@ onMounted(loadSupportedSchools)
     </section>
 
     <!-- ── University (Course Planner) ── -->
-    <section v-if="COURSE_PLANNER" class="py-7 border-t border-paper-line dark:border-gray-700/60">
-      <div class="flex items-baseline justify-between gap-4 mb-4">
+    <section id="university" v-if="COURSE_PLANNER" class="py-7 border-t border-paper-line dark:border-gray-700/60">
+      <div class="flex items-baseline justify-between gap-4 mb-1">
         <h2 class="display text-[15px] text-gray-900 dark:text-gray-100">Your university</h2>
+        <span class="eyebrow text-gray-400 dark:text-gray-500">Course Planner</span>
       </div>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-5 leading-relaxed">
         Selects which university's live course catalog the Course Planner searches.
       </p>
-      <Select
+      <UniversityPicker
         v-model="selectedSchool"
-        label="University"
         :options="schoolOptions"
-        :disabled="schoolsLoading || supportedSchools.length === 0"
-        :hint="schoolsLoading ? 'Loading…' : schoolsError || ''"
+        :loading="schoolsLoading"
         :error="schoolsError"
       />
       <p class="text-xs text-gray-400 dark:text-gray-500 mt-3">
@@ -651,5 +696,28 @@ onMounted(loadSupportedSchools)
       </p>
     </section>
 
+    <!-- Unenroll confirmation (Teleports to <body>, so nesting here is layout-neutral
+         and keeps this page a single root element — required by <Transition mode="out-in">). -->
+    <ConfirmDialog
+      v-model="showUnenrollConfirm"
+      title="Unenroll from course?"
+      confirm-text="Unenroll"
+      cancel-text="Keep"
+      variant="danger"
+      @confirm="confirmUnenroll"
+      @cancel="courseToUnenroll = null"
+    >
+      <div class="space-y-2">
+        <p class="text-sm text-gray-700 dark:text-gray-300">
+          This will permanently remove
+          <strong class="text-gray-900 dark:text-gray-100">{{ courseToUnenroll?.name }}</strong>
+          and all its assignments from your account.
+        </p>
+        <p class="text-[12px] font-mono text-gray-400 dark:text-gray-500">
+          Your completed task history is not affected.
+        </p>
+        <p v-if="unenrollError" class="text-sm text-danger-600 dark:text-danger-400">{{ unenrollError }}</p>
+      </div>
+    </ConfirmDialog>
   </div>
 </template>

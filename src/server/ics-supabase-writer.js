@@ -17,6 +17,17 @@
  * This deliberately avoids `upsert({ onConflict })` because that requires a
  * matching unique constraint to exist in the live DB; the select+insert/update
  * shape works against whatever schema is deployed.
+ *
+ * Dedupe identity (Pillar B): the primary key is the event UID
+ * (`external_assignment_id`), so a moved due date with a *stable* UID updates in
+ * place. Some LMS feeds rotate the UID when an assignment changes, which would
+ * otherwise duplicate the row. To catch that, we additionally load this feed's
+ * existing assignments and, for any incoming occurrence whose UID is unknown,
+ * try to match an existing row by (course + normalized title) and re-key it onto
+ * the new UID instead of inserting. This is intentionally conservative — applied
+ * only to non-recurring occurrences and only when the title match is unambiguous
+ * (exactly one unclaimed candidate) — so two distinct same-titled assignments are
+ * never silently merged. Costs one extra feed-scoped select per non-empty sync.
  */
 
 function nowIso() {
@@ -26,6 +37,70 @@ function nowIso() {
 /** Normalize nullish text to '' so null-vs-'' doesn't read as a change. */
 function normText(v) {
   return v == null ? '' : String(v)
+}
+
+/** Normalize a title for content matching: lowercase, collapse whitespace. */
+function normalizeTitleKey(v) {
+  return String(v == null ? '' : v).toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+/** Content-dedupe key: an assignment is "the same" within a course + title. */
+function contentKey(courseId, title) {
+  return `${courseId}::${normalizeTitleKey(title)}`
+}
+
+/**
+ * Find an existing row to re-key onto a rotated UID, matched by (course + title).
+ * Returns the row and marks it claimed, or null when the match is absent or
+ * ambiguous (more than one unclaimed candidate) — we never merge two distinct
+ * same-titled assignments. Mutates `claimed`.
+ */
+function claimContentMatch(occ, courseId, contentIndex, claimed) {
+  const key = contentKey(courseId, occ.title)
+  const candidates = (contentIndex.get(key) || []).filter((r) => !claimed.has(r.id))
+  if (candidates.length !== 1) return null
+  const match = candidates[0]
+  claimed.add(match.id)
+  return match
+}
+
+// Feature flag for the Pillar A archive columns (feed_status / archived_at).
+// null = unprobed, true = present, false = absent (skip the archive sweep so a
+// pre-migration schema keeps syncing). Mirrors the content_hash feature-detection
+// in ics-routes.js — the live schema can lag the migrations.
+let archiveColumnsPresent = null
+
+const ASSIGNMENT_COLS =
+  'id, external_assignment_id, course_id, assignment_name, due_at, description, feed_id, source_url'
+
+/** True when a PostgREST error means an archive column doesn't exist. */
+function isMissingArchiveColumn(error) {
+  if (!error) return false
+  const code = String(error.code || '')
+  if (code === '42703' || code === 'PGRST204') return true
+  const msg = error.message || ''
+  return /(feed_status|archived_at)/i.test(msg) && /(column|schema cache|does not exist)/i.test(msg)
+}
+
+/**
+ * Read assignments with `feed_status` included when the column exists, falling
+ * back to the base columns (and disabling the archive sweep) when it doesn't.
+ * `applyFilters(query)` chains the per-call .eq/.in filters. Probes once; the
+ * resolved capability is cached in `archiveColumnsPresent` for the process.
+ */
+async function selectAssignments(supabase, applyFilters) {
+  const build = (cols) => applyFilters(supabase.from('assignments').select(cols))
+  if (archiveColumnsPresent === false) return build(ASSIGNMENT_COLS)
+  const rich = await build(`${ASSIGNMENT_COLS}, feed_status`)
+  if (!rich.error) {
+    archiveColumnsPresent = true
+    return rich
+  }
+  if (isMissingArchiveColumn(rich.error)) {
+    archiveColumnsPresent = false
+    return build(ASSIGNMENT_COLS)
+  }
+  return rich
 }
 
 /** Compare two timestamps by instant, tolerating formatting differences. */
@@ -157,6 +232,8 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
   let assignmentsInserted = 0
   let assignmentsUpdated = 0
   let assignmentsUnchanged = 0
+  let assignmentsRekeyed = 0
+  let assignmentsArchived = 0
   const errors = []
 
   if (!occurrences || occurrences.length === 0) {
@@ -166,6 +243,8 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
       assignmentsInserted: 0,
       assignmentsUpdated: 0,
       assignmentsUnchanged: 0,
+      assignmentsRekeyed: 0,
+      assignmentsArchived: 0,
       errors,
     }
   }
@@ -184,17 +263,42 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
     await resolveCourses(supabase, userId, feedId, uniqueOccurrences)
   errors.push(...courseErrors)
 
-  // 2) Bulk read existing assignments by external id.
+  // 2) Bulk read existing assignments by external id (feed_status included when
+  //    the archive columns exist; see selectAssignments).
   const externalIds = [...dedup.keys()]
-  const { data: existingRows, error: selErr } = await supabase
-    .from('assignments')
-    .select('id, external_assignment_id, course_id, assignment_name, due_at, description, feed_id, source_url')
-    .eq('user_id', userId)
-    .in('external_assignment_id', externalIds)
+  const { data: existingRows, error: selErr } = await selectAssignments(
+    supabase,
+    (q) => q.eq('user_id', userId).in('external_assignment_id', externalIds)
+  )
   if (selErr) throw new Error(`assignments select: ${selErr.message}`)
 
   const existingByExt = new Map()
   for (const row of existingRows || []) existingByExt.set(String(row.external_assignment_id), row)
+
+  // Pillar B: load this feed's existing assignments so an incoming occurrence
+  // with an unknown UID can be matched to an existing row by content (course +
+  // title) and re-keyed, instead of duplicating, when a feed rotates its UIDs.
+  // Only rows whose UID is NOT in this sync are eligible for content matching (a
+  // still-present UID is handled by the direct match above). `feedRows` is also
+  // the basis for the Pillar A archive sweep below. Skipped when feedId is absent.
+  const incomingUids = new Set(uniqueOccurrences.map((o) => String(o.uid)))
+  const contentIndex = new Map() // contentKey -> candidate rows (rotated/orphaned)
+  const claimed = new Set() // existing row ids already matched this run
+  let feedRows = []
+  if (feedId) {
+    const { data, error: feedSelErr } = await selectAssignments(
+      supabase,
+      (q) => q.eq('user_id', userId).eq('feed_id', feedId)
+    )
+    if (feedSelErr) throw new Error(`assignments feed select: ${feedSelErr.message}`)
+    feedRows = data || []
+    for (const row of feedRows) {
+      if (incomingUids.has(String(row.external_assignment_id))) continue
+      const key = contentKey(row.course_id, row.assignment_name)
+      if (!contentIndex.has(key)) contentIndex.set(key, [])
+      contentIndex.get(key).push(row)
+    }
+  }
 
   const ts = nowIso()
   const toInsert = []
@@ -209,34 +313,21 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
       continue
     }
     const existing = existingByExt.get(String(occ.uid))
-    if (!existing) {
-      toInsert.push({
-        user_id: userId,
-        course_id: courseId,
-        assignment_name: occ.title,
-        due_at: occ.dueAt,
-        description: occ.description,
-        import_source: 'ics',
-        external_assignment_id: occ.uid,
-        feed_id: feedId,
-        source_url: occ.sourceUrl,
-        last_seen_at: ts,
-      })
-      continue
-    }
+    if (existing) {
+      claimed.add(existing.id)
+      // A previously-archived assignment that's back in the feed must be revived.
+      const wasArchived = normText(existing.feed_status) === 'archived'
+      const changed =
+        wasArchived ||
+        String(existing.course_id) !== String(courseId) ||
+        normText(existing.assignment_name) !== normText(occ.title) ||
+        !sameInstant(existing.due_at, occ.dueAt) ||
+        normText(existing.description) !== normText(occ.description) ||
+        normText(existing.feed_id) !== normText(feedId) ||
+        normText(existing.source_url) !== normText(occ.sourceUrl)
 
-    const changed =
-      String(existing.course_id) !== String(courseId) ||
-      normText(existing.assignment_name) !== normText(occ.title) ||
-      !sameInstant(existing.due_at, occ.dueAt) ||
-      normText(existing.description) !== normText(occ.description) ||
-      normText(existing.feed_id) !== normText(feedId) ||
-      normText(existing.source_url) !== normText(occ.sourceUrl)
-
-    if (changed) {
-      const { error: updErr } = await supabase
-        .from('assignments')
-        .update({
+      if (changed) {
+        const patch = {
           course_id: courseId,
           assignment_name: occ.title,
           due_at: occ.dueAt,
@@ -245,15 +336,71 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
           source_url: occ.sourceUrl,
           last_seen_at: ts,
           updated_at: ts,
-        })
-        .eq('id', existing.id)
-        .eq('user_id', userId)
-      if (updErr) errors.push({ uid: occ.uid, error: `assignments update: ${updErr.message}` })
-      else assignmentsUpdated++
-    } else {
-      assignmentsUnchanged++
-      unchangedIds.push(existing.id)
+        }
+        if (wasArchived && archiveColumnsPresent === true) {
+          patch.feed_status = 'live'
+          patch.archived_at = null
+        }
+        const { error: updErr } = await supabase
+          .from('assignments')
+          .update(patch)
+          .eq('id', existing.id)
+          .eq('user_id', userId)
+        if (updErr) errors.push({ uid: occ.uid, error: `assignments update: ${updErr.message}` })
+        else assignmentsUpdated++
+      } else {
+        assignmentsUnchanged++
+        unchangedIds.push(existing.id)
+      }
+      continue
     }
+
+    // UID unknown. Pillar B: before inserting, try to re-key an existing row
+    // matched by content (course + title) — handles feeds that change the UID
+    // when an assignment moves. Non-recurring + unambiguous match only.
+    const adopt = occ.isRecurring ? null : claimContentMatch(occ, courseId, contentIndex, claimed)
+    if (adopt) {
+      const patch = {
+        external_assignment_id: occ.uid,
+        course_id: courseId,
+        assignment_name: occ.title,
+        due_at: occ.dueAt,
+        description: occ.description,
+        feed_id: feedId,
+        source_url: occ.sourceUrl,
+        last_seen_at: ts,
+        updated_at: ts,
+      }
+      // The row is back in the feed (under a new UID) — keep/restore it live.
+      if (archiveColumnsPresent === true) {
+        patch.feed_status = 'live'
+        patch.archived_at = null
+      }
+      const { error: rekeyErr } = await supabase
+        .from('assignments')
+        .update(patch)
+        .eq('id', adopt.id)
+        .eq('user_id', userId)
+      if (rekeyErr) errors.push({ uid: occ.uid, error: `assignments rekey: ${rekeyErr.message}` })
+      else {
+        assignmentsUpdated++
+        assignmentsRekeyed++
+      }
+      continue
+    }
+
+    toInsert.push({
+      user_id: userId,
+      course_id: courseId,
+      assignment_name: occ.title,
+      due_at: occ.dueAt,
+      description: occ.description,
+      import_source: 'ics',
+      external_assignment_id: occ.uid,
+      feed_id: feedId,
+      source_url: occ.sourceUrl,
+      last_seen_at: ts,
+    })
   }
 
   // 4) Bulk-insert the new assignments.
@@ -277,12 +424,46 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
     }
   }
 
+  // 6) Pillar A archive sweep: feed-owned assignments that vanished from this
+  //    sync are marked archived (kept, never deleted) so a student keeps their
+  //    record and completion after a professor removes the item. Guarded so it
+  //    can only fire on a genuinely-current feed:
+  //    - archive columns must exist (else skip; pre-migration safety);
+  //    - scoped to this feed;
+  //    - we are necessarily past the empty-occurrence early return, and fetch/
+  //      parse failures throw before reaching here, and the content-hash fast
+  //      path returns before calling this — so a broken/login-walled feed can't
+  //      mass-archive real work.
+  //    A row whose UID is still in the feed is never archived, even if an
+  //    upstream error left it unclaimed.
+  if (archiveColumnsPresent === true && feedId) {
+    const toArchive = feedRows
+      .filter(
+        (r) =>
+          !claimed.has(r.id) &&
+          !incomingUids.has(String(r.external_assignment_id)) &&
+          normText(r.feed_status) !== 'archived'
+      )
+      .map((r) => r.id)
+    if (toArchive.length > 0) {
+      const { error: archErr } = await supabase
+        .from('assignments')
+        .update({ feed_status: 'archived', archived_at: ts, updated_at: ts })
+        .eq('user_id', userId)
+        .in('id', toArchive)
+      if (archErr) errors.push({ uid: 'archive-sweep', error: `assignments archive: ${archErr.message}` })
+      else assignmentsArchived = toArchive.length
+    }
+  }
+
   return {
     coursesInserted,
     coursesUpdated,
     assignmentsInserted,
     assignmentsUpdated,
     assignmentsUnchanged,
+    assignmentsRekeyed,
+    assignmentsArchived,
     errors,
   }
 }

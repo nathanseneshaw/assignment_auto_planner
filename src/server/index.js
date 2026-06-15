@@ -46,7 +46,6 @@ function parseAllowedOrigins() {
   const front = String(process.env.FRONTEND_URL || '').trim()
   const set = new Set(fromAllowList)
   if (front) set.add(front)
-  set.add(DESKTOP_ORIGIN)
   return [...set]
 }
 
@@ -71,6 +70,10 @@ app.use(
     origin(origin, callback) {
       // Same-origin / curl have no Origin header  always allow.
       if (!origin) return callback(null, true)
+      // Desktop app is always allowed regardless of the configured list.
+      if (origin === DESKTOP_ORIGIN) return callback(null, true)
+      // No configured origins = open in dev (DESKTOP_ORIGIN is kept separate so
+      // it doesn't accidentally suppress this "allow all" path).
       if (allowedOrigins.length === 0) return callback(null, true)
       if (allowedOrigins.includes(origin)) return callback(null, true)
       callback(null, false)

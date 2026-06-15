@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Button, Input, Modal } from './ui'
+import { Button, Input, Modal, DatePicker } from './ui'
 import IntegrationRow from './features/IntegrationRow.vue'
 import * as syllabusService from '../services/syllabusService'
 import { hydrateLmsStoresFromSupabase } from '../services/lmsSupabaseHydration'
@@ -105,7 +105,10 @@ async function handleParse() {
 
 function addAssignmentRow() {
   if (!draft.value) return
-  draft.value.assignments.push({ name: '', dueAt: null, description: '' })
+  const today = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  const todayIso = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}T23:59:00`
+  draft.value.assignments.push({ name: '', dueAt: new Date(todayIso).toISOString(), description: '' })
 }
 
 function removeAssignmentRow(idx) {
@@ -267,15 +270,23 @@ function handleModalClose() {
     :closable="!saving"
     @close="handleModalClose"
   >
-    <div v-if="draft" class="space-y-6">
-      <div v-if="parseMeta?.truncated" class="text-xs text-warning-800 dark:text-warning-300 bg-warning-50 dark:bg-warning-900/30 border border-warning-200 dark:border-warning-800/60 rounded-xl p-3">
-        This syllabus was long. We sent the first ~50 000 characters plus the last 5 000 to the parser, so a few
-        middle items may be missing  add any missing rows below before saving.
+    <div v-if="draft" class="space-y-8">
+
+      <!-- Truncation notice -->
+      <div v-if="parseMeta?.truncated" class="flex items-start gap-2.5 text-xs text-warning-800 dark:text-warning-300 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-700/40 rounded-xl px-4 py-3">
+        <svg class="w-3.5 h-3.5 mt-0.5 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm.75 4a.75.75 0 0 0-1.5 0v3.5a.75.75 0 0 0 1.5 0V5Zm-.75 6a.875.875 0 1 0 0-1.75A.875.875 0 0 0 8 11Z"/>
+        </svg>
+        <span>Syllabus was too long to send in full — we used the first ~50 000 and last 5 000 characters. A few middle items may be missing; add them below before saving.</span>
       </div>
 
+      <!-- Course section -->
       <section>
-        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Course</h4>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="flex items-center gap-3 mb-4">
+          <p class="eyebrow text-[11px] tracking-widest text-gray-400 dark:text-gray-500 uppercase">Course</p>
+          <div class="flex-1 h-px bg-paper-line dark:bg-gray-700/60"></div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
           <Input v-model="draft.course.name" label="Course name" required />
           <Input v-model="draft.course.code" label="Course code (optional)" />
           <Input v-model="draft.course.term" label="Term (optional)" />
@@ -283,46 +294,85 @@ function handleModalClose() {
         </div>
       </section>
 
+      <!-- Assignments section -->
       <section>
-        <div class="flex items-center justify-between mb-2">
-          <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Assignments ({{ draft.assignments.length }})</h4>
-          <Button size="sm" variant="secondary" @click="addAssignmentRow">+ Add row</Button>
+        <div class="flex items-center gap-3 mb-1">
+          <p class="eyebrow text-[11px] tracking-widest text-gray-400 dark:text-gray-500 uppercase">Assignments</p>
+          <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-600 dark:text-gray-300 tabular-nums">
+            {{ draft.assignments.length }}
+          </span>
+          <div class="flex-1 h-px bg-paper-line dark:bg-gray-700/60"></div>
         </div>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          Assignments without a due date can't be saved  fill one in or remove the row.
+        <p class="text-[11px] text-gray-400 dark:text-gray-500 mb-4">
+          Rows without a due date won't be saved — fill one in or remove the row.
         </p>
 
-        <div v-if="draft.assignments.length === 0" class="text-sm text-gray-500 dark:text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4 text-center">
-          No assignments detected. Click "Add row" to enter them manually.
+        <!-- Column headers -->
+        <div v-if="draft.assignments.length > 0" class="grid grid-cols-[1fr_148px_32px] gap-x-2 px-1 mb-1">
+          <span class="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Name</span>
+          <span class="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Due date</span>
+          <span></span>
         </div>
 
-        <ul v-else class="space-y-2">
+        <div v-if="draft.assignments.length === 0" class="text-sm text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-6 text-center">
+          No assignments detected — click "Add row" to enter them manually.
+        </div>
+
+        <ul v-else class="space-y-1.5">
           <li
             v-for="(a, idx) in draft.assignments"
             :key="idx"
-            class="border border-gray-200 dark:border-gray-700 rounded-xl p-3"
+            class="grid grid-cols-[1fr_148px_32px] gap-x-2 items-center"
           >
-            <div class="grid grid-cols-1 md:grid-cols-[2fr,1fr,auto] gap-3 items-end">
-              <Input v-model="a.name" label="Name" placeholder="Problem Set 3" />
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400">Due date</label>
-                <input
-                  type="date"
-                  :value="isoToDateInput(a.dueAt)"
-                  class="w-full px-4 py-2.5 rounded-xl border bg-surface dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 scheme-light dark:scheme-dark"
-                  :class="a.dueAt ? 'border-gray-200 dark:border-gray-700' : 'border-danger-300 bg-danger-50/40 dark:bg-danger-900/30'"
-                  @input="onDueDateInput(idx, $event)"
-                />
-              </div>
-              <Button size="sm" variant="ghost" @click="removeAssignmentRow(idx)">Remove</Button>
-            </div>
+            <!-- Name -->
+            <input
+              v-model="a.name"
+              type="text"
+              placeholder="Assignment name"
+              class="w-full px-3 py-2 rounded-lg border bg-surface dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 border-gray-200 dark:border-gray-700 transition-colors"
+            />
+            <!-- Due date -->
+            <DatePicker
+              :model-value="isoToDateInput(a.dueAt)"
+              placeholder="Pick a due date"
+              size="sm"
+              @update:model-value="(v) => { a.dueAt = dateInputToIso(v) }"
+            />
+            <!-- Remove -->
+            <button
+              type="button"
+              title="Remove row"
+              class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-300 dark:text-gray-600 hover:text-danger-500 dark:hover:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-danger-500/30"
+              @click="removeAssignmentRow(idx)"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+                <path d="M2 2l10 10M12 2L2 12"/>
+              </svg>
+            </button>
           </li>
         </ul>
+
+        <!-- Add row -->
+        <button
+          type="button"
+          class="mt-3 flex items-center gap-1.5 text-[13px] text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 rounded"
+          @click="addAssignmentRow"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M7 1v12M1 7h12"/>
+          </svg>
+          Add row
+        </button>
       </section>
 
-      <div v-if="saveError" class="text-sm text-danger-700 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/30 border border-danger-200 dark:border-danger-800/60 rounded-xl p-3">
+      <!-- Save error -->
+      <div v-if="saveError" class="flex items-start gap-2.5 text-sm text-danger-700 dark:text-danger-400 bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-700/40 rounded-xl px-4 py-3">
+        <svg class="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm.75 4a.75.75 0 0 0-1.5 0v3.5a.75.75 0 0 0 1.5 0V5Zm-.75 6a.875.875 0 1 0 0-1.75A.875.875 0 0 0 8 11Z"/>
+        </svg>
         {{ saveError }}
       </div>
+
     </div>
 
     <template #footer>

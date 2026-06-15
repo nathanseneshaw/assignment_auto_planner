@@ -13,6 +13,7 @@ import { isSupabaseConfigured } from './lib/supabase'
 import { isElectron } from './lib/platform'
 import { hydrateLmsStoresFromSupabase } from './services/lmsSupabaseHydration'
 import { useSupabaseStoreSync } from './composables/useSupabaseStoreSync'
+import { useSupabaseRealtimeSync } from './composables/useSupabaseRealtimeSync'
 import { useIcsAutoSync } from './composables/useIcsAutoSync'
 
 const route = useRoute()
@@ -30,6 +31,7 @@ const authStore = useAuthStore()
 const profileStore = useProfileStore()
 
 useSupabaseStoreSync()
+useSupabaseRealtimeSync()
 useIcsAutoSync()
 
 function applyTheme(dark) {

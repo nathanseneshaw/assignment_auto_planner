@@ -100,10 +100,11 @@ describe('writeOccurrences (bulked writes)', () => {
     assert.equal(res.assignmentsUnchanged, 0)
     assert.deepEqual(res.errors, [])
 
-    // No N+1: one bulk select + one bulk insert per table, zero updates.
+    // No N+1: one bulk insert per table, zero updates. Assignments take two
+    // selects (UID-keyed match + the feed-scoped read for content dedupe).
     assert.equal(counts.select.courses, 1)
     assert.equal(counts.insert.courses, 1)
-    assert.equal(counts.select.assignments, 1)
+    assert.equal(counts.select.assignments, 2)
     assert.equal(counts.insert.assignments, 1)
     assert.equal(counts.update.assignments || 0, 0)
 
@@ -119,7 +120,8 @@ describe('writeOccurrences (bulked writes)', () => {
 
     assert.equal(res.assignmentsInserted, 25)
     assert.equal(counts.insert.assignments, 1)
-    assert.equal(counts.select.assignments, 1)
+    // Two selects regardless of size (UID-keyed + feed-scoped) — still flat, no N+1.
+    assert.equal(counts.select.assignments, 2)
   })
 
   it('treats an identical re-sync as fully unchanged (no inserts, no field updates)', async () => {
@@ -205,5 +207,154 @@ describe('writeOccurrences (bulked writes)', () => {
     assert.deepEqual(res.errors, [])
     assert.equal(counts.select.assignments || 0, 0)
     assert.equal(counts.select.courses || 0, 0)
+  })
+})
+
+// ── Pillar B: content-based re-key for rotated UIDs ───────────────────────────
+
+const courseSeed = (courseId) => ({
+  id: courseId, user_id: USER, source: 'ics', external_course_id: 'C1', course_name: 'Course 1', feed_id: FEED,
+})
+
+describe('writeOccurrences (rotated-UID content dedupe)', () => {
+  it('re-keys an existing row onto a new UID instead of duplicating when title matches', async () => {
+    const courseId = 'course-1'
+    const seed = {
+      courses: [courseSeed(courseId)],
+      assignments: [{
+        id: 'seed-old', user_id: USER, course_id: courseId,
+        external_assignment_id: 'OLD-UID', assignment_name: 'Assignment 1',
+        due_at: '2026-09-01T12:00:00.000Z', description: 'desc 1', feed_id: FEED, source_url: 'https://x/1',
+      }],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+
+    // Same course + title, NEW uid, MOVED due date: a feed that rotates the UID
+    // when the professor reschedules. Must update the row, not insert a copy.
+    const occurrences = [occ(1, { uid: 'NEW-UID', dueAt: '2026-09-15T12:00:00.000Z' })]
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 1)
+    assert.equal(res.assignmentsUpdated, 1) // a rekey is reported as an update
+    assert.equal(res.assignmentsInserted, 0)
+    assert.equal(db.assignments.length, 1)  // no duplicate
+
+    const row = db.assignments[0]
+    assert.equal(row.id, 'seed-old')                     // same physical row
+    assert.equal(row.external_assignment_id, 'NEW-UID')  // re-keyed to new UID
+    assert.ok(row.due_at.startsWith('2026-09-15'))       // due date moved
+  })
+
+  it('does NOT content-match when two same-titled rows are ambiguous (inserts instead)', async () => {
+    const courseId = 'course-1'
+    const seed = {
+      courses: [courseSeed(courseId)],
+      assignments: [
+        { id: 'seed-a', user_id: USER, course_id: courseId, external_assignment_id: 'OLD-A', assignment_name: 'Weekly Quiz', due_at: '2026-09-01T12:00:00.000Z', feed_id: FEED },
+        { id: 'seed-b', user_id: USER, course_id: courseId, external_assignment_id: 'OLD-B', assignment_name: 'Weekly Quiz', due_at: '2026-09-08T12:00:00.000Z', feed_id: FEED },
+      ],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+    const occurrences = [occ(1, { uid: 'NEW', title: 'Weekly Quiz', dueAt: '2026-09-20T12:00:00.000Z' })]
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 0)
+    assert.equal(res.assignmentsInserted, 1) // ambiguous → safe insert, never a wrong merge
+    assert.equal(db.assignments.length, 3)
+  })
+
+  it('does NOT content-match recurring occurrences (series members share a title)', async () => {
+    const courseId = 'course-1'
+    const seed = {
+      courses: [courseSeed(courseId)],
+      assignments: [
+        { id: 'seed-r', user_id: USER, course_id: courseId, external_assignment_id: 'base@2026-09-01', assignment_name: 'Lecture', due_at: '2026-09-01T12:00:00.000Z', feed_id: FEED },
+      ],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+    const occurrences = [occ(1, { uid: 'base@2026-09-08', title: 'Lecture', dueAt: '2026-09-08T12:00:00.000Z', isRecurring: true })]
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 0)
+    assert.equal(res.assignmentsInserted, 1)
+    assert.equal(db.assignments.length, 2)
+  })
+})
+
+// ── Pillar A: archive lifecycle (removed-from-feed) ───────────────────────────
+
+// occ(1) resolves to uid 'A1', title 'Assignment 1', due '2026-09-02T12:00:00.000Z',
+// description 'desc 1', sourceUrl 'https://x/1' — match these in seeds to keep a
+// row "unchanged" so the assertions isolate the archive behavior.
+const liveRow = (over = {}) => ({
+  id: 'keep', user_id: USER, course_id: 'course-1', external_assignment_id: 'A1',
+  assignment_name: 'Assignment 1', due_at: '2026-09-02T12:00:00.000Z', description: 'desc 1',
+  feed_id: FEED, source_url: 'https://x/1', feed_status: 'live', ...over,
+})
+
+describe('writeOccurrences (archive lifecycle)', () => {
+  it('archives a feed-owned assignment that vanished from the sync (no delete)', async () => {
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [
+        liveRow(),
+        { id: 'gone', user_id: USER, course_id: 'course-1', external_assignment_id: 'A2', assignment_name: 'Assignment 2', due_at: '2026-09-05T12:00:00.000Z', feed_id: FEED, source_url: 'https://x/2', feed_status: 'live' },
+      ],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+    // Only A1 is still in the feed; A2 disappeared.
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.assignmentsArchived, 1)
+    assert.equal(db.assignments.length, 2) // kept, never deleted
+    assert.equal(db.assignments.find((r) => r.external_assignment_id === 'A1').feed_status, 'live')
+    const a2 = db.assignments.find((r) => r.external_assignment_id === 'A2')
+    assert.equal(a2.feed_status, 'archived')
+    assert.ok(a2.archived_at) // timestamped when it left the feed
+  })
+
+  it('revives an archived assignment when it reappears in the feed', async () => {
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [liveRow({ id: 'back', feed_status: 'archived', archived_at: '2026-05-01T00:00:00.000Z' })],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.assignmentsArchived, 0)
+    assert.equal(res.assignmentsUpdated, 1) // revival is reported as an update
+    const a1 = db.assignments.find((r) => r.external_assignment_id === 'A1')
+    assert.equal(a1.feed_status, 'live')
+    assert.equal(a1.archived_at, null)
+  })
+
+  it('does not re-touch a row that was already archived and stays gone', async () => {
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [
+        liveRow(),
+        { id: 'arch', user_id: USER, course_id: 'course-1', external_assignment_id: 'OLD', assignment_name: 'Long gone', due_at: '2026-08-01T12:00:00.000Z', feed_id: FEED, source_url: 'https://x/old', feed_status: 'archived' },
+      ],
+    }
+    const { client } = makeFakeSupabase(seed)
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+    assert.equal(res.assignmentsArchived, 0) // already archived → not counted again
+  })
+
+  it('never archives rows belonging to a different feed', async () => {
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [
+        liveRow(),
+        { id: 'other', user_id: USER, course_id: 'course-1', external_assignment_id: 'B1', assignment_name: 'Other feed item', due_at: '2026-09-02T12:00:00.000Z', feed_id: 'feed-2', source_url: 'https://y/1', feed_status: 'live' },
+      ],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.assignmentsArchived, 0)
+    assert.equal(db.assignments.find((r) => r.external_assignment_id === 'B1').feed_status, 'live') // untouched
   })
 })

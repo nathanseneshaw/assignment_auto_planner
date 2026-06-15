@@ -51,17 +51,35 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
-  /** Not-yet-due, still-open assignments sorted by due date. */
+  /** Not-yet-due, still-open assignments sorted by due date. Archived (removed
+   *  from feed) items are excluded — they're not actionable. */
   const upcomingAssignments = computed(() => {
     const today = localDateKey()
-    return assignmentsByDueDate.value.filter(a => a.dueDate >= today && a.status !== 'completed')
+    return assignmentsByDueDate.value.filter(
+      a => a.dueDate >= today && a.status !== 'completed' && a.feedStatus !== 'archived'
+    )
   })
 
-  /** Past-due and still incomplete — surfaced as warnings in the UI. */
+  /** Past-due and still incomplete — surfaced as warnings in the UI. Archived
+   *  items are excluded so a removed assignment stops nagging. */
   const overdueAssignments = computed(() => {
     const today = localDateKey()
-    return assignments.value.filter(a => a.dueDate < today && a.status !== 'completed')
+    return assignments.value.filter(
+      a => a.dueDate < today && a.status !== 'completed' && a.feedStatus !== 'archived'
+    )
   })
+
+  /**
+   * Assignments that left their ICS feed (Pillar A): a professor removed them,
+   * so they dropped out of the calendar. Kept for the student's record — and
+   * their completion still counts toward semester totals — but surfaced
+   * separately from the active lists. Most-recently-due first.
+   */
+  const archivedAssignments = computed(() =>
+    [...assignments.value]
+      .filter(a => a.feedStatus === 'archived')
+      .sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate))
+  )
 
   /** Lookup table for course detail pages: `{ [courseId]: Assignment[] }`. */
   const assignmentsByCourse = computed(() => {
@@ -223,6 +241,7 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     assignmentsByDueDate,
     upcomingAssignments,
     overdueAssignments,
+    archivedAssignments,
     assignmentsByCourse,
     addAssignment,
     updateAssignment,

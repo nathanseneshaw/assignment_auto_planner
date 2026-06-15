@@ -104,6 +104,10 @@ const routes = [
 const router = createRouter({
   history: IS_ELECTRON_BUILD ? createWebHashHistory() : createWebHistory(),
   routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { top: 0 }
+  },
 })
 
 /**

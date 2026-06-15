@@ -25,6 +25,7 @@ import {
   persistCourseToSupabase,
   persistAssignmentToSupabase,
 } from '../services/lmsSupabaseSync'
+import { isApplyingRemote } from '../services/syncCoordinator'
 
 /** Quiet window before flushing. Coalesces bursts of edits into one round-trip. */
 const DEBOUNCE_MS = 1200
@@ -129,6 +130,10 @@ export function useSupabaseStoreSync() {
         () => coursesStore.courses,
         () => {
           if (suppressWatch) return
+          // A realtime-driven hydration just replaced the array; flushing now
+          // would only re-write identical rows and echo back over Realtime as a
+          // fresh change, looping forever between open instances.
+          if (isApplyingRemote()) return
           if (!authStore.user) return
           scheduleFlush()
         },
@@ -142,6 +147,7 @@ export function useSupabaseStoreSync() {
         () => assignmentsStore.assignments,
         () => {
           if (suppressWatch) return
+          if (isApplyingRemote()) return
           if (!authStore.user) return
           scheduleFlush()
         },

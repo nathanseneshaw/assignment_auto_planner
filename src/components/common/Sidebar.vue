@@ -54,15 +54,15 @@ const sections = computed(() => [
   {
     label: 'Today',
     items: [
-      { name: 'Focus', path: '/dashboard' },
-      { name: 'Agenda', path: '/tasks', count: tasksStore.todaysTasks.filter(t => !t.completed).length },
+      { name: 'Dashboard', path: '/dashboard' },
+      { name: 'Tasks', path: '/tasks', count: tasksStore.todaysTasks.filter(t => !t.completed).length },
     ],
   },
   {
     label: 'Plan',
     items: [
       { name: 'Assignments', path: '/assignments', count: assignmentsStore.upcomingAssignments.length },
-      { name: 'Week', path: '/planner', count: weekTaskCount.value },
+      { name: 'Planner', path: '/planner', count: weekTaskCount.value },
       ...(COURSE_PLANNER
         ? [{ name: 'Courses', path: '/course-planner', count: coursesStore.courses.length }]
         : []),

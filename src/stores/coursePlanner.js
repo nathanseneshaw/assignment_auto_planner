@@ -38,6 +38,11 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
   const loading = reactive({ terms: false, subjects: false, sections: false })
   const errors = reactive({ terms: '', subjects: '', sections: '' })
 
+  // In-flight request controllers, one per resource. Starting a new load aborts
+  // the previous one so a burst of school/term/subject changes can't pile up
+  // hung connections (and so a stale response can't clobber the current view).
+  const inFlight = { terms: null, subjects: null, sections: null }
+
   // Persisted: { rice: [Section, ...], ttu: [...], tamu: [...], smu: [...] }
   const savedSectionsBySchool = ref(loadSaved())
 
@@ -55,51 +60,79 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
 
   async function loadTerms() {
     if (!schoolCode.value) return
+    inFlight.terms?.abort()
+    const ac = new AbortController()
+    inFlight.terms = ac
     loading.terms = true
     errors.terms = ''
     terms.value = []
     try {
-      terms.value = await coursePlannerApi.getTerms(schoolCode.value)
+      terms.value = await coursePlannerApi.getTerms(schoolCode.value, { signal: ac.signal })
     } catch (e) {
+      if (e?.name === 'AbortError') return // superseded by a newer load; it owns the state now
       errors.terms = e?.message || 'Failed to load terms.'
     } finally {
-      loading.terms = false
+      // Only the request that's still current clears the flag — an aborted one
+      // must not flip it off under the request that replaced it.
+      if (inFlight.terms === ac) {
+        loading.terms = false
+        inFlight.terms = null
+      }
     }
   }
 
   async function loadSubjects() {
     if (!schoolCode.value || !selectedTermCode.value) return
+    inFlight.subjects?.abort()
+    const ac = new AbortController()
+    inFlight.subjects = ac
     loading.subjects = true
     errors.subjects = ''
     subjects.value = []
     try {
       subjects.value = await coursePlannerApi.getSubjects(
         schoolCode.value,
-        selectedTermCode.value
+        selectedTermCode.value,
+        { signal: ac.signal }
       )
     } catch (e) {
+      if (e?.name === 'AbortError') return
       errors.subjects = e?.message || 'Failed to load subjects.'
     } finally {
-      loading.subjects = false
+      if (inFlight.subjects === ac) {
+        loading.subjects = false
+        inFlight.subjects = null
+      }
     }
   }
 
   async function loadSections() {
     if (!schoolCode.value || !selectedTermCode.value || !selectedSubjectCode.value) return
+    inFlight.sections?.abort()
+    const ac = new AbortController()
+    inFlight.sections = ac
     loading.sections = true
     errors.sections = ''
     sections.value = []
     try {
-      sections.value = await coursePlannerApi.getSections(schoolCode.value, {
-        termCode: selectedTermCode.value,
-        subjectCode: selectedSubjectCode.value,
-        termLabel: selectedTermLabel.value,
-        subjectLabel: selectedSubjectLabel.value,
-      })
+      sections.value = await coursePlannerApi.getSections(
+        schoolCode.value,
+        {
+          termCode: selectedTermCode.value,
+          subjectCode: selectedSubjectCode.value,
+          termLabel: selectedTermLabel.value,
+          subjectLabel: selectedSubjectLabel.value,
+        },
+        { signal: ac.signal }
+      )
     } catch (e) {
+      if (e?.name === 'AbortError') return
       errors.sections = e?.message || 'Failed to load sections.'
     } finally {
-      loading.sections = false
+      if (inFlight.sections === ac) {
+        loading.sections = false
+        inFlight.sections = null
+      }
     }
   }
 
@@ -132,6 +165,15 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
    * which course catalog you're browsing.
    */
   function resetForSchoolChange() {
+    // Cancel anything still loading for the previous school so a hung/slow
+    // request can't resolve into the freshly-reset state.
+    inFlight.terms?.abort()
+    inFlight.subjects?.abort()
+    inFlight.sections?.abort()
+    inFlight.terms = inFlight.subjects = inFlight.sections = null
+    loading.terms = false
+    loading.subjects = false
+    loading.sections = false
     terms.value = []
     subjects.value = []
     sections.value = []

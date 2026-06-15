@@ -211,9 +211,15 @@ function stringOf(v) {
 }
 
 /**
- * Normalize a non-recurring VEVENT/VTODO occurrence into the shape the writer expects.
+ * Normalize a VEVENT/VTODO occurrence into the shape the writer expects.
+ *
+ * `isRecurring` marks occurrences expanded from an RRULE (their UID carries the
+ * occurrence date, e.g. `uid@2026-09-01T...`). The writer uses this to *exclude*
+ * them from the content-based dedupe fallback: a recurring series legitimately
+ * has many same-titled occurrences in one course, so matching by title would be
+ * ambiguous. Single (non-recurring) events are eligible for that fallback.
  */
-function normalizeOccurrence(event, occurrenceStart, occurrenceEnd, course, sourceUrl, uidOverride) {
+function normalizeOccurrence(event, occurrenceStart, occurrenceEnd, course, sourceUrl, uidOverride, isRecurring = false) {
   const baseUid = stringOf(event.uid) || `${stringOf(event.summary)}@${occurrenceStart?.toISOString?.() || ''}`
   const uid = uidOverride || baseUid
 
@@ -239,6 +245,7 @@ function normalizeOccurrence(event, occurrenceStart, occurrenceEnd, course, sour
     sourceUrl: eventUrl || null,
     courseExternalId: course.courseExternalId,
     courseName: course.courseName,
+    isRecurring: !!isRecurring,
   }
 }
 
@@ -313,7 +320,8 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
             overrideEnd,
             overrideCourse,
             stringOf(override.url) || stringOf(event.url),
-            overrideUid
+            overrideUid,
+            true
           )
         )
         continue
@@ -322,7 +330,7 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
       const occEnd = durationMs > 0 ? new Date(occStart.getTime() + durationMs) : occStart
       const uid = `${stringOf(event.uid) || 'evt'}@${occStart.toISOString()}`
       out.push(
-        normalizeOccurrence(event, occStart, occEnd, course, stringOf(event.url), uid)
+        normalizeOccurrence(event, occStart, occEnd, course, stringOf(event.url), uid, true)
       )
     }
     return out

@@ -19,10 +19,38 @@ const editingTask = ref(null)
 const showDeleteConfirm = ref(false)
 const taskToDelete = ref(null)
 
-// ── View state: date filter · status filter · search ──────────────────────
+// ── View state: date filter · status filter · search · group ─────────────────
 const filterDate = ref('all')   // 'today' | 'week' | 'all'
 const filterStatus = ref('all') // 'all' | 'active' | 'completed'
 const searchQuery = ref('')
+const filterGroup = ref(null)   // null = all groups; string = specific group
+
+// ── Group management ──────────────────────────────────────────────────────────
+const renamingGroup = ref(null)   // group name being renamed, or null
+const renameInput = ref('')       // current value in the rename input
+
+function startRename(name) {
+  renamingGroup.value = name
+  renameInput.value = name
+}
+
+function commitRename(oldName) {
+  const n = renameInput.value.trim()
+  if (n && n !== oldName) {
+    if (filterGroup.value === oldName) filterGroup.value = n
+    tasksStore.renameGroup(oldName, n)
+  }
+  renamingGroup.value = null
+}
+
+function cancelRename() {
+  renamingGroup.value = null
+}
+
+function removeGroup(name) {
+  tasksStore.deleteGroup(name)
+  if (filterGroup.value === name) filterGroup.value = null
+}
 
 const dateTabs = [
   { value: 'today', label: 'Today' },
@@ -107,6 +135,7 @@ const visibleTasks = computed(() => {
   if (q) list = list.filter((t) => t.title?.toLowerCase().includes(q))
   if (filterStatus.value === 'active') list = list.filter((t) => !t.completed)
   else if (filterStatus.value === 'completed') list = list.filter((t) => t.completed)
+  if (filterGroup.value !== null) list = list.filter((t) => t.group === filterGroup.value)
   return list
 })
 
@@ -166,14 +195,20 @@ const groups = computed(() => {
 })
 
 const hasActiveFilter = computed(
-  () => filterDate.value !== 'all' || filterStatus.value !== 'all' || !!searchQuery.value.trim(),
+  () =>
+    filterDate.value !== 'all' ||
+    filterStatus.value !== 'all' ||
+    !!searchQuery.value.trim() ||
+    filterGroup.value !== null,
 )
 
-const emptyCopy = computed(() =>
-  hasActiveFilter.value
-    ? { title: 'No tasks match your filters.', sub: 'Try a different view or clear the search.' }
-    : { title: 'No tasks yet.', sub: 'Add your first study task to get started.' },
-)
+const emptyCopy = computed(() => {
+  if (filterGroup.value !== null)
+    return { title: `No tasks in "${filterGroup.value}".`, sub: 'Add a task and assign it to this group.' }
+  if (hasActiveFilter.value)
+    return { title: 'No tasks match your filters.', sub: 'Try a different view or clear the search.' }
+  return { title: 'No tasks yet.', sub: 'Add your first study task to get started.' }
+})
 
 // ── Course swatch (map stored "bg-blue-100" → solid dot) ──────────────────
 const DOT_BY_BG = {
@@ -301,6 +336,70 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- ── Group chips ── -->
+        <div v-if="tasksStore.taskGroups.length" class="mt-6 flex items-center gap-2 flex-wrap">
+          <span class="eyebrow text-gray-400 dark:text-gray-500 mr-1">Groups</span>
+
+          <!-- All chip -->
+          <button
+            type="button"
+            class="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold transition-colors duration-150"
+            :class="filterGroup === null
+              ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
+              : 'bg-surface dark:bg-gray-700/60 border border-gray-200/80 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-900 dark:hover:text-gray-100'"
+            @click="filterGroup = null"
+          >All</button>
+
+          <!-- Per-group chips -->
+          <div
+            v-for="g in tasksStore.taskGroups"
+            :key="g"
+            class="relative inline-flex"
+          >
+            <!-- Rename input (appears on double-click) -->
+            <template v-if="renamingGroup === g">
+              <input
+                :value="renameInput"
+                @input="renameInput = $event.target.value"
+                @keydown.enter.prevent="commitRename(g)"
+                @keydown.escape.prevent="cancelRename"
+                @blur="commitRename(g)"
+                class="h-[26px] px-2.5 rounded-full text-[12px] font-semibold border border-primary-400/80 bg-surface dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500/25 w-32"
+                autofocus
+              />
+            </template>
+
+            <template v-else>
+              <button
+                type="button"
+                class="group/chip inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold transition-colors duration-150"
+                :class="filterGroup === g
+                  ? 'bg-primary-800 dark:bg-primary-700 text-white'
+                  : 'bg-surface dark:bg-gray-700/60 border border-gray-200/80 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-900 dark:hover:text-gray-100'"
+                @click="filterGroup = (filterGroup === g ? null : g)"
+                @dblclick.prevent="startRename(g)"
+                :title="`Filter by ${g} · double-click to rename`"
+              >
+                <svg class="w-2.5 h-2.5 shrink-0 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                {{ g }}
+                <span
+                  class="opacity-0 group-hover/chip:opacity-100 inline-flex items-center justify-center w-3 h-3 rounded-full transition-all duration-150 hover:text-danger-500 dark:hover:text-danger-400"
+                  :title="`Remove group '${g}'`"
+                  @click.stop="removeGroup(g)"
+                >
+                  <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </span>
+              </button>
+            </template>
+          </div>
+
+          <p class="font-mono text-[10px] text-gray-400 dark:text-gray-500 ml-1">Dbl-click to rename</p>
+        </div>
+
         <!-- Filter row -->
         <div class="mt-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div class="flex items-center gap-5">
@@ -413,6 +512,20 @@ onMounted(() => {
                       {{ task.courseName }}
                     </span>
 
+                    <!-- Group tag -->
+                    <button
+                      v-if="task.group && filterGroup !== task.group"
+                      type="button"
+                      class="inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 rounded-full border border-gray-200/80 dark:border-gray-700/60 text-gray-500 dark:text-gray-400 hover:border-primary-300/80 hover:text-primary-700 dark:hover:text-primary-400 transition-colors"
+                      :title="`Filter by group: ${task.group}`"
+                      @click="filterGroup = task.group"
+                    >
+                      <svg class="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      {{ task.group }}
+                    </button>
+
                     <!-- Linked assignment -->
                     <span
                       v-if="getAssignmentTitle(task)"
@@ -499,6 +612,35 @@ onMounted(() => {
             <span class="font-mono text-[15px] tabular-nums" :class="row.tone">{{ row.value }}</span>
           </div>
         </div>
+
+        <!-- Groups -->
+        <template v-if="tasksStore.taskGroups.length">
+          <p class="eyebrow text-gray-400 dark:text-gray-500 mt-8 mb-2">Groups</p>
+          <div class="space-y-1">
+            <button
+              v-for="g in tasksStore.taskGroups"
+              :key="g"
+              type="button"
+              class="w-full flex items-center justify-between gap-2 py-1.5 group/grail transition-colors"
+              @click="filterGroup = (filterGroup === g ? null : g)"
+            >
+              <span
+                class="flex items-center gap-1.5 text-[13px] transition-colors"
+                :class="filterGroup === g
+                  ? 'text-primary-700 dark:text-primary-400 font-medium'
+                  : 'text-gray-500 dark:text-gray-400 group-hover/grail:text-gray-800 dark:group-hover/grail:text-gray-200'"
+              >
+                <svg class="w-3 h-3 shrink-0 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                {{ g }}
+              </span>
+              <span class="font-mono text-[13px] tabular-nums text-gray-400 dark:text-gray-500">
+                {{ tasksStore.tasks.filter(t => t.group === g).length }}
+              </span>
+            </button>
+          </div>
+        </template>
       </aside>
     </div>
 

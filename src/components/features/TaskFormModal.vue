@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { Modal, Input, Dropdown, DatePicker, Button } from '../ui'
 import { useAssignmentsStore } from '../../stores/assignments'
 import { useCoursesStore } from '../../stores/courses'
+import { useTasksStore } from '../../stores/tasks'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -17,6 +18,7 @@ const emit = defineEmits(['update:modelValue', 'save'])
 
 const assignmentsStore = useAssignmentsStore()
 const coursesStore = useCoursesStore()
+const tasksStore = useTasksStore()
 
 const PRIORITY_OPTIONS = [
   {
@@ -49,8 +51,27 @@ const scheduledDate = ref('')
 const priorityLevel = ref('normal')
 const courseId = ref('')
 const assignmentId = ref('')
+const group = ref('')
 
 const titleError = ref('')
+
+// ── Group combobox state ─────────────────────────────────────────────────────
+const groupDropdownOpen = ref(false)
+
+const groupSuggestions = computed(() => {
+  const q = group.value.trim().toLowerCase()
+  return tasksStore.taskGroups.filter(g => !q || g.toLowerCase().includes(q))
+})
+
+function selectGroup(name) {
+  group.value = name
+  groupDropdownOpen.value = false
+}
+
+function onGroupBlur() {
+  // Delay so a click on a suggestion fires before we close.
+  setTimeout(() => { groupDropdownOpen.value = false }, 150)
+}
 
 // Filter assignments by selected course, or show all if no course picked
 const filteredAssignments = computed(() => {
@@ -92,12 +113,14 @@ watch(() => props.modelValue, (open) => {
     priorityLevel.value = props.task.priorityLevel || 'normal'
     courseId.value = props.task.courseId || ''
     assignmentId.value = props.task.assignmentId || ''
+    group.value = props.task.group || ''
   } else {
     title.value = ''
     scheduledDate.value = props.defaultDate || ''
     priorityLevel.value = 'normal'
     courseId.value = ''
     assignmentId.value = ''
+    group.value = ''
   }
 })
 
@@ -130,6 +153,7 @@ function handleSubmit() {
     assignmentId: assignment?.id || null,
     courseId: course?.id || assignment?.courseId || null,
     courseName: course?.name || assignment?.courseName || null,
+    group: group.value.trim() || null,
   })
 
   close()
@@ -185,6 +209,57 @@ function handleSubmit() {
             {{ opt.label }}
           </button>
         </div>
+      </div>
+
+      <!-- Group -->
+      <div class="space-y-1.5">
+        <label class="eyebrow text-gray-500 dark:text-gray-400">
+          Group <span class="normal-case text-gray-400 dark:text-gray-500">(optional)</span>
+        </label>
+        <div class="relative">
+          <input
+            v-model="group"
+            type="text"
+            placeholder="e.g. Study, Work, Personal…"
+            class="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-surface dark:bg-gray-800 text-[15px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-medium tracking-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 focus-visible:border-primary-300/80 dark:focus-visible:border-primary-600/60 transition-[border-color,box-shadow] duration-200 pr-8"
+            @focus="groupDropdownOpen = true"
+            @blur="onGroupBlur"
+          />
+          <button
+            v-if="group"
+            type="button"
+            tabindex="-1"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-0.5 rounded"
+            @click="group = ''"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <!-- Existing group suggestions -->
+          <Transition name="dropdown">
+            <div
+              v-if="groupDropdownOpen && groupSuggestions.length"
+              class="absolute z-50 mt-1.5 w-full rounded-xl border border-gray-200/80 dark:border-gray-700/60 bg-surface dark:bg-gray-800 py-1 shadow-[0_4px_16px_rgba(15,23,42,0.08),0_2px_4px_rgba(15,23,42,0.04)]"
+            >
+              <button
+                v-for="s in groupSuggestions"
+                :key="s"
+                type="button"
+                class="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-[14px] font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-100 transition-colors cursor-pointer"
+                @mousedown.prevent="selectGroup(s)"
+              >
+                <svg class="w-3 h-3 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                {{ s }}
+              </button>
+            </div>
+          </Transition>
+        </div>
+        <p v-if="group && !tasksStore.taskGroups.includes(group.trim())" class="font-mono text-[11px] text-primary-600 dark:text-primary-400">
+          Creates a new group "{{ group.trim() }}"
+        </p>
       </div>
 
       <!-- Course -->

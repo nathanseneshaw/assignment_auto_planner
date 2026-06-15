@@ -477,7 +477,7 @@ async function syncOneFeed(userSupabase, writeClient, userId, feed) {
  * inserts and we'd rather take a few extra seconds than have one feed's
  * burst starve the others. Per-feed results are aggregated into `totals`.
  */
-const ZERO_TOTALS = { coursesInserted: 0, coursesUpdated: 0, assignmentsInserted: 0, assignmentsUpdated: 0 }
+const ZERO_TOTALS = { coursesInserted: 0, coursesUpdated: 0, assignmentsInserted: 0, assignmentsUpdated: 0, assignmentsArchived: 0 }
 
 router.post('/api/ics/sync', requireUser, syncLimiter, async (req, res) => {
   const feedId = req.body?.feedId || null
@@ -506,6 +506,7 @@ router.post('/api/ics/sync', requireUser, syncLimiter, async (req, res) => {
           acc.coursesUpdated += r.coursesUpdated || 0
           acc.assignmentsInserted += r.assignmentsInserted || 0
           acc.assignmentsUpdated += r.assignmentsUpdated || 0
+          acc.assignmentsArchived += r.assignmentsArchived || 0
         }
         return acc
       },
@@ -513,9 +514,12 @@ router.post('/api/ics/sync', requireUser, syncLimiter, async (req, res) => {
     )
 
     // True when the DB actually changed — lets the client skip a re-hydration
-    // round-trip (getUser + 3 table selects) on the common no-op sync.
+    // round-trip (getUser + 3 table selects) on the common no-op sync. An
+    // archive-only sync (items vanished, nothing else changed) still counts so
+    // the UI reflects the newly-archived rows.
     const changed =
-      totals.coursesInserted + totals.coursesUpdated + totals.assignmentsInserted + totals.assignmentsUpdated > 0
+      totals.coursesInserted + totals.coursesUpdated + totals.assignmentsInserted +
+        totals.assignmentsUpdated + totals.assignmentsArchived > 0
 
     // Return refreshed feed rows so the client doesn't need a follow-up GET
     // /api/ics/feeds (which would re-validate the token and re-select).

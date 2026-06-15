@@ -71,21 +71,33 @@ function mapCourseRow(row, index) {
 
 /**
  * Map a Supabase `assignments` row → the shape `useAssignmentsStore` expects.
- * Defaults `status='pending'`, no subtasks, 0% progress — local task state is
- * not stored server-side yet, so hydration always starts these fresh.
+ *
+ * Completion state (`status` / `progress` / `completedAt`) is read back from the
+ * row so a finished assignment stays finished across syncs (Pillar C). `tasks`
+ * still starts empty — subtasks live in the separate `tasks` store and are
+ * hydrated independently. On a pre-migration schema these columns are absent, so
+ * we fall back to the previous pending/0 defaults.
  */
 function mapAssignmentRow(row, course) {
   const id = row.id
   const ext = row.external_assignment_id != null ? String(row.external_assignment_id).trim() : ''
   const src = row.import_source
+  // Coerce + clamp so a string or out-of-range value can't reach the UI; mirrors
+  // the write-side clamp in lmsSupabaseSync.completionFields.
+  const progressNum = Number(row.progress)
 
   const base = {
     id,
     supabaseAssignmentId: id,
     createdAt: row.created_at || new Date().toISOString(),
-    status: 'pending',
+    status: row.status || 'pending',
     tasks: [],
-    progress: 0,
+    progress: Number.isFinite(progressNum) ? Math.max(0, Math.min(100, Math.round(progressNum))) : 0,
+    completedAt: row.completed_at || null,
+    // Pillar A: 'archived' means the item left its ICS feed (kept for the record
+    // but hidden from active lists). Pre-migration rows have no column → 'live'.
+    feedStatus: row.feed_status || 'live',
+    archivedAt: row.archived_at || null,
     courseId: row.course_id,
     courseName: course?.name || 'Unknown course',
     title: row.assignment_name || 'Untitled',
@@ -103,6 +115,54 @@ function mapAssignmentRow(row, course) {
     return { ...base, blackboardId: ext }
   }
   return base
+}
+
+/** True when two timestamps point at the same instant, tolerating format
+ *  differences (e.g. the `…Z` we write vs the `…+00:00` Postgres returns). */
+function sameInstant(a, b) {
+  if (!a && !b) return true
+  if (!a || !b) return false
+  const ta = new Date(a).getTime()
+  const tb = new Date(b).getTime()
+  return !Number.isNaN(ta) && ta === tb
+}
+
+/**
+ * True when a Supabase `assignments` row already carries the same user-visible
+ * state the local Pinia row has. The realtime layer uses this to tell its own
+ * write echoing back (ignore — nothing new) from a genuine edit made on another
+ * instance (apply). Reuses {@link mapAssignmentRow} so the field mapping can never
+ * drift from what hydration actually writes. See useSupabaseRealtimeSync.
+ */
+export function assignmentDbRowMatchesLocal(row, local) {
+  if (!row || !local) return false
+  const mapped = mapAssignmentRow(row, { name: local.courseName })
+  return (
+    mapped.status === local.status &&
+    mapped.progress === local.progress &&
+    sameInstant(mapped.completedAt, local.completedAt) &&
+    mapped.feedStatus === local.feedStatus &&
+    sameInstant(mapped.archivedAt, local.archivedAt) &&
+    mapped.title === local.title &&
+    mapped.dueDate === local.dueDate &&
+    (mapped.description || '') === (local.description || '') &&
+    mapped.courseId === local.courseId
+  )
+}
+
+/** Course counterpart to {@link assignmentDbRowMatchesLocal}. */
+export function courseDbRowMatchesLocal(row, local) {
+  if (!row || !local) return false
+  const mapped = mapCourseRow(row, 0) // index only affects color, which we don't compare
+  return (
+    mapped.name === local.name &&
+    (mapped.instructor || '') === (local.instructor || '') &&
+    mapped.lmsSource === local.lmsSource &&
+    (mapped.code || '') === (local.code || '') &&
+    (mapped.term || '') === (local.term || '') &&
+    (mapped.canvasCourseId || '') === (local.canvasCourseId || '') &&
+    (mapped.blackboardId || '') === (local.blackboardId || '')
+  )
 }
 
 /**

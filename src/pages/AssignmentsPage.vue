@@ -60,14 +60,20 @@ function shortDate(dateString) {
 }
 
 // ── Status classification ────────────────────────────────────────────────
+// Archived = removed from its ICS feed (Pillar A). It gets its own bucket and is
+// kept out of the active overdue/upcoming/completed lists, but its completion is
+// preserved and still counts toward the semester total on the dashboard.
+function isArchived(a) {
+  return a.feedStatus === 'archived'
+}
 function isCompleted(a) {
-  return a.status === 'completed'
+  return !isArchived(a) && a.status === 'completed'
 }
 function isOverdue(a) {
-  return a.status !== 'completed' && a.dueDate < localDateKey()
+  return !isArchived(a) && a.status !== 'completed' && a.dueDate < localDateKey()
 }
 function isUpcoming(a) {
-  return a.status !== 'completed' && a.dueDate >= localDateKey()
+  return !isArchived(a) && a.status !== 'completed' && a.dueDate >= localDateKey()
 }
 
 function byDueDate(list) {
@@ -83,20 +89,30 @@ const courseFiltered = computed(() => {
 const overdueList = computed(() => byDueDate(courseFiltered.value.filter(isOverdue)))
 const upcomingList = computed(() => byDueDate(courseFiltered.value.filter(isUpcoming)))
 const completedList = computed(() => byDueDate(courseFiltered.value.filter(isCompleted)))
+// Most-recently-due first — the items a student is most likely looking for.
+const archivedList = computed(() =>
+  [...courseFiltered.value.filter(isArchived)].sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate))
+)
 
 const counts = computed(() => ({
   all: courseFiltered.value.length,
   overdue: overdueList.value.length,
   upcoming: upcomingList.value.length,
   completed: completedList.value.length,
+  archived: archivedList.value.length,
 }))
 
-const tabs = computed(() => [
-  { key: 'all', label: 'All', count: counts.value.all },
-  { key: 'upcoming', label: 'Upcoming', count: counts.value.upcoming },
-  { key: 'overdue', label: 'Overdue', count: counts.value.overdue },
-  { key: 'completed', label: 'Completed', count: counts.value.completed },
-])
+// The Archived tab only appears once there's something archived — no empty noise.
+const tabs = computed(() => {
+  const base = [
+    { key: 'all', label: 'All', count: counts.value.all },
+    { key: 'upcoming', label: 'Upcoming', count: counts.value.upcoming },
+    { key: 'overdue', label: 'Overdue', count: counts.value.overdue },
+    { key: 'completed', label: 'Completed', count: counts.value.completed },
+  ]
+  if (counts.value.archived) base.push({ key: 'archived', label: 'Archived', count: counts.value.archived })
+  return base
+})
 
 // Grouped sections rendered for the active tab.
 const sections = computed(() => {
@@ -111,6 +127,9 @@ const sections = computed(() => {
   if ((tab === 'all' || tab === 'completed') && completedList.value.length) {
     out.push({ key: 'completed', label: 'Completed', tone: 'muted', items: completedList.value })
   }
+  if ((tab === 'all' || tab === 'archived') && archivedList.value.length) {
+    out.push({ key: 'archived', label: 'Removed from calendar', tone: 'muted', items: archivedList.value })
+  }
   return out
 })
 
@@ -122,18 +141,26 @@ const emptyCopy = computed(() => {
       return { title: 'Nothing on the horizon yet.', sub: 'New deadlines will appear here as they arrive.' }
     case 'completed':
       return { title: 'Nothing completed yet.', sub: 'Check items off and they’ll collect here.' }
+    case 'archived':
+      return { title: 'Nothing archived.', sub: 'Assignments removed from your calendar feed are kept here.' }
     default:
       return { title: 'No assignments yet.', sub: 'Add one manually or connect a calendar feed.' }
   }
 })
 
 // ── Overview panel ───────────────────────────────────────────────────────
-const overviewRows = computed(() => [
-  { label: 'Total', value: counts.value.all, tone: 'text-gray-900 dark:text-gray-100' },
-  { label: 'Overdue', value: counts.value.overdue, tone: counts.value.overdue ? 'text-rust-600 dark:text-rust-500' : 'text-gray-400' },
-  { label: 'Upcoming', value: counts.value.upcoming, tone: 'text-gray-900 dark:text-gray-100' },
-  { label: 'Completed', value: counts.value.completed, tone: 'text-gray-400' },
-])
+const overviewRows = computed(() => {
+  const rows = [
+    { label: 'Total', value: counts.value.all, tone: 'text-gray-900 dark:text-gray-100' },
+    { label: 'Overdue', value: counts.value.overdue, tone: counts.value.overdue ? 'text-rust-600 dark:text-rust-500' : 'text-gray-400' },
+    { label: 'Upcoming', value: counts.value.upcoming, tone: 'text-gray-900 dark:text-gray-100' },
+    { label: 'Completed', value: counts.value.completed, tone: 'text-gray-400' },
+  ]
+  if (counts.value.archived) {
+    rows.push({ label: 'Archived', value: counts.value.archived, tone: 'text-gray-400' })
+  }
+  return rows
+})
 
 // ── Course swatches ──────────────────────────────────────────────────────
 // Map the stored course color (e.g. "bg-blue-100") to a solid dot. Listing the
@@ -320,7 +347,7 @@ onMounted(() => {
         </div>
 
         <!-- Tabs -->
-        <div class="mt-6 flex items-center gap-5 border-b border-paper-line dark:border-gray-700/60 overflow-x-auto">
+        <div class="mt-6 flex items-center gap-5 border-b border-paper-line dark:border-gray-700/60">
           <button
             v-for="tab in tabs"
             :key="tab.key"
@@ -399,6 +426,16 @@ onMounted(() => {
                       :class="importBadgeClass(assignment)"
                     >
                       {{ assignmentImportLabel(assignment) }}
+                    </span>
+                    <span
+                      v-if="isArchived(assignment)"
+                      class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wide border bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200/70 dark:border-amber-800/60"
+                      title="Removed from your calendar feed — kept here for your records."
+                    >
+                      <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 01-2 2M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M10 12h4" />
+                      </svg>
+                      Removed from calendar
                     </span>
                   </div>
                 </div>
@@ -487,7 +524,7 @@ onMounted(() => {
               class="flex-1 min-w-0 truncate text-[13px]"
               :class="filterCourse === 'all' ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-300'"
             >All courses</span>
-            <span class="font-mono text-[12px] text-gray-400 tabular-nums">{{ counts.all }}</span>
+            <span class="font-mono text-[12px] text-gray-400 tabular-nums">{{ assignmentsStore.assignments.length }}</span>
           </button>
 
           <button
