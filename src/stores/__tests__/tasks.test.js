@@ -3,7 +3,7 @@ import { flushPromises } from '@vue/test-utils'
 import { useTasksStore } from '../tasks.js'
 
 vi.mock('../../services/taskSync', () => ({
-  persistTaskToSupabase: vi.fn().mockResolvedValue('sb-task-id'),
+  persistTaskToSupabase: vi.fn().mockResolvedValue({ status: 'ok', id: 'sb-task-id' }),
   deleteTaskFromSupabase: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -117,11 +117,12 @@ describe('deleteTask', () => {
     expect(deleteTaskFromSupabase).toHaveBeenCalledWith('sb-123')
   })
 
-  it('does not call deleteTaskFromSupabase when task was never persisted', () => {
+  it('calls deleteTaskFromSupabase with task.id as fallback when supabaseTaskId is null', async () => {
     const store = useTasksStore()
     const task = store.addTask({ title: 'Local only' })
     store.deleteTask(task.id)
-    expect(deleteTaskFromSupabase).not.toHaveBeenCalled()
+    await flushPromises()
+    expect(deleteTaskFromSupabase).toHaveBeenCalledWith(task.id)
   })
 })
 
