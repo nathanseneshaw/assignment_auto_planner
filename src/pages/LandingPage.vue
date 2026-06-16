@@ -221,11 +221,11 @@ function toggleFaq(i) {
 
                 <p class="eyebrow text-gray-400 mb-2">Today</p>
                 <nav class="space-y-0.5 mb-6 text-sm">
-                  <p class="px-2.5 py-1.5 rounded-lg text-gray-600">Focus</p>
+                  <p class="px-2.5 py-1.5 rounded-lg text-gray-600">Dashboard</p>
                   <p
                     class="px-2.5 py-1.5 rounded-lg bg-primary-100/70 text-primary-900 font-medium flex items-center gap-2"
                   >
-                    <span class="w-1.5 h-1.5 rounded-full bg-primary-600"></span> Agenda
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary-600"></span> Tasks
                   </p>
                 </nav>
 
@@ -234,7 +234,12 @@ function toggleFaq(i) {
                   <p class="px-2.5 py-1.5 rounded-lg text-gray-600 flex items-center justify-between">
                     Assignments <span class="font-mono text-[11px] text-gray-400">3</span>
                   </p>
-                  <p class="px-2.5 py-1.5 rounded-lg text-gray-600">Week</p>
+                  <p class="px-2.5 py-1.5 rounded-lg text-gray-600 flex items-center justify-between">
+                    Planner <span class="font-mono text-[11px] text-gray-400">5</span>
+                  </p>
+                  <p class="px-2.5 py-1.5 rounded-lg text-gray-600 flex items-center justify-between">
+                    Courses <span class="font-mono text-[11px] text-gray-400">4</span>
+                  </p>
                 </nav>
 
                 <div class="mt-auto flex items-center gap-2.5 pt-6">
