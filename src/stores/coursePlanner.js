@@ -38,6 +38,11 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
   const loading = reactive({ terms: false, subjects: false, sections: false })
   const errors = reactive({ terms: '', subjects: '', sections: '' })
 
+  // In-flight request controllers, one per resource. Starting a new load aborts
+  // the previous one so a burst of school/term/subject changes can't pile up
+  // hung connections (and so a stale response can't clobber the current view).
+  const inFlight = { terms: null, subjects: null, sections: null }
+
   // Persisted: { rice: [Section, ...], ttu: [...], tamu: [...], smu: [...] }
   const savedSectionsBySchool = ref(loadSaved())
 
@@ -46,7 +51,7 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     return savedSectionsBySchool.value[schoolCode.value] || []
   })
 
-  // Persisted: weekly work shifts. Global (not per-school) — a job doesn't
+  // Persisted: weekly work shifts. Global (not per-school)  a job doesn't
   // change when you switch which catalog you're browsing.
   // Shape: [{ id, days: ['M','W'], startTime: '09:00', endTime: '17:00' }]
   const workShifts = ref(loadWork())
@@ -55,51 +60,79 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
 
   async function loadTerms() {
     if (!schoolCode.value) return
+    inFlight.terms?.abort()
+    const ac = new AbortController()
+    inFlight.terms = ac
     loading.terms = true
     errors.terms = ''
     terms.value = []
     try {
-      terms.value = await coursePlannerApi.getTerms(schoolCode.value)
+      terms.value = await coursePlannerApi.getTerms(schoolCode.value, { signal: ac.signal })
     } catch (e) {
+      if (e?.name === 'AbortError') return // superseded by a newer load; it owns the state now
       errors.terms = e?.message || 'Failed to load terms.'
     } finally {
-      loading.terms = false
+      // Only the request that's still current clears the flag — an aborted one
+      // must not flip it off under the request that replaced it.
+      if (inFlight.terms === ac) {
+        loading.terms = false
+        inFlight.terms = null
+      }
     }
   }
 
   async function loadSubjects() {
     if (!schoolCode.value || !selectedTermCode.value) return
+    inFlight.subjects?.abort()
+    const ac = new AbortController()
+    inFlight.subjects = ac
     loading.subjects = true
     errors.subjects = ''
     subjects.value = []
     try {
       subjects.value = await coursePlannerApi.getSubjects(
         schoolCode.value,
-        selectedTermCode.value
+        selectedTermCode.value,
+        { signal: ac.signal }
       )
     } catch (e) {
+      if (e?.name === 'AbortError') return
       errors.subjects = e?.message || 'Failed to load subjects.'
     } finally {
-      loading.subjects = false
+      if (inFlight.subjects === ac) {
+        loading.subjects = false
+        inFlight.subjects = null
+      }
     }
   }
 
   async function loadSections() {
     if (!schoolCode.value || !selectedTermCode.value || !selectedSubjectCode.value) return
+    inFlight.sections?.abort()
+    const ac = new AbortController()
+    inFlight.sections = ac
     loading.sections = true
     errors.sections = ''
     sections.value = []
     try {
-      sections.value = await coursePlannerApi.getSections(schoolCode.value, {
-        termCode: selectedTermCode.value,
-        subjectCode: selectedSubjectCode.value,
-        termLabel: selectedTermLabel.value,
-        subjectLabel: selectedSubjectLabel.value,
-      })
+      sections.value = await coursePlannerApi.getSections(
+        schoolCode.value,
+        {
+          termCode: selectedTermCode.value,
+          subjectCode: selectedSubjectCode.value,
+          termLabel: selectedTermLabel.value,
+          subjectLabel: selectedSubjectLabel.value,
+        },
+        { signal: ac.signal }
+      )
     } catch (e) {
+      if (e?.name === 'AbortError') return
       errors.sections = e?.message || 'Failed to load sections.'
     } finally {
-      loading.sections = false
+      if (inFlight.sections === ac) {
+        loading.sections = false
+        inFlight.sections = null
+      }
     }
   }
 
@@ -122,8 +155,25 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     if (code) loadSections()
   }
 
-  /** Wipe state — called when the user switches their primary school in profile. */
+  /**
+   * Reset the planner to a clean slate for a newly-picked school. Called from the
+   * profile page the moment the user changes their school. Clears the live search
+   * state (terms / subjects / sections / current selection) AND the saved weekly
+   * plan, so no courses from the previous school linger on the planner grid.
+   *
+   * Work shifts are intentionally left untouched — a job schedule isn't tied to
+   * which course catalog you're browsing.
+   */
   function resetForSchoolChange() {
+    // Cancel anything still loading for the previous school so a hung/slow
+    // request can't resolve into the freshly-reset state.
+    inFlight.terms?.abort()
+    inFlight.subjects?.abort()
+    inFlight.sections?.abort()
+    inFlight.terms = inFlight.subjects = inFlight.sections = null
+    loading.terms = false
+    loading.subjects = false
+    loading.sections = false
     terms.value = []
     subjects.value = []
     sections.value = []
@@ -134,6 +184,9 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     errors.terms = ''
     errors.subjects = ''
     errors.sections = ''
+    // Drop every saved section so the weekly grid starts empty for the new school.
+    savedSectionsBySchool.value = {}
+    persistSaved()
   }
 
   // --- Saved sections ---
@@ -148,6 +201,13 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
 
   function addSection(section) {
     if (!section || !section.school) return
+    // Reject sections that are explicitly closed or enrollment-full.
+    if (section.status === 'closed') return
+    const enr = section.enrollment || {}
+    const atCapacity =
+      (enr.available != null && enr.available <= 0) ||
+      (enr.max != null && enr.current != null && enr.current >= enr.max)
+    if (atCapacity) return
     const list = savedSectionsBySchool.value[section.school] || []
     if (list.some((s) => sectionKey(s) === sectionKey(section))) return
     savedSectionsBySchool.value = {

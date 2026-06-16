@@ -1,5 +1,5 @@
 /**
- * Auth store — wraps Supabase Auth in a Pinia store and mirrors the current
+ * Auth store  wraps Supabase Auth in a Pinia store and mirrors the current
  * user's display name/email into the profile store so the rest of the app can
  * stay LMS/auth-agnostic.
  *
@@ -19,7 +19,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   /** Full session object (contains access/refresh tokens). */
   const session = ref(null)
-  /** True after the initial session restore completes — gates the router. */
+  /** True after the initial session restore completes  gates the router. */
   const ready = ref(false)
 
   // Guard against `init()` being called twice (it wires up a global listener).
@@ -48,7 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Restore any persisted session and subscribe to future auth changes.
-   * Safe to call before Supabase is configured — just marks the store ready.
+   * Safe to call before Supabase is configured  just marks the store ready.
    */
   async function init() {
     if (initialized) return

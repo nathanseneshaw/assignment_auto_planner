@@ -26,15 +26,20 @@ export const useProfileStore = defineStore('profile', () => {
   }
 
   function saveToLocalStorage() {
-    localStorage.setItem('profile', JSON.stringify(profile.value))
+    const { darkMode, ...identity } = profile.value
+    localStorage.setItem('profile', JSON.stringify(identity))
+    localStorage.setItem('theme', darkMode ? '1' : '0')
   }
 
   function loadFromLocalStorage() {
     try {
       const savedProfile = localStorage.getItem('profile')
       if (savedProfile) {
-        // Merge so new fields (like darkMode) keep their defaults when missing from saved data
         profile.value = { ...profile.value, ...JSON.parse(savedProfile) }
+      }
+      const savedTheme = localStorage.getItem('theme')
+      if (savedTheme !== null) {
+        profile.value.darkMode = savedTheme === '1'
       }
     } catch (e) {
       console.warn('[profile] Failed to load from localStorage, using defaults:', e)

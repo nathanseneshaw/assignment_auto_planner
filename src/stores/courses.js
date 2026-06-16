@@ -11,7 +11,8 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { persistCourseToSupabase } from '../services/lmsSupabaseSync'
+import { persistCourseToSupabase, deleteCourseAndAssignmentsFromSupabase } from '../services/lmsSupabaseSync'
+import { useAssignmentsStore } from './assignments'
 
 export const useCoursesStore = defineStore('courses', () => {
   const courses = ref([])
@@ -55,7 +56,7 @@ export const useCoursesStore = defineStore('courses', () => {
     if (!initial) return null
     if (initial.supabaseCourseId) return initial.supabaseCourseId
 
-    // A concurrent caller is already persisting this row — reuse their promise.
+    // A concurrent caller is already persisting this row  reuse their promise.
     if (coursePersistPromises.has(localCourseId)) {
       return coursePersistPromises.get(localCourseId)
     }
@@ -113,7 +114,7 @@ export const useCoursesStore = defineStore('courses', () => {
       const hasExtId =
         (merged.canvasCourseId != null && String(merged.canvasCourseId).trim() !== '') ||
         (merged.blackboardId != null && String(merged.blackboardId).trim() !== '')
-      // Skip persistence for purely-local courses that have never reached Supabase yet —
+      // Skip persistence for purely-local courses that have never reached Supabase yet
       // the background sync (useSupabaseStoreSync) will pick them up.
       if (!merged.supabaseCourseId && !hasExtId) return
 
@@ -130,6 +131,28 @@ export const useCoursesStore = defineStore('courses', () => {
   /** Local-only delete; the Supabase row is intentionally left in place. */
   function deleteCourse(id) {
     courses.value = courses.value.filter(c => c.id !== id)
+  }
+
+  /**
+   * Unenroll: removes the course and all its assignments both locally and from
+   * Supabase. Optimistic — local state is wiped immediately; the remote delete
+   * runs in the background. Throws if the Supabase deletes fail so the caller
+   * can surface an error to the user.
+   */
+  async function unenrollCourse(id) {
+    const course = getCourseById(id)
+    if (!course) return
+
+    // Optimistic local wipe — assignments first, then course.
+    const assignmentsStore = useAssignmentsStore()
+    const linked = assignmentsStore.assignments.filter(a => a.courseId === id)
+    for (const a of linked) assignmentsStore.deleteAssignment(a.id)
+    courses.value = courses.value.filter(c => c.id !== id)
+
+    // Remote delete (fire-and-forget; caller should await and handle errors).
+    if (course.supabaseCourseId) {
+      await deleteCourseAndAssignmentsFromSupabase(course.supabaseCourseId)
+    }
   }
 
   /** Resolve once every in-flight course persist has settled (used by hydration). */
@@ -171,6 +194,7 @@ export const useCoursesStore = defineStore('courses', () => {
     ensureSupabaseCourseRow,
     updateCourse,
     deleteCourse,
+    unenrollCourse,
     replaceFromHydration,
     clearAll,
     flushPendingPersists,

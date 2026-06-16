@@ -63,7 +63,7 @@ export function resolveImportSource(assignment) {
 /**
  * Coerce any accepted date input (ISO string, Date, epoch ms) into an ISO
  * string. Falls back to "now" on garbage input so Supabase NOT NULL still
- * succeeds — the user can fix the date later.
+ * succeeds  the user can fix the date later.
  */
 function normalizeDueAt(due) {
   if (!due) return new Date().toISOString()
@@ -72,13 +72,75 @@ function normalizeDueAt(due) {
   return d.toISOString()
 }
 
+/** ISO string for a completion timestamp, or null when not completed / unparseable. */
+function normalizeCompletedAt(v) {
+  if (!v) return null
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+/**
+ * The durable completion fields (Pillar C). Written on both insert and update so
+ * an assignment's completed state survives ICS re-sync and Supabase hydration.
+ */
+function completionFields(assignment) {
+  const progress = Number(assignment.progress)
+  return {
+    status: assignment.status || 'pending',
+    progress: Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : 0,
+    completed_at: normalizeCompletedAt(assignment.completedAt),
+  }
+}
+
+// Capability flag for the completion columns added 2026-06-14 (status / progress
+// / completed_at). null = not probed yet, true = present, false = absent (older
+// schema  strip the fields so saves still succeed). Mirrors the content_hash
+// feature-detection in ics-routes.js; tolerates the documented schema drift.
+let completionColumnsPresent = null
+
+/** True when a PostgREST error means one of the completion columns doesn't exist. */
+function isMissingCompletionColumn(error) {
+  if (!error) return false
+  const code = String(error.code || '')
+  if (code === '42703' || code === 'PGRST204') return true
+  const msg = error.message || ''
+  return /(status|progress|completed_at)/i.test(msg) &&
+    /(column|schema cache|does not exist)/i.test(msg)
+}
+
+/** Return a shallow copy of `payload` with the completion columns removed. */
+function withoutCompletionFields(payload) {
+  const clone = { ...payload }
+  delete clone.status
+  delete clone.progress
+  delete clone.completed_at
+  return clone
+}
+
+/**
+ * Run a single-row assignment insert/update, transparently retrying without the
+ * completion columns if the live schema predates them. `build(payload)` must
+ * return the fully-chained PostgREST query (e.g. `.select('id').single()`).
+ */
+async function writeAssignmentRow(build, payload) {
+  const first = completionColumnsPresent === false ? withoutCompletionFields(payload) : payload
+  let res = await build(first)
+  if (res.error && completionColumnsPresent !== false && isMissingCompletionColumn(res.error)) {
+    completionColumnsPresent = false
+    res = await build(withoutCompletionFields(payload))
+  } else if (!res.error && completionColumnsPresent === null) {
+    completionColumnsPresent = true
+  }
+  return res
+}
+
 /**
  * Upsert a course row for the signed-in user. Returns Supabase course UUID or null.
  *
  * Tries three paths in order:
- *   1. **Known id** — update by `supabaseCourseId` (fast path on subsequent syncs).
- *   2. **External match** — look up `(source, external_course_id)` and update if found.
- *   3. **Fresh insert** — no match anywhere; create a new row.
+ *   1. **Known id**  update by `supabaseCourseId` (fast path on subsequent syncs).
+ *   2. **External match**  look up `(source, external_course_id)` and update if found.
+ *   3. **Fresh insert**  no match anywhere; create a new row.
  * Errors are swallowed and logged; the caller treats `null` as "try again later".
  */
 export async function persistCourseToSupabase(course) {
@@ -148,7 +210,7 @@ export async function persistCourseToSupabase(course) {
       }
     }
 
-    // No match — insert a fresh row.
+    // No match  insert a fresh row.
     const { data, error } = await supabase
       .from('courses')
       .insert(row)
@@ -169,10 +231,37 @@ export async function persistCourseToSupabase(course) {
  *
  * Mirrors the three-path pattern from {@link persistCourseToSupabase}. The
  * "title + due_at" fallback dedupes manually-entered rows that have no stable
- * external id — accept the small risk of two genuinely-identical assignments
+ * external id  accept the small risk of two genuinely-identical assignments
  * collapsing in exchange for not duplicating on re-sync.
  */
-export async function persistAssignmentToSupabase(assignment, supabaseCourseId) {
+// Per-row write serialization. Every write for one assignment runs strictly in
+// submission order, so a fast complete→uncheck can't have its two writes land out
+// of order and leave Supabase holding the wrong final state (which would then echo
+// back over Realtime and revert the checkbox on every open instance). Keyed by the
+// stable local id, which all call sites carry (immediate per-edit persist, the
+// debounced full-store flush, and the initial insert).
+const assignmentWriteChains = new Map()
+export function runSerialized(key, task) {
+  const prev = assignmentWriteChains.get(key) || Promise.resolve()
+  const run = prev.then(() => task())
+  // The stored chain never rejects, so one failed write can't wedge the queue.
+  const guarded = run.then(() => {}, () => {})
+  assignmentWriteChains.set(key, guarded)
+  // Drop the entry once the queue drains so the map can't grow without bound.
+  guarded.then(() => {
+    if (assignmentWriteChains.get(key) === guarded) assignmentWriteChains.delete(key)
+  })
+  return run
+}
+
+export function persistAssignmentToSupabase(assignment, supabaseCourseId) {
+  const key = (assignment && (assignment.id || assignment.supabaseAssignmentId)) || 'pending'
+  return runSerialized(`assignment:${key}`, () =>
+    persistAssignmentRowToSupabase(assignment, supabaseCourseId)
+  )
+}
+
+async function persistAssignmentRowToSupabase(assignment, supabaseCourseId) {
   if (!isSupabaseConfigured || !supabase || !supabaseCourseId) return null
 
   const {
@@ -182,6 +271,7 @@ export async function persistAssignmentToSupabase(assignment, supabaseCourseId) 
   if (authErr || !user) return null
 
   const nowIso = new Date().toISOString()
+  const completion = completionFields(assignment)
   const row = {
     user_id: user.id,
     course_id: supabaseCourseId,
@@ -189,6 +279,7 @@ export async function persistAssignmentToSupabase(assignment, supabaseCourseId) 
     due_at: normalizeDueAt(assignment.dueAt || assignment.dueDate),
     description: assignment.description != null ? String(assignment.description) : null,
     updated_at: nowIso,
+    ...completion,
   }
 
   const assignmentUpdatePayload = {
@@ -197,18 +288,23 @@ export async function persistAssignmentToSupabase(assignment, supabaseCourseId) 
     due_at: row.due_at,
     description: row.description,
     updated_at: row.updated_at,
+    ...completion,
   }
 
   try {
-    // Fast path — already mapped to a Supabase row.
+    // Fast path  already mapped to a Supabase row.
     if (assignment.supabaseAssignmentId) {
-      const { data, error } = await supabase
-        .from('assignments')
-        .update(assignmentUpdatePayload)
-        .eq('id', assignment.supabaseAssignmentId)
-        .eq('user_id', user.id)
-        .select('id')
-        .single()
+      const { data, error } = await writeAssignmentRow(
+        (payload) =>
+          supabase
+            .from('assignments')
+            .update(payload)
+            .eq('id', assignment.supabaseAssignmentId)
+            .eq('user_id', user.id)
+            .select('id')
+            .single(),
+        assignmentUpdatePayload
+      )
       if (error) throw error
       return data.id
     }
@@ -227,22 +323,60 @@ export async function persistAssignmentToSupabase(assignment, supabaseCourseId) 
     if (selErr) throw selErr
 
     if (existing?.id) {
-      const { data, error } = await supabase
-        .from('assignments')
-        .update(assignmentUpdatePayload)
-        .eq('id', existing.id)
-        .select('id')
-        .single()
+      const { data, error } = await writeAssignmentRow(
+        (payload) =>
+          supabase
+            .from('assignments')
+            .update(payload)
+            .eq('id', existing.id)
+            .select('id')
+            .single(),
+        assignmentUpdatePayload
+      )
       if (error) throw error
       return data.id
     }
 
-    // No match — insert.
-    const { data, error } = await supabase.from('assignments').insert(row).select('id').single()
+    // No match  insert.
+    const { data, error } = await writeAssignmentRow(
+      (payload) => supabase.from('assignments').insert(payload).select('id').single(),
+      row
+    )
     if (error) throw error
     return data.id
   } catch (e) {
     console.warn('[lmsSupabaseSync] persistAssignmentToSupabase', e.message || e)
     return null
+  }
+}
+
+/**
+ * Hard-delete a course and all its assignments from Supabase. Assignments are
+ * deleted first so the operation is safe even if the DB has no CASCADE rule.
+ * Silently no-ops when Supabase is unconfigured or the user is signed out.
+ */
+export async function deleteCourseAndAssignmentsFromSupabase(supabaseCourseId) {
+  if (!isSupabaseConfigured || !supabase || !supabaseCourseId) return
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return
+
+  try {
+    await supabase
+      .from('assignments')
+      .delete()
+      .eq('course_id', supabaseCourseId)
+      .eq('user_id', user.id)
+  } catch (e) {
+    console.warn('[lmsSupabaseSync] delete assignments for course:', e?.message || e)
+  }
+
+  try {
+    await supabase
+      .from('courses')
+      .delete()
+      .eq('id', supabaseCourseId)
+      .eq('user_id', user.id)
+  } catch (e) {
+    console.warn('[lmsSupabaseSync] delete course:', e?.message || e)
   }
 }

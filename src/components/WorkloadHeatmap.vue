@@ -78,7 +78,7 @@ const monthLabels = computed(() => {
 
 function intensityClass(count, inYear) {
   if (!inYear) return 'bg-transparent'
-  if (count === 0)  return 'bg-gray-100 dark:bg-white/8'
+  if (count === 0)  return 'bg-gray-100 dark:bg-surface/8'
   if (count <= 2)   return 'bg-accent-200'
   if (count <= 5)   return 'bg-warning-300'
   if (count <= 8)   return 'bg-warning-500'
@@ -97,7 +97,7 @@ function onCellEnter(cell) { if (cell.inYear) hoveredCell.value = cell }
 function onCellLeave()     { hoveredCell.value = null }
 
 const DAY_LABELS    = ['Mon', '', 'Wed', '', 'Fri', '', '']
-const LEGEND_CELLS  = ['bg-gray-100 dark:bg-white/8', 'bg-accent-200', 'bg-warning-300', 'bg-warning-500', 'bg-danger-500']
+const LEGEND_CELLS  = ['bg-gray-100 dark:bg-surface/8', 'bg-accent-200', 'bg-warning-300', 'bg-warning-500', 'bg-danger-500']
 </script>
 
 <template>
@@ -105,7 +105,7 @@ const LEGEND_CELLS  = ['bg-gray-100 dark:bg-white/8', 'bg-accent-200', 'bg-warni
     <!-- Header -->
     <div class="mb-4">
       <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Workload heatmap</h3>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ year }} — assignments due + tasks scheduled per day</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ year }}  assignments due + tasks scheduled per day</p>
     </div>
 
     <!-- Grid -->
@@ -163,7 +163,7 @@ const LEGEND_CELLS  = ['bg-gray-100 dark:bg-white/8', 'bg-accent-200', 'bg-warni
         <transition name="fade" mode="out-in">
           <p v-if="hoveredCell" :key="hoveredCell.dateKey" class="text-[13px] text-gray-600 dark:text-gray-300 truncate">
             <span class="font-semibold text-gray-900 dark:text-gray-100">{{ hoveredDateLabel }}</span>
-            &nbsp;—&nbsp;
+            &nbsp;&nbsp;
             <span>{{
               hoveredCell.count === 0
                 ? 'Nothing scheduled'

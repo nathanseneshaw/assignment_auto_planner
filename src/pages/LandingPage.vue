@@ -15,6 +15,33 @@ const registerToApp = { name: 'Register', query: { redirect: '/dashboard' } }
 // Filename is version-less (see build.artifactName) so this link never changes.
 const installerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/releases/latest/download/Plannr-x64.exe'
 
+// ── Static hero product preview (a faithful, non-interactive snapshot of the
+//    Tasks page). Decorative only — marked aria-hidden in the template. ──
+const previewAccount = { name: 'Alex Rivera', email: 'alex.rivera@school.edu', initials: 'AR' }
+
+const previewTasks = [
+  'Read Chapter 7 — Thermodynamics',
+  'Draft thesis for English essay',
+  'Problem Set 4 — Linear Algebra',
+  'Review lecture notes for Bio midterm',
+  'Outline slides for group project',
+]
+
+const previewStats = [
+  { label: 'Total', value: 9, tone: 'text-gray-900' },
+  { label: 'Completed', value: 0, tone: 'text-primary-600' },
+  { label: 'Overdue', value: 0, tone: 'text-rust-600' },
+  { label: 'Due Today', value: 2, tone: 'text-warning-600' },
+]
+
+const previewBreakdown = [
+  { label: 'Total', value: 9, tone: 'text-gray-900' },
+  { label: 'Completed', value: 0, tone: 'text-primary-600' },
+  { label: 'Remaining', value: 9, tone: 'text-warning-600' },
+  { label: 'Overdue', value: 0, tone: 'text-rust-600' },
+  { label: 'Due today', value: 2, tone: 'text-gray-400' },
+]
+
 const features = [
   {
     title: 'One timeline for everything',
@@ -68,11 +95,9 @@ function toggleFaq(i) {
 </script>
 
 <template>
-  <div
-    class="min-h-screen scroll-smooth bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(16,185,129,0.08),transparent_50%),#fafaf9] text-gray-900"
-  >
+  <div class="min-h-screen scroll-smooth bg-paper text-gray-900">
     <header
-      class="sticky top-0 z-20 border-b border-gray-200/70 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70"
+      class="sticky top-0 z-20 border-b border-paper-line bg-paper/90 backdrop-blur-xl"
     >
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
         <RouterLink to="/" class="flex items-center gap-3 group min-w-0">
@@ -93,6 +118,14 @@ function toggleFaq(i) {
               <Button size="sm" type="button" @click="navigate">Go to app</Button>
             </RouterLink>
           </template>
+          <template v-else-if="isSupabaseConfigured">
+            <RouterLink :to="loginToApp" custom v-slot="{ navigate }">
+              <Button variant="secondary" size="sm" type="button" @click="navigate">Sign in</Button>
+            </RouterLink>
+            <RouterLink :to="registerToApp" custom v-slot="{ navigate }">
+              <Button size="sm" type="button" @click="navigate">Create account</Button>
+            </RouterLink>
+          </template>
         </nav>
       </div>
     </header>
@@ -100,16 +133,16 @@ function toggleFaq(i) {
     <main>
       <section class="max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-16 sm:pb-24">
         <div class="max-w-3xl">
-          <p
-            class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary-700 bg-primary-100/80 px-3 py-1 rounded-full border border-primary-200/60 mb-6"
+          <span
+            class="eyebrow text-gray-600 border border-gray-400/50 px-3.5 py-1.5 rounded-full mb-6 inline-block"
           >
             Built for students
-          </p>
+          </span>
           <h1
-            class="text-4xl sm:text-5xl lg:text-[3.25rem] font-bold tracking-tight text-gray-900 leading-[1.1]"
+            class="display text-5xl sm:text-6xl lg:text-7xl text-gray-900 leading-[1.05]"
           >
             Stop juggling tabs.<br />
-            <span class="text-primary-800">Plan assignments</span> with clarity.
+            <span class="text-primary-600">Plan assignments</span> with clarity.
           </h1>
           <p class="mt-6 text-lg sm:text-xl text-gray-600 leading-relaxed max-w-2xl">
             Plannr brings your coursework into one organized workspace: deadlines, weekly planning, and calendar
@@ -149,65 +182,200 @@ function toggleFaq(i) {
           </p>
         </div>
 
-        <div
-          class="mt-16 sm:mt-20 rounded-3xl border border-gray-200/80 bg-white shadow-xl shadow-gray-900/[0.06] overflow-hidden"
-        >
-          <!-- Abstract illustration of the planner's week view — not a literal screenshot. -->
+        <!-- ── Product preview: a static, non-interactive snapshot of the Tasks page ── -->
+        <div class="mt-14 sm:mt-20" aria-hidden="true">
           <div
-            class="aspect-[4/3] sm:aspect-[16/9] bg-gradient-to-br from-gray-50 via-white to-primary-100/50 p-4 sm:p-6"
+            class="relative mx-auto max-w-5xl rounded-2xl border border-paper-line bg-surface shadow-2xl shadow-gray-900/15 overflow-hidden"
           >
-            <div
-              class="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white/80 shadow-sm"
-            >
-              <div class="flex h-9 shrink-0 items-center gap-1.5 border-b border-gray-200/70 px-4">
-                <span class="h-2.5 w-2.5 rounded-full bg-gray-200"></span>
-                <span class="h-2.5 w-2.5 rounded-full bg-gray-200"></span>
-                <span class="h-2.5 w-2.5 rounded-full bg-gray-200"></span>
-                <span class="ml-3 h-2 w-28 rounded-full bg-gray-100"></span>
-                <span class="ml-auto h-5 w-14 rounded-md bg-primary-100"></span>
+            <!-- Browser chrome -->
+            <div class="flex items-center gap-3 border-b border-paper-line bg-paper/60 px-4 py-2.5">
+              <div class="flex items-center gap-1.5">
+                <span class="w-3 h-3 rounded-full bg-gray-300"></span>
+                <span class="w-3 h-3 rounded-full bg-gray-300"></span>
+                <span class="w-3 h-3 rounded-full bg-gray-300"></span>
               </div>
-              <div class="flex min-h-0 flex-1 gap-2 p-3 sm:gap-3 sm:p-4">
-                <div class="flex flex-1 flex-col gap-2">
-                  <span class="h-2 w-2/3 rounded-full bg-gray-200"></span>
-                  <div class="space-y-1 rounded-lg bg-primary-100 p-1.5">
-                    <span class="block h-1.5 w-3/4 rounded-full bg-primary-300/70"></span>
-                    <span class="block h-1.5 w-1/2 rounded-full bg-primary-300/40"></span>
-                  </div>
-                  <div class="h-6 rounded-lg bg-gray-100"></div>
-                </div>
-                <div class="flex flex-1 flex-col gap-2">
-                  <span class="h-2 w-1/2 rounded-full bg-gray-200"></span>
-                  <div class="h-8 rounded-lg bg-gray-100"></div>
-                  <div class="space-y-1 rounded-lg bg-primary-100 p-1.5">
-                    <span class="block h-1.5 w-2/3 rounded-full bg-primary-300/70"></span>
-                  </div>
-                </div>
-                <div class="flex flex-1 flex-col gap-2">
-                  <span class="h-2 w-3/4 rounded-full bg-gray-200"></span>
-                  <div class="space-y-1 rounded-lg bg-primary-200/60 p-1.5">
-                    <span class="block h-1.5 w-3/4 rounded-full bg-primary-400/50"></span>
-                    <span class="block h-1.5 w-2/3 rounded-full bg-primary-400/30"></span>
-                  </div>
-                </div>
-                <div class="hidden flex-1 flex-col gap-2 sm:flex">
-                  <span class="h-2 w-1/2 rounded-full bg-gray-200"></span>
-                  <div class="h-6 rounded-lg bg-gray-100"></div>
-                  <div class="space-y-1 rounded-lg bg-primary-100 p-1.5">
-                    <span class="block h-1.5 w-3/4 rounded-full bg-primary-300/70"></span>
-                    <span class="block h-1.5 w-1/2 rounded-full bg-primary-300/40"></span>
-                  </div>
-                </div>
-                <div class="hidden flex-1 flex-col gap-2 sm:flex">
-                  <span class="h-2 w-2/3 rounded-full bg-gray-200"></span>
-                  <div class="h-10 rounded-lg bg-gray-100"></div>
+              <div class="flex-1 flex justify-center">
+                <div
+                  class="flex items-center gap-1.5 rounded-md border border-paper-line bg-surface px-3 py-1 text-[11px] font-mono text-gray-400"
+                >
+                  <span class="text-gray-500">app.plannr.co</span>
+                  <span class="text-gray-300">/</span>
+                  <span>tasks</span>
                 </div>
               </div>
+              <span
+                class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-mono text-primary-700"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-primary-500"></span> On track
+              </span>
+            </div>
+
+            <!-- App body -->
+            <div class="flex">
+              <!-- Sidebar -->
+              <aside class="hidden lg:flex w-52 shrink-0 flex-col border-r border-paper-line bg-paper/40 p-5">
+                <div class="flex items-center gap-2.5 mb-8">
+                  <img src="/plannr-icon-light.svg" alt="" class="w-7 h-7 rounded-lg" />
+                  <span class="text-[15px] font-semibold text-gray-900">Plannr</span>
+                </div>
+
+                <p class="eyebrow text-gray-400 mb-2">Today</p>
+                <nav class="space-y-0.5 mb-6 text-sm">
+                  <p class="px-2.5 py-1.5 rounded-lg text-gray-600">Focus</p>
+                  <p
+                    class="px-2.5 py-1.5 rounded-lg bg-primary-100/70 text-primary-900 font-medium flex items-center gap-2"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary-600"></span> Agenda
+                  </p>
+                </nav>
+
+                <p class="eyebrow text-gray-400 mb-2">Plan</p>
+                <nav class="space-y-0.5 text-sm">
+                  <p class="px-2.5 py-1.5 rounded-lg text-gray-600 flex items-center justify-between">
+                    Assignments <span class="font-mono text-[11px] text-gray-400">3</span>
+                  </p>
+                  <p class="px-2.5 py-1.5 rounded-lg text-gray-600">Week</p>
+                </nav>
+
+                <div class="mt-auto flex items-center gap-2.5 pt-6">
+                  <span
+                    class="flex w-8 h-8 shrink-0 items-center justify-center rounded-full bg-gray-300 text-[11px] font-medium text-gray-600"
+                  >{{ previewAccount.initials }}</span>
+                  <div class="min-w-0">
+                    <p class="text-[13px] font-medium text-gray-700 truncate">{{ previewAccount.name }}</p>
+                    <p class="text-[11px] text-gray-400 truncate">{{ previewAccount.email }}</p>
+                  </div>
+                </div>
+              </aside>
+
+              <!-- Main column -->
+              <div class="flex-1 min-w-0 p-5 sm:p-7">
+                <!-- Breadcrumb + meta -->
+                <div class="flex items-center justify-between gap-4 mb-5">
+                  <p class="eyebrow text-gray-400 flex items-center gap-1.5">
+                    <span>Home</span><span class="text-gray-300">›</span><span class="text-gray-600">Tasks</span>
+                  </p>
+                  <p class="hidden sm:flex eyebrow text-gray-400 items-center gap-2">
+                    <span>Fri · Jun 12 · 3:03 PM</span>
+                    <span class="text-gray-300">·</span>
+                    <span>0/0 Today</span>
+                    <span class="text-rust-600">9 Overdue</span>
+                  </p>
+                </div>
+
+                <!-- Title + add -->
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 class="display text-3xl sm:text-4xl text-gray-900">Tasks</h3>
+                    <p class="mt-1 font-serif italic text-sm sm:text-base text-gray-500">
+                      Plan and track your daily study tasks
+                    </p>
+                  </div>
+                  <span
+                    class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-900 text-white text-[12px] font-semibold shadow-sm shadow-primary-900/15"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Task
+                  </span>
+                </div>
+
+                <!-- Stat cards -->
+                <div class="mt-5 grid grid-cols-4 gap-2.5 sm:gap-3">
+                  <div
+                    v-for="card in previewStats"
+                    :key="card.label"
+                    class="rounded-xl border border-paper-line bg-surface px-3 py-3 sm:px-4 shadow-sm shadow-gray-900/[0.03]"
+                  >
+                    <p class="display text-2xl sm:text-4xl leading-none" :class="card.tone">{{ card.value }}</p>
+                    <p class="eyebrow text-gray-400 mt-2">{{ card.label }}</p>
+                  </div>
+                </div>
+
+                <!-- Filter row -->
+                <div class="mt-6 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-4">
+                    <span class="eyebrow text-gray-400">Today</span>
+                    <span class="hidden sm:inline eyebrow text-gray-400">This Week</span>
+                    <span class="eyebrow text-gray-900 border-b-2 border-gray-900 pb-1">All</span>
+                    <span
+                      class="hidden sm:inline-flex items-center gap-1 rounded-lg border border-paper-line bg-surface px-2.5 py-1 text-[11px] font-mono text-gray-500"
+                    >
+                      All tasks
+                      <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </span>
+                  </div>
+                  <span
+                    class="hidden sm:inline-flex items-center gap-2 rounded-xl border border-paper-line bg-surface px-3 py-1.5 text-[11px] font-mono text-gray-400"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search tasks…
+                  </span>
+                </div>
+
+                <!-- Task group -->
+                <div class="mt-6">
+                  <div class="flex items-center gap-3">
+                    <p class="eyebrow text-gray-400">No Date</p>
+                    <span class="font-mono text-[11px] text-gray-400 tabular-nums">0/9</span>
+                    <div class="flex-1 h-px bg-paper-line"></div>
+                  </div>
+                  <div class="mt-1">
+                    <div
+                      v-for="title in previewTasks"
+                      :key="title"
+                      class="flex items-start gap-3 py-2.5 border-b border-dotted border-paper-line"
+                    >
+                      <span class="mt-0.5 shrink-0 w-[18px] h-[18px] rounded-full border border-gray-300"></span>
+                      <div class="flex-1 min-w-0">
+                        <p class="font-serif text-[15px] leading-snug text-gray-900">{{ title }}</p>
+                        <span
+                          class="mt-1 inline-block font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-rust-50 text-rust-600"
+                        >
+                          Urgent
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right rail · Progress -->
+              <aside class="hidden xl:block w-56 shrink-0 border-l border-paper-line p-6">
+                <p class="eyebrow text-gray-400 mb-3">Progress</p>
+                <p class="display text-gray-900 leading-none">
+                  <span class="text-5xl">0</span><span class="text-2xl text-gray-400">%</span>
+                </p>
+                <div class="mt-4 h-1.5 rounded-full bg-paper-line overflow-hidden"></div>
+                <p class="mt-3 text-[12px] text-gray-500">
+                  <span class="font-medium text-gray-900">0</span> of
+                  <span class="font-medium text-gray-900">9</span> tasks complete
+                </p>
+
+                <p class="eyebrow text-gray-400 mt-7 mb-2">Breakdown</p>
+                <div>
+                  <div
+                    v-for="row in previewBreakdown"
+                    :key="row.label"
+                    class="flex items-center justify-between py-2 border-b border-dotted border-paper-line"
+                  >
+                    <span class="text-[12px] text-gray-500">{{ row.label }}</span>
+                    <span class="font-mono text-[14px] tabular-nums" :class="row.tone">{{ row.value }}</span>
+                  </div>
+                </div>
+              </aside>
             </div>
           </div>
         </div>
+
       </section>
 
-      <section id="features" class="scroll-mt-20 border-t border-gray-200/80 bg-white/50 py-16 sm:py-20">
+      <section id="features" class="scroll-mt-20 border-t border-paper-line py-16 sm:py-20">
         <div class="max-w-6xl mx-auto px-4 sm:px-6">
           <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Why students use it</h2>
           <p class="mt-2 text-gray-600 max-w-2xl">
@@ -219,7 +387,7 @@ function toggleFaq(i) {
             <li
               v-for="item in features"
               :key="item.title"
-              class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm shadow-gray-900/[0.03]"
+              class="rounded-2xl border border-paper-line bg-surface p-6 shadow-sm shadow-gray-900/[0.03]"
             >
               <div class="w-11 h-11 rounded-xl bg-primary-100 flex items-center justify-center text-primary-900 mb-4">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -233,19 +401,19 @@ function toggleFaq(i) {
         </div>
       </section>
 
-      <section id="download" class="scroll-mt-20 border-t border-gray-200/80 py-16 sm:py-20">
+      <section id="download" class="scroll-mt-20 border-t border-paper-line py-16 sm:py-20">
         <div class="max-w-4xl mx-auto px-4 sm:px-6">
           <div class="text-center">
-            <p
-              class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary-700 bg-primary-100/80 px-3 py-1 rounded-full border border-primary-200/60 mb-6"
+            <span
+              class="eyebrow text-gray-600 border border-gray-400/50 px-3.5 py-1.5 rounded-full mb-6 inline-block"
             >
               Desktop app
-            </p>
+            </span>
             <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
               Take Plannr off the browser tab
             </h2>
             <p class="mt-3 text-gray-600 max-w-xl mx-auto">
-              Install the desktop app to keep your planner one click away — independent of your browser and always at hand during study sessions.
+              Install the desktop app to keep your planner one click away  independent of your browser and always at hand during study sessions.
             </p>
           </div>
 
@@ -253,7 +421,7 @@ function toggleFaq(i) {
             <a
               :href="installerUrl"
               download
-              class="flex items-center gap-4 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-900/[0.03] hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              class="flex items-center gap-4 rounded-2xl border border-paper-line bg-surface p-5 shadow-sm shadow-gray-900/[0.03] hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5 transition-all group"
             >
               <svg
                 class="w-10 h-10 shrink-0 text-primary-700"
@@ -287,7 +455,7 @@ function toggleFaq(i) {
         </div>
       </section>
 
-      <section id="faq" class="scroll-mt-20 border-t border-gray-200/80 bg-white/50 py-16 sm:py-20">
+      <section id="faq" class="scroll-mt-20 border-t border-paper-line py-16 sm:py-20">
         <div class="max-w-3xl mx-auto px-4 sm:px-6">
           <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Frequently asked questions</h2>
           <p class="mt-2 text-gray-600">Everything you need to know before you dive in.</p>
@@ -296,7 +464,7 @@ function toggleFaq(i) {
             <li
               v-for="(item, i) in faqs"
               :key="item.q"
-              class="rounded-2xl border border-gray-200/80 bg-white shadow-sm shadow-gray-900/[0.03]"
+              class="rounded-2xl border border-paper-line bg-surface shadow-sm shadow-gray-900/[0.03]"
             >
               <button
                 type="button"
@@ -330,7 +498,7 @@ function toggleFaq(i) {
         </div>
       </section>
 
-      <section class="py-16 sm:py-20 border-t border-gray-200/80">
+      <section class="py-16 sm:py-20 border-t border-paper-line">
         <div class="max-w-4xl mx-auto px-4 sm:px-6">
           <div
             class="text-center rounded-3xl bg-primary-900 text-white px-8 py-14 sm:py-16 shadow-xl shadow-primary-900/25"
@@ -346,7 +514,7 @@ function toggleFaq(i) {
                     variant="secondary"
                     size="lg"
                     type="button"
-                    class="!bg-white !text-primary-900 hover:!bg-gray-100"
+                    class="!bg-surface !text-primary-900 hover:!bg-gray-100"
                     @click="navigate"
                   >
                     Sign in
@@ -357,7 +525,7 @@ function toggleFaq(i) {
                     variant="outline"
                     size="lg"
                     type="button"
-                    class="!border-white/40 !text-white hover:!bg-white/10"
+                    class="!border-white/40 !text-white hover:!bg-surface/10"
                     @click="navigate"
                   >
                     Create account
@@ -370,7 +538,7 @@ function toggleFaq(i) {
                     variant="secondary"
                     size="lg"
                     type="button"
-                    class="!bg-white !text-primary-900 hover:!bg-gray-100"
+                    class="!bg-surface !text-primary-900 hover:!bg-gray-100"
                     @click="navigate"
                   >
                     Open the app
@@ -382,7 +550,7 @@ function toggleFaq(i) {
         </div>
       </section>
 
-      <footer class="border-t border-gray-200/80 py-10">
+      <footer class="border-t border-paper-line py-10">
         <div
           class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500"
         >

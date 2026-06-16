@@ -1,7 +1,7 @@
 /**
  * In-memory TTL cache shared across scrapers.
  *
- * The user picked "on-demand scraping" — but firing 4 universities' worth of
+ * The user picked "on-demand scraping"  but firing 4 universities' worth of
  * HTML/CSV/XLSX on every keystroke would be both slow and rude. A 5-minute
  * cache flattens repeat clicks without making the data feel stale.
  */
@@ -19,6 +19,12 @@ export function cacheGet(key) {
 
 export function cacheSet(key, value, ttlMs = 5 * 60 * 1000) {
   store.set(key, { value, expiresAt: Date.now() + ttlMs })
+}
+
+/** Flush a single key (or the entire store + pending map if no key given). For tests only. */
+export function cacheFlush(key) {
+  if (key === undefined) { store.clear(); pending.clear() }
+  else { store.delete(key); pending.delete(key) }
 }
 
 /** Memoize an async loader by cache key. Pending requests are de-duplicated. */

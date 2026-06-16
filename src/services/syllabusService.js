@@ -2,11 +2,11 @@
  * Client wrapper for the Syllabus Parser backend (`/api/syllabus/*`).
  *
  * Two calls:
- *   parse(file) — multipart upload, returns the AI-extracted draft. Uses raw
- *                 fetch (not fetchApiJson) because the body is FormData — we
+ *   parse(file)  multipart upload, returns the AI-extracted draft. Uses raw
+ *                 fetch (not fetchApiJson) because the body is FormData  we
  *                 must NOT set Content-Type so the browser inserts the
  *                 multipart boundary automatically.
- *   save(draft) — JSON POST, returns { courseId, assignmentsInserted, ... }.
+ *   save(draft)  JSON POST, returns { courseId, assignmentsInserted, ... }.
  */
 import { fetchApiJson } from './fetchApiJson'
 import { apiUrl } from './apiBase'
@@ -31,7 +31,7 @@ export async function parseSyllabus(file) {
   const fd = new FormData()
   fd.append('file', file, file.name)
 
-  // IMPORTANT: do NOT set Content-Type — the browser must add the
+  // IMPORTANT: do NOT set Content-Type  the browser must add the
   // multipart boundary parameter, and a manual value would break it.
   const res = await fetch(apiUrl('/api/syllabus/parse'), {
     method: 'POST',

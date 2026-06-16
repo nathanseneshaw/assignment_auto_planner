@@ -4,7 +4,7 @@
  * Endpoints (no auth required):
  *   - GET  /api/all-terms                  list of all Banner STVTERM rows
  *   - POST /api/course-sections            full term's sections (subject param is ignored
- *                                          server-side — we filter client-side after caching)
+ *                                          server-side  we filter client-side after caching)
  *
  * Important caveat for the unified shape: TAMU returns "NA" for max / current /
  * available enrollment in the public search. Only an open/closed flag
@@ -139,6 +139,6 @@ function parseInstructorsJson(raw) {
     return []
   }
   if (!Array.isArray(arr)) return []
-  // Names look like "Michelle C. Diaz (P)" — strip the trailing "(P)"/"(S)" role tag.
+  // Names look like "Michelle C. Diaz (P)"  strip the trailing "(P)"/"(S)" role tag.
   return arr.map((a) => String(a.NAME || '').replace(/\s*\([A-Z]\)\s*$/, '').trim()).filter(Boolean)
 }

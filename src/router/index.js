@@ -21,7 +21,7 @@ import { isSupabaseConfigured } from '../lib/supabase'
 import { IS_ELECTRON_BUILD } from '../lib/platform'
 
 // Electron has no marketing page: `/` is an auth-aware entry point. The
-// redirect function decides the destination on the first hop — unauthenticated
+// redirect function decides the destination on the first hop  unauthenticated
 // users go straight to /login (the explicit guarantee asked for here), while
 // signed-in users go straight to /dashboard without flashing through /login.
 // Safe to call useAuthStore() here because Pinia is installed before the
@@ -98,12 +98,16 @@ const routes = [
 // breaks: the initial pathname is the full filesystem path (not `/`), so
 // routes don't match; and `pushState('/tasks')` produces `file:///tasks`,
 // which Chromium treats as a different document and can wipe in-memory state
-// (Pinia/auth) mid-navigation — that's why "click any button → kicked to /login"
+// (Pinia/auth) mid-navigation  that's why "click any button  kicked to /login"
 // was happening. Hash mode keeps the document path stable and routes purely
 // from the `#fragment`, which is the standard Electron + Vue Router fix.
 const router = createRouter({
   history: IS_ELECTRON_BUILD ? createWebHashHistory() : createWebHistory(),
   routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { top: 0 }
+  },
 })
 
 /**
@@ -111,7 +115,7 @@ const router = createRouter({
  * "don't let signed-in users see /login or /register" bouncing.
  */
 router.beforeEach((to, from, next) => {
-  // Browser tab title — set on every nav, not just initial mount.
+  // Browser tab title  set on every nav, not just initial mount.
   document.title = `${to.meta.title} | Plannr`
 
   const authStore = useAuthStore()
@@ -123,7 +127,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (isSupabaseConfigured) {
-    // Auth wall — bounce anonymous users to login, preserving where they were headed.
+    // Auth wall  bounce anonymous users to login, preserving where they were headed.
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
       next({
         name: 'Login',
@@ -131,7 +135,7 @@ router.beforeEach((to, from, next) => {
       })
       return
     }
-    // Already authed? /login and /register make no sense — send to dashboard.
+    // Already authed? /login and /register make no sense  send to dashboard.
     if (to.meta.guestOnly && authStore.isAuthenticated) {
       next({ path: '/dashboard' })
       return

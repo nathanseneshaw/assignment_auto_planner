@@ -1,20 +1,86 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useTasksStore } from '../stores/tasks'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
-import { Card, EmptyState, Modal, Input, Dropdown, Button } from '../components/ui'
+import { Modal, Input, Dropdown, DatePicker, Button } from '../components/ui'
 import TaskFormModal from '../components/features/TaskFormModal.vue'
+import MonthCalendar from '../components/features/MonthCalendar.vue'
+import { resolveAssignmentCourseName } from '../utils/assignmentDisplay.js'
 
+const router = useRouter()
 const tasksStore = useTasksStore()
 const coursesStore = useCoursesStore()
 const assignmentsStore = useAssignmentsStore()
 
+// ── View mode: 'day' (focused agenda) or 'month' (full calendar). The choice
+// is remembered across sessions so the planner reopens the way the user left it.
+const VIEW_STORAGE_KEY = 'plannr.plannerView'
+function loadViewMode() {
+  try {
+    return localStorage.getItem(VIEW_STORAGE_KEY) === 'month' ? 'month' : 'day'
+  } catch {
+    return 'day'
+  }
+}
+const viewMode = ref(loadViewMode())
+function setViewMode(mode) {
+  viewMode.value = mode
+  try { localStorage.setItem(VIEW_STORAGE_KEY, mode) } catch { /* storage unavailable  ignore */ }
+}
+
+// ── Date helpers (all local-timezone; never toISOString  avoids UTC drift) ──
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const MINI_WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+function localDateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function parseDateLocal(dateString) {
+  const [y, m, d] = dateString.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+function startOfDay(d) {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+function startOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+function addDays(d, n) {
+  const x = new Date(d)
+  x.setDate(x.getDate() + n)
+  return x
+}
+function dayDiff(a, b) {
+  return Math.round((startOfDay(a).getTime() - startOfDay(b).getTime()) / 86_400_000)
+}
+function shortDate(dateString) {
+  const d = parseDateLocal(dateString)
+  return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`
+}
+
+// ── Live clock: keeps "today" / relative-day labels honest across midnight ──
+const now = ref(new Date())
+let clockTimer = null
+onMounted(() => { clockTimer = setInterval(() => { now.value = new Date() }, 30_000) })
+onUnmounted(() => { if (clockTimer) clearInterval(clockTimer) })
+
+// ── Selected day + mini-calendar month (both default to today) ──────────────
+const selectedDate = ref(startOfDay(new Date()))
+const calendarAnchor = ref(startOfMonth(new Date()))
+
+const todayKey = computed(() => localDateKey(now.value))
+const selectedKey = computed(() => localDateKey(selectedDate.value))
+const isToday = computed(() => selectedKey.value === todayKey.value)
+
 /** @typedef {{ kind: 'task' | 'assignment', id: string, title: string, courseId: string, courseName: string, completed: boolean, task?: object, assignmentId?: string }} PlannerItem */
 
-/**
- * Tasks + assignments (by due date) for calendar cells. Assignments come from Supabase hydration / sync.
- */
+/** Tasks (by scheduled date) + assignments (by due date) grouped by day key. */
 const plannerItemsByDateKey = computed(() => {
   /** @type {Record<string, PlannerItem[]>} */
   const map = {}
@@ -48,24 +114,226 @@ const plannerItemsByDateKey = computed(() => {
     })
   }
 
-  for (const k of Object.keys(map)) {
-    map[k].sort((x, y) => {
-      if (x.kind !== y.kind) return x.kind === 'task' ? -1 : 1
-      return x.title.localeCompare(y.title)
-    })
-  }
-
   return map
 })
 
-// Assignment edit modal
+// Everything to do on the selected day: incomplete first, deadlines (assignments)
+// ahead of work blocks (tasks), then alphabetical.
+const dayItems = computed(() => {
+  const items = [...(plannerItemsByDateKey.value[selectedKey.value] || [])]
+  items.sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1
+    if (a.kind !== b.kind) return a.kind === 'assignment' ? -1 : 1
+    return a.title.localeCompare(b.title)
+  })
+  return items
+})
+
+const dueCount = computed(() => dayItems.value.length)
+const remainingCount = computed(() => dayItems.value.filter(i => !i.completed).length)
+
+const overdueCount = computed(() => assignmentsStore.overdueAssignments.length)
+const overdueNoun = computed(() => `assignment${overdueCount.value === 1 ? '' : 's'}`)
+const nextDeadline = computed(() => assignmentsStore.upcomingAssignments[0] || null)
+const comingUp = computed(() => assignmentsStore.upcomingAssignments.slice(0, 5))
+
+// ── Hero copy ───────────────────────────────────────────────────────────────
+const heading = computed(() => {
+  const d = selectedDate.value
+  return `${WEEKDAYS_LONG[d.getDay()]}, ${MONTHS_LONG[d.getMonth()]} ${d.getDate()}`
+})
+
+const relativeDayLabel = computed(() => {
+  const diff = dayDiff(selectedDate.value, now.value)
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Tomorrow'
+  if (diff === -1) return 'Yesterday'
+  if (diff > 1) return `In ${diff} days`
+  return `${Math.abs(diff)} days ago`
+})
+
+const dayDotClass = computed(() => {
+  const diff = dayDiff(selectedDate.value, now.value)
+  if (diff === 0) return 'bg-primary-500'
+  if (diff < 0) return 'bg-rust-400'
+  return 'bg-gray-300 dark:bg-gray-600'
+})
+
+const dayMood = computed(() => {
+  const n = dueCount.value
+  if (n === 0) return 'A clear day.'
+  if (n <= 2) return 'A light day.'
+  if (n <= 4) return 'A steady day.'
+  return 'A full day.'
+})
+
+// ── Mini calendar ─────────────────────────────────────────────────────────
+const calMonthYear = computed(() =>
+  `${MONTHS_LONG[calendarAnchor.value.getMonth()]} ${calendarAnchor.value.getFullYear()}`
+)
+
+const calendarCells = computed(() => {
+  const y = calendarAnchor.value.getFullYear()
+  const m = calendarAnchor.value.getMonth()
+  const first = new Date(y, m, 1)
+  const startPad = first.getDay() // 0 = Sunday → week starts Sunday, matching the mockup
+  const gridStart = new Date(y, m, 1 - startPad)
+
+  const cells = []
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(gridStart)
+    d.setDate(gridStart.getDate() + i)
+    const key = localDateKey(d)
+    const inMonth = d.getMonth() === m
+    cells.push({
+      date: d,
+      dateKey: key,
+      dayNumber: d.getDate(),
+      inMonth,
+      isToday: key === todayKey.value,
+      isSelected: key === selectedKey.value,
+      hasItems: inMonth && (plannerItemsByDateKey.value[key]?.length || 0) > 0,
+    })
+  }
+  return cells
+})
+
+function cellClasses(cell) {
+  if (!cell.inMonth) return 'text-gray-300 dark:text-gray-600 hover:bg-paper-line/40 dark:hover:bg-gray-700/30'
+  if (cell.isToday) return 'bg-primary-900 text-white font-semibold'
+  if (cell.isSelected) return 'bg-primary-50 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300 ring-1 ring-inset ring-primary-500/50 font-semibold'
+  return 'text-gray-700 dark:text-gray-300 hover:bg-paper-line/60 dark:hover:bg-gray-700/50'
+}
+function dotClass(cell) {
+  if (cell.isToday) return 'bg-primary-300'
+  if (cell.isSelected) return 'bg-primary-600 dark:bg-primary-400'
+  return 'bg-primary-500/70 dark:bg-primary-400/60'
+}
+
+// ── Day navigation ──────────────────────────────────────────────────────────
+function selectDate(date) {
+  selectedDate.value = startOfDay(date)
+  calendarAnchor.value = startOfMonth(date)
+}
+function prevDay() { selectDate(addDays(selectedDate.value, -1)) }
+function nextDay() { selectDate(addDays(selectedDate.value, 1)) }
+function goToToday() { selectDate(new Date()) }
+function prevMonth() {
+  const d = new Date(calendarAnchor.value)
+  d.setMonth(d.getMonth() - 1)
+  calendarAnchor.value = startOfMonth(d)
+}
+function nextMonth() {
+  const d = new Date(calendarAnchor.value)
+  d.setMonth(d.getMonth() + 1)
+  calendarAnchor.value = startOfMonth(d)
+}
+
+// ── Per-item display helpers ────────────────────────────────────────────────
+function courseAccent(courseId) {
+  const c = coursesStore.getCourseById(courseId)
+  if (c?.color?.bg) return c.color.bg.replace('100', '500')
+  return 'bg-gray-300 dark:bg-gray-600'
+}
+function itemMeta(item) {
+  if (item.kind === 'assignment') {
+    const a = item.assignmentId ? assignmentsStore.getAssignmentById(item.assignmentId) : null
+    return resolveAssignmentCourseName(a, coursesStore.getCourseById) || item.courseName || 'Calendar feed'
+  }
+  return item.courseName || item.task?.assignmentTitle || 'Personal task'
+}
+function itemBadge(item) {
+  if (item.kind === 'assignment') return 'Due'
+  const lvl = item.task?.priorityLevel
+  if (lvl === 'urgent') return 'Urgent'
+  if (lvl === 'high') return 'High'
+  return 'Task'
+}
+function badgeClass(item) {
+  if (item.kind === 'assignment') return 'text-rust-500'
+  const lvl = item.task?.priorityLevel
+  if (lvl === 'urgent') return 'text-rust-500'
+  if (lvl === 'high') return 'text-warning-600 dark:text-warning-500'
+  return 'text-gray-300 dark:text-gray-600'
+}
+
+// ── Coming-up rail helpers ──────────────────────────────────────────────────
+function monthAbbr(dateKey) { return MONTHS_SHORT[parseDateLocal(dateKey).getMonth()] }
+function dayNum(dateKey) { return parseDateLocal(dateKey).getDate() }
+function weekdayName(dateKey) { return WEEKDAYS_LONG[parseDateLocal(dateKey).getDay()] }
+function railCourseName(a) {
+  return resolveAssignmentCourseName(a, coursesStore.getCourseById) || 'Calendar feed'
+}
+function relativeDue(dateKey) {
+  const diff = dayDiff(parseDateLocal(dateKey), now.value)
+  if (diff === 0) return 'due today'
+  if (diff === 1) return 'in 1 day'
+  if (diff === -1) return '1 day ago'
+  if (diff > 1) return `in ${diff} days`
+  return `${Math.abs(diff)} days ago`
+}
+function goToAssignmentDay(a) {
+  selectDate(parseDateLocal(a.dueDate))
+}
+
+// ── Item click / completion ─────────────────────────────────────────────────
+function onPlannerItemClick(item) {
+  if (item.kind === 'assignment' && item.assignmentId) {
+    openEditModal(item.assignmentId)
+    return
+  }
+  if (item.kind === 'task') openTaskEditModal(item.id)
+}
+function onPlannerCheckboxClick(item) {
+  if (item.kind === 'task') {
+    tasksStore.toggleTaskComplete(item.id)
+    return
+  }
+  if (item.assignmentId) {
+    if (item.completed) assignmentsStore.markAssignmentIncomplete(item.assignmentId)
+    else assignmentsStore.markAssignmentComplete(item.assignmentId)
+  }
+}
+
+// ── Task add / edit modal ───────────────────────────────────────────────────
+const showTaskModal = ref(false)
+const editingTask = ref(null)
+const taskDefaultDate = ref('')
+
+function openTaskEditModal(taskId) {
+  const t = tasksStore.tasks.find(t => t.id === taskId)
+  if (!t) return
+  editingTask.value = t
+  taskDefaultDate.value = ''
+  showTaskModal.value = true
+}
+function openAddTask() {
+  editingTask.value = null
+  taskDefaultDate.value = selectedKey.value
+  showTaskModal.value = true
+}
+function onTaskSave(data) {
+  const assignment = data.assignmentId
+    ? assignmentsStore.getAssignmentById(data.assignmentId)
+    : null
+  const payload = {
+    title: data.title,
+    scheduledDate: data.scheduledDate,
+    priorityLevel: data.priorityLevel,
+    priority: data.priority,
+    assignmentId: data.assignmentId || null,
+    assignmentTitle: assignment?.title || null,
+    courseId: data.courseId || null,
+    courseName: data.courseName || null,
+  }
+  if (editingTask.value) tasksStore.updateTask(editingTask.value.id, payload)
+  else tasksStore.addTask(payload)
+}
+
+// ── Assignment edit modal ───────────────────────────────────────────────────
 const showEditModal = ref(false)
 const editingAssignmentId = ref(null)
 const editFormData = ref({ title: '', description: '', courseId: '', dueDate: '' })
-
-// Task edit modal
-const showTaskEditModal = ref(false)
-const editingTask = ref(null)
 
 const modalCourseOptions = computed(() => [
   { value: '', label: 'Select a course' },
@@ -84,31 +352,6 @@ function openEditModal(assignmentId) {
   }
   showEditModal.value = true
 }
-
-function openTaskEditModal(taskId) {
-  const t = tasksStore.tasks.find(t => t.id === taskId)
-  if (!t) return
-  editingTask.value = t
-  showTaskEditModal.value = true
-}
-
-function saveEditedTask(data) {
-  if (!editingTask.value) return
-  const assignment = data.assignmentId
-    ? assignmentsStore.getAssignmentById(data.assignmentId)
-    : null
-  tasksStore.updateTask(editingTask.value.id, {
-    title: data.title,
-    scheduledDate: data.scheduledDate,
-    priorityLevel: data.priorityLevel,
-    priority: data.priority,
-    assignmentId: data.assignmentId || null,
-    assignmentTitle: assignment?.title || null,
-    courseId: data.courseId || null,
-    courseName: data.courseName || null,
-  })
-}
-
 function saveEditedAssignment() {
   if (!editFormData.value.title.trim() || !editFormData.value.dueDate) return
   const course = coursesStore.getCourseById(editFormData.value.courseId)
@@ -121,730 +364,370 @@ function saveEditedAssignment() {
   })
   showEditModal.value = false
 }
-
-function onPlannerItemClick(item) {
-  if (item.kind === 'assignment' && item.assignmentId) {
-    openEditModal(item.assignmentId)
-    return
-  }
-  if (item.kind === 'task') {
-    openTaskEditModal(item.id)
-  }
-}
-
-function onPlannerCheckboxClick(item) {
-  if (item.kind === 'task') {
-    tasksStore.toggleTaskComplete(item.id)
-    return
-  }
-  if (item.assignmentId) {
-    if (item.completed) {
-      assignmentsStore.markAssignmentIncomplete(item.assignmentId)
-    } else {
-      assignmentsStore.markAssignmentComplete(item.assignmentId)
-    }
-  }
-}
-
-const showPlannerEmptyState = computed(
-  () =>
-    coursesStore.courses.length === 0 &&
-    assignmentsStore.assignments.length === 0 &&
-    tasksStore.tasks.length === 0
-)
-
-const viewMode = ref('week')
-const currentWeekStart = ref(getWeekStart(new Date()))
-
-// Drag-and-drop state for month grid
-const draggingItem = ref(null)
-const dragOverDateKey = ref(null)
-
-function onDragStart(event, item) {
-  draggingItem.value = item
-  event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('text/plain', item.id)
-}
-
-function onDragEnd() {
-  draggingItem.value = null
-  dragOverDateKey.value = null
-}
-
-function onDragOverCell(event, day) {
-  if (!draggingItem.value) return
-  event.preventDefault()
-  event.dataTransfer.dropEffect = 'move'
-  dragOverDateKey.value = day.dateKey
-}
-
-function onDragLeaveCell(event, day) {
-  if (!event.currentTarget.contains(event.relatedTarget)) {
-    if (dragOverDateKey.value === day.dateKey) dragOverDateKey.value = null
-  }
-}
-
-function onDropCell(event, day) {
-  event.preventDefault()
-  const item = draggingItem.value
-  if (!item) return
-  const newDateKey = day.dateKey
-  if (item.kind === 'task') {
-    tasksStore.rescheduleTask(item.id, newDateKey)
-  } else if (item.kind === 'assignment' && item.assignmentId) {
-    assignmentsStore.updateAssignment(item.assignmentId, { dueDate: newDateKey })
-  }
-  draggingItem.value = null
-  dragOverDateKey.value = null
-}
-
-function startOfMonthFromDate(d) {
-  return new Date(d.getFullYear(), d.getMonth(), 1)
-}
-
-const currentMonthAnchor = ref(startOfMonthFromDate(new Date()))
-
-const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-
-function getWeekStart(date) {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  return new Date(d.setDate(diff))
-}
-
-function formatDateKeyLocal(date) {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-const weekDays = computed(() => {
-  const days = []
-  const start = new Date(currentWeekStart.value)
-
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(start)
-    date.setDate(start.getDate() + i)
-    const dateKey = formatDateKeyLocal(date)
-    const dayItems = plannerItemsByDateKey.value[dateKey] || []
-
-    days.push({
-      date,
-      dateKey,
-      dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-      dayNumber: date.getDate(),
-      monthName: date.toLocaleDateString('en-US', { month: 'short' }),
-      isToday: dateKey === formatDateKeyLocal(new Date()),
-      isWeekend: date.getDay() === 0 || date.getDay() === 6,
-      items: dayItems,
-      completedItems: dayItems.filter(t => t.completed).length
-    })
-  }
-
-  return days
-})
-
-const weekRange = computed(() => {
-  const start = currentWeekStart.value
-  const end = new Date(start)
-  end.setDate(start.getDate() + 6)
-
-  const startMonth = start.toLocaleDateString('en-US', { month: 'short' })
-  const endMonth = end.toLocaleDateString('en-US', { month: 'short' })
-  const year = end.getFullYear()
-
-  if (startMonth === endMonth) {
-    return `${startMonth} ${start.getDate()} – ${end.getDate()}, ${year}`
-  }
-  return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}, ${year}`
-})
-
-const weekStats = computed(() => {
-  const allItems = weekDays.value.flatMap(d => d.items)
-  const completed = allItems.filter(t => t.completed).length
-  return {
-    total: allItems.length,
-    completed,
-    percentage: allItems.length > 0 ? Math.round((completed / allItems.length) * 100) : 0
-  }
-})
-
-const monthYearLabel = computed(() =>
-  currentMonthAnchor.value.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-)
-
-const monthDayCells = computed(() => {
-  const y = currentMonthAnchor.value.getFullYear()
-  const m = currentMonthAnchor.value.getMonth()
-  const first = new Date(y, m, 1)
-  const startPad = (first.getDay() + 6) % 7
-  const gridStart = new Date(y, m, 1 - startPad)
-
-  const cells = []
-  for (let i = 0; i < 42; i++) {
-    const d = new Date(gridStart)
-    d.setDate(gridStart.getDate() + i)
-    const dateKey = formatDateKeyLocal(d)
-    const inMonth = d.getMonth() === m
-    const items = plannerItemsByDateKey.value[dateKey] || []
-
-    cells.push({
-      date: d,
-      dateKey,
-      dayNumber: d.getDate(),
-      inMonth,
-      isToday: dateKey === formatDateKeyLocal(new Date()),
-      isWeekend: d.getDay() === 0 || d.getDay() === 6,
-      items,
-      completedItems: items.filter(t => t.completed).length
-    })
-  }
-  return cells
-})
-
-const monthWeekRows = computed(() => {
-  const cells = monthDayCells.value
-  const rows = []
-  for (let i = 0; i < cells.length; i += 7) {
-    rows.push(cells.slice(i, i + 7))
-  }
-  return rows
-})
-
-const monthStats = computed(() => {
-  const start = new Date(currentMonthAnchor.value.getFullYear(), currentMonthAnchor.value.getMonth(), 1)
-  const end = new Date(currentMonthAnchor.value.getFullYear(), currentMonthAnchor.value.getMonth() + 1, 0)
-  const startKey = formatDateKeyLocal(start)
-  const endKey = formatDateKeyLocal(end)
-
-  const taskInRange = tasksStore.getTasksForDateRange(startKey, endKey)
-  const assignInRange = assignmentsStore.assignments.filter(
-    (a) => a.dueDate >= startKey && a.dueDate <= endKey
-  )
-  const allItems = [
-    ...taskInRange.map((t) => ({ completed: t.completed })),
-    ...assignInRange.map((a) => ({ completed: a.status === 'completed' })),
-  ]
-
-  const completed = allItems.filter((x) => x.completed).length
-  return {
-    total: allItems.length,
-    completed,
-    percentage: allItems.length > 0 ? Math.round((completed / allItems.length) * 100) : 0
-  }
-})
-
-const periodStats = computed(() => (viewMode.value === 'week' ? weekStats.value : monthStats.value))
-const periodLabel = computed(() => (viewMode.value === 'week' ? 'Week progress' : 'Month progress'))
-
-function previousWeek() {
-  const newStart = new Date(currentWeekStart.value)
-  newStart.setDate(newStart.getDate() - 7)
-  currentWeekStart.value = newStart
-}
-
-function nextWeek() {
-  const newStart = new Date(currentWeekStart.value)
-  newStart.setDate(newStart.getDate() + 7)
-  currentWeekStart.value = newStart
-}
-
-function goToTodayWeek() {
-  currentWeekStart.value = getWeekStart(new Date())
-}
-
-function previousMonth() {
-  const d = new Date(currentMonthAnchor.value)
-  d.setMonth(d.getMonth() - 1)
-  currentMonthAnchor.value = startOfMonthFromDate(d)
-}
-
-function nextMonth() {
-  const d = new Date(currentMonthAnchor.value)
-  d.setMonth(d.getMonth() + 1)
-  currentMonthAnchor.value = startOfMonthFromDate(d)
-}
-
-function goToThisMonth() {
-  currentMonthAnchor.value = startOfMonthFromDate(new Date())
-}
-
-function getCourseColor(courseId) {
-  const course = coursesStore.getCourseById(courseId)
-  return course?.color || { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300' }
-}
 </script>
 
 <template>
   <div>
     <!-- Single root ELEMENT required by <Transition mode="out-in"> in App.vue.
-         A fragment root (multiple roots, or even a stray comment beside the root)
-         stalls the leave transition so the next page never mounts. This regressed
-         when the drag-and-drop work moved the edit modals out of this <div>. -->
-    <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col gap-4">
-      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Planner</h2>
-          <p class="text-gray-500">Switch between week and month to plan your tasks</p>
-        </div>
-
-        <div class="flex flex-col items-stretch sm:items-end gap-3">
-          <!-- View tabs -->
-          <div
-            class="inline-flex self-stretch sm:self-auto p-1 rounded-xl bg-gray-100/90 dark:bg-gray-700/80 border border-gray-200/80 dark:border-gray-600/80 shadow-sm shadow-gray-900/5"
-            role="tablist"
-            aria-label="Planner view"
-          >
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="viewMode === 'week'"
-              class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200"
-              :class="
-                viewMode === 'week'
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-gray-200/80 dark:ring-gray-600/80'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-              "
-              @click="viewMode = 'week'"
-            >
-              Week
-            </button>
-            <button
-              type="button"
-              role="tab"
-              :aria-selected="viewMode === 'month'"
-              class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200"
-              :class="
-                viewMode === 'month'
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm ring-1 ring-gray-200/80 dark:ring-gray-600/80'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-              "
-              @click="viewMode = 'month'"
-            >
-              Month
-            </button>
-          </div>
-
-          <!-- Week navigation -->
-          <div
-            v-if="viewMode === 'week'"
-            class="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1.5"
-          >
-            <button
-              type="button"
-              class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              @click="previousWeek"
-            >
-              <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-
-            <span class="px-3 text-sm font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              {{ weekRange }}
-            </span>
-
-            <button
-              type="button"
-              class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              @click="nextWeek"
-            >
-              <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-
-          <!-- Month navigation -->
-          <div
-            v-else
-            class="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1.5"
-          >
-            <button
-              type="button"
-              class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              @click="previousMonth"
-            >
-              <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-
-            <span class="px-3 text-sm font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              {{ monthYearLabel }}
-            </span>
-
-            <button
-              type="button"
-              class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              @click="nextMonth"
-            >
-              <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </div>
+         This comment MUST stay inside the root <div>, never beside it  a stray
+         comment (or any second node) at the template root makes this a fragment
+         component, which stalls the leave transition so the next page never
+         mounts (symptom: navigate away from Planner → blank page). Keep the
+         modals inside this wrapper too. -->
+    <!-- View switch: Day (focused agenda) ⇄ Month (full calendar). Persisted. -->
+    <div class="flex justify-end pt-1 mb-5 sm:mb-6">
+      <div
+        class="inline-flex items-center p-0.5 rounded-lg border border-paper-line dark:border-gray-700 bg-surface/60 dark:bg-gray-800/40"
+        role="tablist"
+        aria-label="Planner view"
+      >
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="viewMode === 'day'"
+          @click="setViewMode('day')"
+          class="inline-flex items-center gap-1.5 px-3 h-8 rounded-md text-[12.5px] font-semibold transition-colors"
+          :class="viewMode === 'day'
+            ? 'bg-primary-900 text-white shadow-sm shadow-primary-900/15'
+            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>
+          Day
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="viewMode === 'month'"
+          @click="setViewMode('month')"
+          class="inline-flex items-center gap-1.5 px-3 h-8 rounded-md text-[12.5px] font-semibold transition-colors"
+          :class="viewMode === 'month'
+            ? 'bg-primary-900 text-white shadow-sm shadow-primary-900/15'
+            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          Month
+        </button>
       </div>
     </div>
 
-    <!-- Period stats -->
-    <Card class="bg-gray-50/60 dark:bg-gray-800/60 border-gray-200/80 dark:border-gray-700/80">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div class="flex items-center gap-4">
-          <div
-            class="w-14 h-14 rounded-2xl bg-white dark:bg-gray-700 border border-gray-200/70 dark:border-gray-600/70 shadow-sm shadow-gray-900/5 flex items-center justify-center"
-          >
-            <svg
-              class="w-7 h-7 text-primary-800"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              />
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">{{ periodLabel }}</h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              {{ periodStats.completed }} of {{ periodStats.total }} scheduled items completed
-            </p>
-          </div>
-        </div>
+    <!-- ══ Day view · focused agenda ═══════════════════════════════════════ -->
+    <div v-if="viewMode === 'day'" class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-x-10 gap-y-10 pb-12">
 
-        <div class="flex items-center gap-4">
-          <div class="w-32 sm:w-40">
-            <div class="flex justify-between text-sm mb-1">
-              <span class="text-gray-600 dark:text-gray-400">Progress</span>
-              <span class="font-semibold text-gray-900 dark:text-gray-100">{{ periodStats.percentage }}%</span>
+      <!-- ══ Center column · the day ════════════════════════════════════════ -->
+      <div class="min-w-0 space-y-9">
+
+        <!-- Hero -->
+        <header>
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2.5">
+              <span class="w-1.5 h-1.5 rounded-full" :class="dayDotClass" />
+              <p class="eyebrow text-gray-400 dark:text-gray-500">{{ relativeDayLabel }}</p>
             </div>
-            <div
-              class="h-2 bg-gray-200/80 dark:bg-gray-700/80 rounded-full overflow-hidden ring-1 ring-inset ring-gray-200/50 dark:ring-gray-600/50"
-            >
-              <div
-                class="h-full bg-gradient-to-r from-primary-800 to-primary-950 rounded-full transition-all duration-500"
-                :style="{ width: `${periodStats.percentage}%` }"
-              />
+
+            <!-- Day navigation -->
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                @click="prevDay"
+                class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-paper-line dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-surface/70 dark:hover:bg-gray-800/70 transition-colors"
+                aria-label="Previous day"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <button
+                type="button"
+                @click="nextDay"
+                class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-paper-line dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-surface/70 dark:hover:bg-gray-800/70 transition-colors"
+                aria-label="Next day"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+              </button>
+              <button
+                v-if="!isToday"
+                type="button"
+                @click="goToToday"
+                class="ml-1 px-2.5 h-8 inline-flex items-center rounded-lg border border-paper-line dark:border-gray-700 eyebrow text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-surface/70 dark:hover:bg-gray-800/70 transition-colors"
+              >
+                Today
+              </button>
             </div>
           </div>
-        </div>
-      </div>
-    </Card>
 
-    <!-- Week grid -->
-    <div v-show="viewMode === 'week'" class="grid grid-cols-7 gap-2 sm:gap-3">
-      <div v-for="day in weekDays" :key="day.dateKey" class="min-h-[280px] sm:min-h-[320px] flex flex-col">
-        <div
-          class="text-center p-2 sm:p-3 rounded-t-xl border-b-2 transition-all"
-          :class="[
-            day.isToday
-              ? 'bg-primary-900 text-white border-primary-900'
-              : day.isWeekend
-                ? 'bg-gray-100 dark:bg-gray-700/60 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600'
-                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700'
-          ]"
-        >
-          <p
-            class="text-[10px] sm:text-xs font-medium uppercase tracking-wider"
-            :class="day.isToday ? 'text-primary-300' : 'text-gray-500'"
-          >
-            {{ day.dayName }}
-          </p>
-          <p class="text-xl sm:text-2xl font-bold mt-0.5">{{ day.dayNumber }}</p>
-          <p
-            v-if="day.items.length > 0"
-            class="text-[10px] sm:text-xs mt-1"
-            :class="day.isToday ? 'text-primary-300/90' : 'text-gray-400'"
-          >
-            {{ day.completedItems }}/{{ day.items.length }} done
-          </p>
-        </div>
+          <h1 class="display mt-2 text-4xl sm:text-5xl lg:text-6xl text-gray-900 dark:text-gray-50">
+            {{ heading }}
+          </h1>
 
-        <div
-          class="flex-1 border-2 border-t-0 rounded-b-xl p-1.5 sm:p-2 overflow-y-auto max-h-[480px] transition-colors"
-          :class="[
-            day.isToday && dragOverDateKey !== day.dateKey
-              ? 'border-primary-200/80 dark:border-primary-700/60 bg-primary-50/40 dark:bg-primary-900/20'
-              : day.isWeekend && dragOverDateKey !== day.dateKey
-                ? 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/20'
-                : dragOverDateKey !== day.dateKey
-                  ? 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
-                  : '',
-            dragOverDateKey === day.dateKey ? 'border-primary-400 dark:border-primary-500 bg-primary-50/60 dark:bg-primary-900/30' : ''
-          ]"
-          @dragover="onDragOverCell($event, day)"
-          @dragleave="onDragLeaveCell($event, day)"
-          @drop="onDropCell($event, day)"
-        >
-          <div v-if="day.items.length === 0" class="h-full min-h-[120px] flex items-center justify-center">
-            <p class="text-[10px] sm:text-xs text-gray-400 text-center px-1">Nothing due</p>
+          <p class="mt-4 max-w-2xl font-serif text-lg sm:text-xl leading-relaxed text-gray-600 dark:text-gray-300">
+            {{ dayMood }}
+            <template v-if="dueCount === 0">
+              Nothing’s due{{ isToday ? ' today' : ' this day' }}<template v-if="isToday && overdueCount">
+                <span class="italic text-rust-600 dark:text-rust-500">{{ overdueCount }} overdue {{ overdueNoun }}</span>
+                {{ overdueCount === 1 ? 'is' : 'are' }} waiting to be cleared.</template><template v-else>.</template>
+            </template>
+            <template v-else-if="remainingCount === 0">
+              All {{ dueCount }} {{ dueCount === 1 ? 'item' : 'items' }} done{{ isToday ? ' for today' : '' }}  nicely cleared.
+            </template>
+            <template v-else>
+              {{ remainingCount }} {{ remainingCount === 1 ? 'thing' : 'things' }} to work
+              through{{ isToday ? ' today' : '' }}<template v-if="isToday && overdueCount">, and
+                <span class="italic text-rust-600 dark:text-rust-500">{{ overdueCount }} overdue {{ overdueNoun }}</span>
+                {{ overdueCount === 1 ? 'is' : 'are' }} waiting.</template><template v-else>.</template>
+            </template>
+          </p>
+        </header>
+
+        <!-- To-do list for the day -->
+        <section>
+          <div class="flex items-baseline justify-between border-b border-paper-line dark:border-gray-700/60 pb-2.5">
+            <p class="eyebrow text-gray-400 dark:text-gray-500">To do · {{ dueCount }} {{ dueCount === 1 ? 'item' : 'items' }}</p>
+            <button
+              type="button"
+              @click="openAddTask"
+              class="eyebrow text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            >
+              + Add
+            </button>
           </div>
 
-          <div v-else class="space-y-1.5 sm:space-y-2">
+          <div v-if="dayItems.length" class="mt-4 space-y-2.5">
             <div
-              v-for="item in day.items"
+              v-for="item in dayItems"
               :key="item.id"
-              draggable="true"
-              class="group p-2 sm:p-2.5 rounded-lg border-l-4 transition-all hover:shadow-sm select-none"
-              :class="[
-                getCourseColor(item.courseId).bg,
-                getCourseColor(item.courseId).border,
-                item.completed ? 'opacity-60' : '',
-                draggingItem?.id === item.id ? 'opacity-40 ring-1 ring-gray-400' : ''
-              ]"
-              @dragstart="onDragStart($event, item)"
-              @dragend="onDragEnd"
+              class="group relative flex items-start gap-3 rounded-xl border border-paper-line dark:border-gray-700/60 bg-surface/60 dark:bg-gray-800/40 hover:bg-surface dark:hover:bg-gray-800 hover:shadow-sm hover:shadow-gray-900/5 transition-all cursor-pointer pl-4 pr-3.5 py-3 overflow-hidden"
+              :class="item.completed ? 'opacity-60' : ''"
               @click="onPlannerItemClick(item)"
             >
-              <div class="flex items-start gap-1.5 sm:gap-2">
-                <div class="flex-1 min-w-0">
-                  <p
-                    class="text-[10px] sm:text-xs font-medium leading-tight"
-                    :class="[
-                      getCourseColor(item.courseId).text,
-                      item.completed ? 'line-through' : ''
-                    ]"
-                  >
-                    {{ item.title }}
-                  </p>
-                  <p class="text-[9px] sm:text-[10px] text-gray-500 truncate mt-0.5">
-                    {{ item.courseName
-                    }}<span v-if="item.kind === 'assignment'" class="text-gray-400"> · Assignment</span>
-                  </p>
-                </div>
-                <div
-                  class="shrink-0 mt-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 transition-all flex items-center justify-center cursor-pointer hover:scale-110"
-                  :class="
-                    item.completed
-                      ? 'bg-primary-900 border-primary-900'
-                      : 'border-gray-400 group-hover:border-primary-700 bg-white dark:bg-gray-700'
-                  "
-                  @click.stop="onPlannerCheckboxClick(item)"
+              <!-- Course accent -->
+              <span class="absolute left-0 top-0 bottom-0 w-[3px]" :class="courseAccent(item.courseId)" />
+
+              <!-- Completion checkbox -->
+              <button
+                type="button"
+                class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all"
+                :class="item.completed
+                  ? 'bg-primary-600 border-primary-600'
+                  : 'border-gray-300 dark:border-gray-600 group-hover:border-primary-500'"
+                @click.stop="onPlannerCheckboxClick(item)"
+                :aria-label="item.completed ? 'Mark incomplete' : 'Mark complete'"
+              >
+                <svg v-if="item.completed" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5" d="M5 13l4 4L19 7" />
+                </svg>
+              </button>
+
+              <!-- Body -->
+              <div class="flex-1 min-w-0">
+                <p
+                  class="text-[15px] font-medium leading-snug truncate"
+                  :class="item.completed ? 'text-gray-400 dark:text-gray-600 line-through' : 'text-gray-900 dark:text-gray-100'"
                 >
-                  <svg
-                    v-if="item.completed"
-                    class="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
+                  {{ item.title }}
+                </p>
+                <p class="mt-0.5 font-mono text-[11px] text-gray-400 dark:text-gray-500 truncate">
+                  {{ itemMeta(item) }}
+                </p>
               </div>
+
+              <!-- Type / priority badge -->
+              <span class="flex-shrink-0 mt-0.5 eyebrow" :class="badgeClass(item)">
+                {{ itemBadge(item) }}
+              </span>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Month grid -->
-    <div
-      v-show="viewMode === 'month'"
-      class="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-800 shadow-[0_1px_2px_rgba(28,25,23,0.04)] overflow-hidden overflow-x-auto"
-    >
-      <div class="min-w-[640px] sm:min-w-0">
-        <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 bg-gray-50/90 dark:bg-gray-700/60">
+          <!-- Empty day -->
           <div
-            v-for="label in weekdayLabels"
-            :key="label"
-            class="py-2.5 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+            v-else
+            class="mt-5 rounded-2xl border border-dashed border-paper-line dark:border-gray-700/60 bg-surface/40 dark:bg-gray-800/30 px-6 py-10 text-center"
           >
-            {{ label }}
-          </div>
-        </div>
-        <div class="divide-y divide-gray-100 dark:divide-gray-700">
-          <div v-for="(row, ri) in monthWeekRows" :key="ri" class="grid grid-cols-7 divide-x divide-gray-100 dark:divide-gray-700">
-            <div
-              v-for="day in row"
-              :key="day.dateKey"
-              class="min-h-[100px] sm:min-h-[140px] p-1 sm:p-2 flex flex-col gap-1 transition-colors"
-              :class="[
-                !day.inMonth && dragOverDateKey !== day.dateKey ? 'bg-gray-50/70 dark:bg-gray-800/40 text-gray-400' : '',
-                day.inMonth && day.isToday && dragOverDateKey !== day.dateKey
-                  ? 'bg-primary-50/50 dark:bg-primary-900/20 ring-1 ring-inset ring-primary-200/60 dark:ring-primary-700/40 z-1'
-                  : '',
-                day.inMonth && day.isWeekend && !day.isToday && dragOverDateKey !== day.dateKey ? 'bg-gray-50/40 dark:bg-gray-700/20' : '',
-                dragOverDateKey === day.dateKey ? 'bg-primary-100/60 dark:bg-primary-800/30 ring-2 ring-inset ring-primary-400 dark:ring-primary-500' : ''
-              ]"
-              @dragover="onDragOverCell($event, day)"
-              @dragleave="onDragLeaveCell($event, day)"
-              @drop="onDropCell($event, day)"
+            <p class="font-serif italic text-lg text-gray-500 dark:text-gray-400">
+              {{ isToday ? 'Your slate is clear for today.' : 'Nothing planned for this day.' }}
+            </p>
+            <p class="mt-1.5 text-sm text-gray-400 dark:text-gray-500">
+              Add a task, or pick another day on the calendar.
+            </p>
+            <button
+              type="button"
+              @click="openAddTask"
+              class="mt-5 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-900 hover:bg-primary-800 text-white text-[13px] font-semibold transition-colors duration-200 active:scale-[0.98] shadow-sm shadow-primary-900/15"
             >
-              <div class="flex items-center justify-between gap-1 shrink-0">
-                <span
-                  class="text-xs sm:text-sm font-semibold tabular-nums"
-                  :class="[
-                    !day.inMonth ? 'text-gray-300 dark:text-gray-600' : '',
-                    day.inMonth && day.isToday ? 'text-primary-900 dark:text-primary-400' : '',
-                    day.inMonth && !day.isToday ? 'text-gray-900 dark:text-gray-100' : ''
-                  ]"
-                >
-                  {{ day.dayNumber }}
-                </span>
-                <span
-                  v-if="day.inMonth && day.items.length > 0"
-                  class="text-[10px] font-medium text-gray-500 tabular-nums"
-                >
-                  {{ day.completedItems }}/{{ day.items.length }}
-                </span>
-              </div>
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add a task
+            </button>
+          </div>
+        </section>
+      </div>
 
-              <div class="flex-1 flex flex-col gap-1 min-h-0 overflow-y-auto max-h-[200px] sm:max-h-[280px]">
-                <template v-if="day.items.length === 0">
-                  <p v-if="day.inMonth" class="text-[10px] text-gray-300 mt-1 hidden sm:block">—</p>
-                </template>
-                <div
-                  v-for="item in day.items"
-                  v-else
-                  :key="item.id"
-                  draggable="true"
-                  class="group rounded-md border-l-[3px] px-1 py-1 sm:px-1.5 sm:py-1.5 transition-all hover:shadow-sm select-none"
-                  :class="[
-                    getCourseColor(item.courseId).bg,
-                    getCourseColor(item.courseId).border,
-                    item.completed ? 'opacity-60' : '',
-                    draggingItem?.id === item.id ? 'opacity-40 ring-1 ring-gray-400' : '',
-                    !day.inMonth && draggingItem?.id !== item.id ? 'opacity-50' : ''
-                  ]"
-                  @dragstart="onDragStart($event, item)"
-                  @dragend="onDragEnd"
-                  @click="onPlannerItemClick(item)"
-                >
-                  <div class="flex items-start gap-1">
-                    <p
-                      class="flex-1 text-[9px] sm:text-[10px] font-medium leading-snug line-clamp-2 sm:line-clamp-3"
-                      :class="[
-                        getCourseColor(item.courseId).text,
-                        item.completed ? 'line-through' : ''
-                      ]"
-                    >
-                      {{ item.title }}
-                    </p>
-                    <div
-                      class="shrink-0 mt-0.5 w-3 h-3 rounded-full border border-gray-400 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
-                      :class="item.completed ? 'bg-primary-900 border-primary-900' : 'bg-white dark:bg-gray-700'"
-                      @click.stop="onPlannerCheckboxClick(item)"
-                    >
-                      <svg
-                        v-if="item.completed"
-                        class="w-1.5 h-1.5 text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </div>
+      <!-- ══ Right rail ══════════════════════════════════════════════════════ -->
+      <aside class="lg:border-l lg:border-paper-line dark:lg:border-gray-700/60 lg:pl-8 space-y-8 lg:sticky lg:top-16 self-start">
+
+        <!-- Mini calendar -->
+        <div>
+          <p class="eyebrow text-gray-400 dark:text-gray-500 mb-3">{{ calMonthYear }}</p>
+
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-serif text-base text-gray-900 dark:text-gray-100">{{ calMonthYear }}</span>
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                @click="prevMonth"
+                class="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-paper-line/60 dark:hover:bg-gray-700/50 transition-colors"
+                aria-label="Previous month"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <button
+                type="button"
+                @click="nextMonth"
+                class="w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-paper-line/60 dark:hover:bg-gray-700/50 transition-colors"
+                aria-label="Next month"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+              </button>
             </div>
           </div>
+
+          <div class="grid grid-cols-7 mb-1">
+            <span
+              v-for="(d, i) in MINI_WEEKDAYS"
+              :key="`wd-${i}`"
+              class="text-center font-mono text-[10px] text-gray-400 dark:text-gray-500 py-1"
+            >{{ d }}</span>
+          </div>
+
+          <div class="grid grid-cols-7 gap-y-0.5">
+            <button
+              v-for="cell in calendarCells"
+              :key="cell.dateKey"
+              type="button"
+              @click="selectDate(cell.date)"
+              class="relative h-9 flex items-center justify-center rounded-lg text-[13px] tabular-nums transition-colors"
+              :class="cellClasses(cell)"
+            >
+              {{ cell.dayNumber }}
+              <span
+                v-if="cell.hasItems"
+                class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
+                :class="dotClass(cell)"
+              />
+            </button>
+          </div>
         </div>
-      </div>
+
+        <!-- Coming up -->
+        <div>
+          <p class="eyebrow text-gray-400 dark:text-gray-500 mb-3">Coming up</p>
+
+          <div v-if="comingUp.length">
+            <button
+              v-for="a in comingUp"
+              :key="a.id"
+              type="button"
+              @click="goToAssignmentDay(a)"
+              class="group flex items-start gap-3.5 w-full text-left py-2.5 border-b border-dotted border-paper-line dark:border-gray-700/60 last:border-0"
+            >
+              <div class="flex flex-col items-center justify-center w-9 shrink-0 pt-0.5">
+                <span class="font-mono text-[10px] uppercase tracking-wide text-gray-400 leading-none">{{ monthAbbr(a.dueDate) }}</span>
+                <span class="font-serif text-lg leading-none mt-1 text-gray-900 dark:text-gray-100">{{ dayNum(a.dueDate) }}</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[13px] font-medium leading-snug text-gray-900 dark:text-gray-100 line-clamp-2 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors">
+                  {{ a.title }}
+                </p>
+                <p class="mt-1 font-mono text-[10.5px] text-gray-400 truncate">{{ railCourseName(a) }} · {{ relativeDue(a.dueDate) }}</p>
+              </div>
+            </button>
+          </div>
+          <p v-else class="text-[13px] text-gray-400 dark:text-gray-500 py-2">Nothing on the horizon yet.</p>
+        </div>
+
+        <!-- Overdue alert -->
+        <div
+          v-if="overdueCount"
+          class="rounded-2xl border border-dashed border-rust-500/35 bg-rust-50/70 dark:bg-rust-500/[0.06] p-4"
+        >
+          <div class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-rust-500" />
+            <span class="eyebrow text-rust-600">{{ overdueCount }} Overdue</span>
+          </div>
+          <p class="mt-2 font-serif text-[13.5px] leading-relaxed text-gray-600 dark:text-gray-300">
+            Clear {{ overdueCount === 1 ? 'it' : 'these' }} before
+            <template v-if="nextDeadline">{{ weekdayName(nextDeadline.dueDate) }}  {{ shortDate(nextDeadline.dueDate) }} brings your next deadline.</template><template v-else>the week gets heavier.</template>
+          </p>
+          <button
+            type="button"
+            @click="router.push('/assignments')"
+            class="mt-2.5 inline-flex items-center text-[12.5px] font-medium text-rust-600 hover:text-rust-500 underline underline-offset-2 decoration-rust-500/40 transition-colors"
+          >
+            View all overdue →
+          </button>
+        </div>
+      </aside>
+
     </div>
 
-    <p v-if="viewMode === 'month'" class="text-xs text-gray-500 sm:hidden">
-      Scroll horizontally on small screens to see the full month.
-    </p>
+    <!-- ══ Month view · full interactive calendar ══════════════════════════ -->
+    <MonthCalendar v-else />
 
-    <!-- Course legend -->
-    <Card v-if="coursesStore.courses.length > 0">
-      <div class="flex items-center justify-between mb-3">
-        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Course legend</h4>
-        <span class="text-xs text-gray-500">{{ coursesStore.courses.length }} courses</span>
-      </div>
-      <div class="flex flex-wrap gap-3">
-        <div
-          v-for="course in coursesStore.courses"
-          :key="course.id"
-          class="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-          :class="course.color.bg"
-        >
-          <div class="w-2.5 h-2.5 rounded-full" :class="course.color.bg.replace('100', '500')" />
-          <span class="text-sm font-medium" :class="course.color.text">
-            {{ course.code || course.name }}
-          </span>
-        </div>
-      </div>
-    </Card>
+    <!-- Edit / Add Task Modal -->
+    <TaskFormModal
+      v-model="showTaskModal"
+      :task="editingTask"
+      :default-date="taskDefaultDate"
+      @save="onTaskSave"
+    />
 
-    <Card v-if="showPlannerEmptyState" padding="none">
-      <EmptyState
-        icon="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-        title="Nothing to plan yet"
-        description="Sign in and sync courses, or add assignments and tasks to see them on your calendar"
-      />
-    </Card>
-  </div>
-
-  <!-- Edit Task Modal -->
-  <TaskFormModal v-model="showTaskEditModal" :task="editingTask" @save="saveEditedTask" />
-
-  <!-- Edit Assignment Modal -->
-  <Modal v-model="showEditModal" title="Edit Assignment" size="lg">
-    <form id="planner-edit-form" @submit.prevent="saveEditedAssignment" class="space-y-5">
-      <Input
-        v-model="editFormData.title"
-        label="Assignment Title"
-        placeholder="e.g., Research Essay on Climate Change"
-        required
-      />
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description</label>
-        <textarea
-          v-model="editFormData.description"
-          rows="4"
-          placeholder="Add any details about the assignment..."
-          class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-        ></textarea>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Dropdown v-model="editFormData.courseId" label="Course" :options="modalCourseOptions" />
+    <!-- Edit Assignment Modal -->
+    <Modal v-model="showEditModal" title="Edit Assignment" size="lg">
+      <form id="planner-edit-form" @submit.prevent="saveEditedAssignment" class="space-y-5">
+        <Input
+          v-model="editFormData.title"
+          label="Assignment Title"
+          placeholder="e.g., Research Essay on Climate Change"
+          required
+        />
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            Due Date <span class="text-danger-500">*</span>
-          </label>
-          <input
-            v-model="editFormData.dueDate"
-            type="date"
-            required
-            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent scheme-light dark:scheme-dark"
-          />
+          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">Description</label>
+          <textarea
+            v-model="editFormData.description"
+            rows="4"
+            placeholder="Add any details about the assignment..."
+            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-surface dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 transition-[border-color,box-shadow] duration-200 resize-none"
+          ></textarea>
         </div>
-      </div>
 
-      <p class="text-sm text-gray-500">
-        Use the checkbox on each card to mark the assignment complete or active.
-      </p>
-    </form>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Dropdown v-model="editFormData.courseId" label="Course" :options="modalCourseOptions" />
 
-    <template #footer>
-      <div class="flex gap-3 justify-end">
-        <Button type="button" variant="secondary" @click="showEditModal = false">Cancel</Button>
-        <Button
-          type="submit"
-          form="planner-edit-form"
-          variant="primary"
-          :disabled="!editFormData.title.trim() || !editFormData.dueDate"
-        >
-          Save Changes
-        </Button>
-      </div>
-    </template>
-  </Modal>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              Due Date <span class="text-danger-500">*</span>
+            </label>
+            <DatePicker v-model="editFormData.dueDate" placeholder="Pick a due date" />
+          </div>
+        </div>
+
+        <p class="text-sm text-gray-500">
+          Use the checkbox on each card to mark the assignment complete or active.
+        </p>
+      </form>
+
+      <template #footer>
+        <div class="flex gap-3 justify-end">
+          <Button type="button" variant="secondary" @click="showEditModal = false">Cancel</Button>
+          <Button
+            type="submit"
+            form="planner-edit-form"
+            variant="primary"
+            :disabled="!editFormData.title.trim() || !editFormData.dueDate"
+          >
+            Save Changes
+          </Button>
+        </div>
+      </template>
+    </Modal>
   </div>
 </template>

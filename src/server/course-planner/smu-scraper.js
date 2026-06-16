@@ -42,8 +42,7 @@ async function discoverTerms() {
           if (!codeMatch) continue
           const code = codeMatch[1]
           // SMU PeopleSoft short code: "1<century-digit><year-tens><year-ones-with-term-offset>".
-          // The middle two digits ARE the last two of the calendar year for the season —
-          // e.g. 1267 → 2026, 1262 → 2026, 1264 → 2026.
+          // The middle two digits ARE the last two of the calendar year for the season           // e.g. 1267 → 2026, 1262 → 2026, 1264 → 2026.
           const yyyy = 2000 + Number(code.slice(1, 3))
           const label = `${season} ${yyyy}`
           if (!found.some((t) => t.code === code)) found.push({ code, label, url })
@@ -53,7 +52,7 @@ async function discoverTerms() {
       }
       return found
     },
-    6 * 60 * 60 * 1000 // 6 h — SMU re-publishes weekly so a long cache is fine.
+    6 * 60 * 60 * 1000 // 6 h  SMU re-publishes weekly so a long cache is fine.
   )
 }
 
@@ -118,7 +117,7 @@ export async function getSections({ termCode, subjectCode }) {
 function normalize(row, termCode, termLabel) {
   const meetings = []
   // SMU stores meeting day-pattern and times in separate columns. A row with
-  // "TBA,To Be Announced" in Name and ARR in Pat is unschedulable — surface it
+  // "TBA,To Be Announced" in Name and ARR in Pat is unschedulable  surface it
   // with empty meetings rather than a fake time block.
   const days = parseDays(String(row.Pat || '').replace(/[^A-Za-z]/g, ''))
   const startTime = normalizeTime(row['Mtg Start'])

@@ -6,6 +6,20 @@ const { contextBridge, ipcRenderer } = require('electron')
 // bridge for backend calls — only the desktop auto-updater below.
 contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
+  // Custom title bar: drive the frameless window's min/max/close from our own
+  // buttons (see TitleBar.vue), and let the renderer track maximize state so the
+  // maximize/restore icon stays correct.
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+    close: () => ipcRenderer.invoke('window:close'),
+    isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+    onMaximizeChange: (callback) => {
+      const listener = (_event, isMaximized) => callback(isMaximized)
+      ipcRenderer.on('window:maximized-changed', listener)
+      return () => ipcRenderer.removeListener('window:maximized-changed', listener)
+    },
+  },
   // Auto-update controls, backed by electron-updater in the main process
   // (see electron/updater.js). All methods are no-ops returning {status:'dev'}
   // when the app isn't packaged.

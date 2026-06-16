@@ -1,6 +1,5 @@
 /**
- * Unit tests for the Claude wrapper. We don't make real API calls here —
- * those are exercised end-to-end via the dev server. The tests below cover
+ * Unit tests for the Claude wrapper. We don't make real API calls here  * those are exercised end-to-end via the dev server. The tests below cover
  * the configuration paths.
  */
 import assert from 'node:assert'
@@ -14,7 +13,7 @@ describe('extractSyllabus', () => {
 
     // Import after clearing so the module's lazy client builder picks up the
     // missing env. (Our buildClient() is per-call, so import timing isn't
-    // strictly required — but staying explicit keeps the test honest.)
+    // strictly required  but staying explicit keeps the test honest.)
     const { extractSyllabus } = await import('../syllabus-claude.js')
 
     try {

@@ -2,11 +2,11 @@
  * Express router for the Syllabus Parser feature.
  *
  * Two endpoints:
- *   POST /api/syllabus/parse  — multipart upload (PDF or DOCX). Returns a draft
+ *   POST /api/syllabus/parse   multipart upload (PDF or DOCX). Returns a draft
  *                                JSON object with extracted course + assignments,
  *                                NOT persisted. The user reviews/edits this in
  *                                the UI before saving.
- *   POST /api/syllabus/save   — JSON body of the (possibly edited) draft. Inserts
+ *   POST /api/syllabus/save   JSON body of the (possibly edited) draft. Inserts
  *                                one new course + N new assignments under the
  *                                signed-in user's RLS scope.
  *
@@ -44,7 +44,7 @@ function parseDueAt(input) {
   if (input === null || input === undefined || input === '') return null
   const d = new Date(input)
   if (Number.isNaN(d.getTime())) {
-    throw new Error(`Invalid due date "${input}" — must be a parseable ISO 8601 string or null.`)
+    throw new Error(`Invalid due date "${input}"  must be a parseable ISO 8601 string or null.`)
   }
   return d.toISOString()
 }
@@ -57,7 +57,7 @@ function clip(value, max) {
 }
 
 /**
- * POST /api/syllabus/parse — upload + parse, returns the draft for review.
+ * POST /api/syllabus/parse  upload + parse, returns the draft for review.
  * The file never touches disk and is not persisted in Supabase Storage; we
  * keep only the extracted JSON, which is much smaller and easier to redact.
  */
@@ -113,8 +113,8 @@ router.post('/api/syllabus/parse', requireUser, syllabusParseRateLimit, (req, re
 })
 
 /**
- * POST /api/syllabus/save — persist the user-confirmed draft.
- * Each save creates a NEW course row (and N assignment rows) — we never merge
+ * POST /api/syllabus/save  persist the user-confirmed draft.
+ * Each save creates a NEW course row (and N assignment rows)  we never merge
  * into an existing course, per the product decision to keep things simple.
  * The fresh `external_course_id` guarantees no collision with prior saves.
  */
@@ -192,7 +192,7 @@ router.post('/api/syllabus/save', requireUser, async (req, res) => {
   }
   const courseId = insertedCourse.id
 
-  // ---- Insert assignments (only when due_at is present — column is NOT NULL) ----
+  // ---- Insert assignments (only when due_at is present  column is NOT NULL) ----
   const insertableRows = cleaned
     .map((a, idx) => ({ a, idx }))
     .filter(({ a }) => a.dueAt !== null)
@@ -218,7 +218,7 @@ router.post('/api/syllabus/save', requireUser, async (req, res) => {
       .select('id')
 
     if (insErr) {
-      // Course is already in — surface the error but don't try to roll back.
+      // Course is already in  surface the error but don't try to roll back.
       // The user can edit the course on the assignments page or re-run save
       // for the missing items.
       return res.status(500).json({

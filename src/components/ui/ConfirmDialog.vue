@@ -75,17 +75,17 @@ function confirm() {
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <!-- Backdrop -->
-        <div 
-          class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        <div
+          class="absolute inset-0 bg-stone-950/50 backdrop-blur-[3px]"
           @click="close"
         ></div>
-        
+
         <!-- Dialog -->
-        <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform">
+        <div class="relative bg-surface dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(28,25,23,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full max-w-md overflow-hidden transform">
           <div class="p-6">
             <!-- Icon -->
             <div
-              class="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4"
+              class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-4"
               :class="colors[variant].bg"
             >
               <svg 
@@ -102,7 +102,7 @@ function confirm() {
 
             <!-- Content -->
             <div class="text-center">
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight mb-2">
                 {{ title }}
               </h3>
               <slot>
@@ -114,7 +114,7 @@ function confirm() {
           </div>
 
           <!-- Actions -->
-          <div class="flex gap-3 p-4 bg-gray-50 dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-700">
+          <div class="flex gap-3 px-6 py-4 bg-paper/40 dark:bg-gray-800/50 border-t border-paper-line/70 dark:border-gray-700/80">
             <Button 
               variant="secondary" 
               @click="close"
@@ -139,12 +139,12 @@ function confirm() {
 <style scoped>
 .confirm-enter-active,
 .confirm-leave-active {
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .confirm-enter-active > div:last-child,
 .confirm-leave-active > div:last-child {
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .confirm-enter-from,
@@ -154,7 +154,7 @@ function confirm() {
 
 .confirm-enter-from > div:last-child,
 .confirm-leave-to > div:last-child {
-  transform: scale(0.95);
+  transform: scale(0.95) translateY(10px);
   opacity: 0;
 }
 </style>

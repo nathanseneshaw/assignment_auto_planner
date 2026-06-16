@@ -1,10 +1,10 @@
 /**
- * Platform detection — single source of truth for "are we running inside Electron?"
+ * Platform detection  single source of truth for "are we running inside Electron?"
  *
  * Two flavors:
  *   - IS_ELECTRON_BUILD: a Vite-injected literal (true/false). Set by
  *     `VITE_BUILD_TARGET=electron` in npm scripts. Because Rollup sees it as a
- *     constant, dead branches (and any imports inside them) are eliminated —
+ *     constant, dead branches (and any imports inside them) are eliminated
  *     this is what lets the Electron build skip bundling LandingPage.vue.
  *   - isElectron: build-time literal OR a runtime fallback that checks the
  *     preload-exposed `window.electronAPI.isElectron` sentinel. Use this when

@@ -1,7 +1,7 @@
 /**
  * Unit tests for the syllabus text-extraction module.
  *
- * We don't ship binary PDF/DOCX fixtures here — those formats are best
+ * We don't ship binary PDF/DOCX fixtures here  those formats are best
  * exercised via manual end-to-end testing with real files. These tests cover
  * the validation and error paths that are easy to reason about programmatically.
  */

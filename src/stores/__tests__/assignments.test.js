@@ -276,3 +276,34 @@ describe('assignmentsByCourse', () => {
     expect(store.assignmentsByCourse['c2']).toHaveLength(1)
   })
 })
+
+// ── archive lifecycle (Pillar A) ──────────────────────────────────────────────
+
+describe('archivedAssignments', () => {
+  it('returns only feed-archived assignments, most-recently-due first', () => {
+    const store = useAssignmentsStore()
+    store.assignments.push(
+      { id: '1', title: 'Live', dueDate: '2099-01-01', status: 'pending', feedStatus: 'live' },
+      { id: '2', title: 'Archived early', dueDate: '2026-01-01', status: 'completed', feedStatus: 'archived' },
+      { id: '3', title: 'Archived late', dueDate: '2026-05-01', status: 'pending', feedStatus: 'archived' },
+    )
+    const archived = store.archivedAssignments
+    expect(archived).toHaveLength(2)
+    expect(archived[0].title).toBe('Archived late') // most recent due first
+    expect(archived[1].title).toBe('Archived early')
+  })
+})
+
+describe('active lists exclude archived', () => {
+  it('upcomingAssignments and overdueAssignments skip archived items', () => {
+    const store = useAssignmentsStore()
+    store.assignments.push(
+      { id: '1', title: 'Future archived', dueDate: '2099-12-31', status: 'pending', feedStatus: 'archived' },
+      { id: '2', title: 'Past archived', dueDate: '2020-01-01', status: 'pending', feedStatus: 'archived' },
+      { id: '3', title: 'Future live', dueDate: '2099-12-31', status: 'pending', feedStatus: 'live' },
+      { id: '4', title: 'Past live', dueDate: '2020-01-01', status: 'pending', feedStatus: 'live' },
+    )
+    expect(store.upcomingAssignments.map(a => a.title)).toEqual(['Future live'])
+    expect(store.overdueAssignments.map(a => a.title)).toEqual(['Past live'])
+  })
+})

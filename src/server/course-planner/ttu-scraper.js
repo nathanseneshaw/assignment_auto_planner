@@ -23,7 +23,7 @@ import { daysFromBooleans, parseCredits } from './util.js'
  */
 function extractCookies(res) {
   const raw = res.headers.getSetCookie ? res.headers.getSetCookie() : []
-  // Each entry looks like "name=value; Path=/; HttpOnly" — keep only name=value.
+  // Each entry looks like "name=value; Path=/; HttpOnly"  keep only name=value.
   return raw.map((c) => c.split(';')[0].trim()).join('; ')
 }
 
@@ -56,7 +56,7 @@ const MEP = 'TTU'
 /**
  * A per-term Banner session: visit registration, then bind the term.
  * Returns a fetch wrapper that automatically forwards the accumulated session
- * cookies on every call (read-only after setup — cookies are not updated
+ * cookies on every call (read-only after setup  cookies are not updated
  * from subsequent responses, which is sufficient for Banner's read-only APIs).
  */
 async function bannerSessionForTerm(termCode) {
@@ -96,7 +96,7 @@ async function bannerSessionForTerm(termCode) {
     })
 }
 
-/** Terms requires the JSESSIONID from the /registration GET — otherwise 500. */
+/** Terms requires the JSESSIONID from the /registration GET  otherwise 500. */
 export async function getTerms() {
   return cacheMemo(
     'ttu:terms',
