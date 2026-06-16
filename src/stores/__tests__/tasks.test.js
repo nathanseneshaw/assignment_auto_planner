@@ -269,3 +269,151 @@ describe('overdueTasks', () => {
     expect(overdue[0].title).toBe('Overdue')
   })
 })
+
+// ── todaysTasks ───────────────────────────────────────────────────────────────
+
+describe('todaysTasks', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 5, 15, 12, 0, 0)) // June 15 2026 noon local
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('returns only tasks scheduled for today, sorted by priority', () => {
+    const store = useTasksStore()
+    store.hydrateFromSupabase([
+      { id: '1', title: 'Today low priority', scheduledDate: '2026-06-15', priority: 2 },
+      { id: '2', title: 'Today high priority', scheduledDate: '2026-06-15', priority: 1 },
+      { id: '3', title: 'Tomorrow', scheduledDate: '2026-06-16', priority: 1 },
+    ])
+    const today = store.todaysTasks
+    expect(today).toHaveLength(2)
+    expect(today[0].title).toBe('Today high priority')
+    expect(today[1].title).toBe('Today low priority')
+  })
+
+  it('returns empty when nothing is scheduled today', () => {
+    const store = useTasksStore()
+    store.hydrateFromSupabase([{ id: '1', title: 'Yesterday', scheduledDate: '2026-06-14' }])
+    expect(store.todaysTasks).toHaveLength(0)
+  })
+})
+
+// ── taskGroups ────────────────────────────────────────────────────────────────
+
+describe('taskGroups', () => {
+  it('returns sorted unique group names in use', () => {
+    const store = useTasksStore()
+    store.addTask({ title: 'A', group: 'Zebra' })
+    store.addTask({ title: 'B', group: 'Alpha' })
+    store.addTask({ title: 'C', group: 'Alpha' })
+    expect(store.taskGroups).toEqual(['Alpha', 'Zebra'])
+  })
+
+  it('excludes tasks with no group', () => {
+    const store = useTasksStore()
+    store.addTask({ title: 'Ungrouped' })
+    expect(store.taskGroups).toHaveLength(0)
+  })
+})
+
+// ── renameGroup ───────────────────────────────────────────────────────────────
+
+describe('renameGroup', () => {
+  it('renames the group across all matching tasks', () => {
+    const store = useTasksStore()
+    store.addTask({ title: 'A', group: 'Old Name' })
+    store.addTask({ title: 'B', group: 'Old Name' })
+    store.addTask({ title: 'C', group: 'Other' })
+    store.renameGroup('Old Name', 'New Name')
+    const groups = store.tasks.map(t => t.group)
+    expect(groups.filter(g => g === 'New Name')).toHaveLength(2)
+    expect(groups.filter(g => g === 'Old Name')).toHaveLength(0)
+    expect(groups.filter(g => g === 'Other')).toHaveLength(1)
+  })
+
+  it('does nothing when the new name is blank', () => {
+    const store = useTasksStore()
+    store.addTask({ title: 'A', group: 'Keep' })
+    store.renameGroup('Keep', '   ')
+    expect(store.tasks[0].group).toBe('Keep')
+  })
+
+  it('does nothing when new name equals old name', () => {
+    const store = useTasksStore()
+    store.addTask({ title: 'A', group: 'Same' })
+    store.renameGroup('Same', 'Same')
+    expect(store.tasks[0].group).toBe('Same')
+  })
+})
+
+// ── deleteGroup ───────────────────────────────────────────────────────────────
+
+describe('deleteGroup', () => {
+  it('clears the group from all matching tasks', () => {
+    const store = useTasksStore()
+    store.addTask({ title: 'A', group: 'Remove Me' })
+    store.addTask({ title: 'B', group: 'Remove Me' })
+    store.addTask({ title: 'C', group: 'Keep' })
+    store.deleteGroup('Remove Me')
+    expect(store.tasks.filter(t => t.group === 'Remove Me')).toHaveLength(0)
+    expect(store.tasks.find(t => t.title === 'C')?.group).toBe('Keep')
+  })
+
+  it('leaves unrelated groups untouched', () => {
+    const store = useTasksStore()
+    store.addTask({ title: 'A', group: 'Unrelated' })
+    store.deleteGroup('Gone')
+    expect(store.tasks[0].group).toBe('Unrelated')
+  })
+})
+
+// ── removeLocalTask ───────────────────────────────────────────────────────────
+
+describe('removeLocalTask', () => {
+  it('removes a task by its local id', () => {
+    const store = useTasksStore()
+    const t = store.addTask({ title: 'Remove by local id' })
+    store.removeLocalTask(t.id)
+    expect(store.tasks).toHaveLength(0)
+  })
+
+  it('removes a task by its supabaseTaskId', () => {
+    const store = useTasksStore()
+    store.hydrateFromSupabase([{ id: 'local-1', title: 'From Supabase', supabaseTaskId: 'sb-abc' }])
+    store.removeLocalTask('sb-abc')
+    expect(store.tasks).toHaveLength(0)
+  })
+
+  it('is a no-op for null', () => {
+    const store = useTasksStore()
+    store.addTask({ title: 'Stay' })
+    store.removeLocalTask(null)
+    expect(store.tasks).toHaveLength(1)
+  })
+
+  it('is a no-op for an unknown id', () => {
+    const store = useTasksStore()
+    store.addTask({ title: 'Stay' })
+    store.removeLocalTask('does-not-exist')
+    expect(store.tasks).toHaveLength(1)
+  })
+})
+
+// ── hydrateFromSupabase (group overlay) ──────────────────────────────────────
+
+describe('hydrateFromSupabase group overlay', () => {
+  it('re-applies local group labels onto hydrated tasks', () => {
+    const store = useTasksStore()
+    const t = store.addTask({ title: 'Grouped locally', group: 'Study' })
+    // Server snapshot won't carry the group (it's stored locally only)
+    store.hydrateFromSupabase([{ id: t.id, title: 'Grouped locally', supabaseTaskId: 'sb-1' }])
+    expect(store.tasks[0].group).toBe('Study')
+  })
+
+  it('falls back to null when no overlay entry exists for a task', () => {
+    const store = useTasksStore()
+    store.hydrateFromSupabase([{ id: 'x', title: 'No group', supabaseTaskId: 'sb-x' }])
+    expect(store.tasks[0].group).toBeNull()
+  })
+})

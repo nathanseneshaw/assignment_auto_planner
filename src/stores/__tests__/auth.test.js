@@ -9,7 +9,7 @@ vi.mock('../../lib/supabase', () => ({
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
       onAuthStateChange: vi.fn().mockReturnValue({}),
       signInWithPassword: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } }, error: null }),
-      signUp: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      signUp: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' }, session: null }, error: null }),
       signOut: vi.fn().mockResolvedValue({}),
     },
   },
@@ -148,8 +148,94 @@ describe('signOut', () => {
     const store = useAuthStore()
     localStorage.setItem('profile', '{"name":"Test"}')
     localStorage.setItem('coursePlanner:saved', '[]')
+    localStorage.setItem('coursePlanner:work', '[]')
     await store.signOut()
     expect(localStorage.getItem('profile')).toBeNull()
     expect(localStorage.getItem('coursePlanner:saved')).toBeNull()
+    expect(localStorage.getItem('coursePlanner:work')).toBeNull()
+  })
+
+  it('preserves the theme preference across sign-out', async () => {
+    const store = useAuthStore()
+    localStorage.setItem('theme', '1')
+    await store.signOut()
+    expect(localStorage.getItem('theme')).toBe('1')
+  })
+})
+
+// ── signUp ────────────────────────────────────────────────────────────────────
+
+describe('signUp', () => {
+  it('delegates to supabase.auth.signUp with email, password, and full_name', async () => {
+    const store = useAuthStore()
+    await store.signUp('new@example.com', 'pass123', 'Jane Doe')
+    expect(supabase.auth.signUp).toHaveBeenCalledWith({
+      email: 'new@example.com',
+      password: 'pass123',
+      options: {
+        emailRedirectTo: expect.stringContaining('/dashboard'),
+        data: { full_name: 'Jane Doe' },
+      },
+    })
+  })
+
+  it('returns the supabase response on success', async () => {
+    supabase.auth.signUp.mockResolvedValueOnce({ data: { user: { id: 'u3' }, session: null }, error: null })
+    const store = useAuthStore()
+    const result = await store.signUp('new@example.com', 'pass123', 'Jane Doe')
+    expect(result.error).toBeNull()
+    expect(result.data.user.id).toBe('u3')
+  })
+
+  it('returns an error when supabase rejects the sign-up', async () => {
+    supabase.auth.signUp.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Email already registered' },
+    })
+    const store = useAuthStore()
+    const result = await store.signUp('taken@example.com', 'pass123', 'Jane')
+    expect(result.error?.message).toBe('Email already registered')
+  })
+})
+
+// ── onAuthStateChange callback ────────────────────────────────────────────────
+
+describe('onAuthStateChange', () => {
+  it('updates user and session when a SIGNED_IN event fires', async () => {
+    let capturedCallback
+    supabase.auth.onAuthStateChange.mockImplementationOnce((cb) => {
+      capturedCallback = cb
+      return {}
+    })
+
+    const store = useAuthStore()
+    await store.init()
+
+    const newUser = { id: 'u2', email: 'signin@example.com', user_metadata: { full_name: 'Alice' } }
+    const newSession = { access_token: 'new-tok', user: newUser }
+    capturedCallback('SIGNED_IN', newSession)
+
+    expect(store.user?.id).toBe('u2')
+    expect(store.session).toEqual(newSession)
+    expect(store.isAuthenticated).toBe(true)
+  })
+
+  it('clears user and session when a SIGNED_OUT event fires', async () => {
+    let capturedCallback
+    supabase.auth.onAuthStateChange.mockImplementationOnce((cb) => {
+      capturedCallback = cb
+      return {}
+    })
+
+    const store = useAuthStore()
+    store.session = { access_token: 'old-tok' }
+    store.user = { id: 'u1' }
+    await store.init()
+
+    capturedCallback('SIGNED_OUT', null)
+
+    expect(store.user).toBeNull()
+    expect(store.session).toBeNull()
+    expect(store.isAuthenticated).toBe(false)
   })
 })

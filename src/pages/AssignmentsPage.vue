@@ -72,8 +72,14 @@ function isCompleted(a) {
 function isOverdue(a) {
   return !isArchived(a) && a.status !== 'completed' && a.dueDate < localDateKey()
 }
+function sevenDaysFromNow() {
+  const d = new Date()
+  d.setDate(d.getDate() + 7)
+  return localDateKey(d)
+}
+
 function isUpcoming(a) {
-  return !isArchived(a) && a.status !== 'completed' && a.dueDate >= localDateKey()
+  return !isArchived(a) && a.status !== 'completed' && a.dueDate >= localDateKey() && a.dueDate <= sevenDaysFromNow()
 }
 
 function byDueDate(list) {
@@ -138,7 +144,7 @@ const emptyCopy = computed(() => {
     case 'overdue':
       return { title: 'Nothing overdue — nicely done.', sub: 'You’re all caught up here.' }
     case 'upcoming':
-      return { title: 'Nothing on the horizon yet.', sub: 'New deadlines will appear here as they arrive.' }
+      return { title: 'Nothing due in the next 7 days.', sub: 'You\'re clear for now — check back as deadlines approach.' }
     case 'completed':
       return { title: 'Nothing completed yet.', sub: 'Check items off and they’ll collect here.' }
     case 'archived':

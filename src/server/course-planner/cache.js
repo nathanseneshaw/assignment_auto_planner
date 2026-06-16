@@ -21,6 +21,12 @@ export function cacheSet(key, value, ttlMs = 5 * 60 * 1000) {
   store.set(key, { value, expiresAt: Date.now() + ttlMs })
 }
 
+/** Flush a single key (or the entire store + pending map if no key given). For tests only. */
+export function cacheFlush(key) {
+  if (key === undefined) { store.clear(); pending.clear() }
+  else { store.delete(key); pending.delete(key) }
+}
+
 /** Memoize an async loader by cache key. Pending requests are de-duplicated. */
 const pending = new Map()
 export async function cacheMemo(key, loader, ttlMs) {

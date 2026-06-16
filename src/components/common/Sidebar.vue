@@ -35,6 +35,21 @@ function localDateKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+function dateInDays(n) {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return localDateKey(d)
+}
+
+/** Assignments due within the next 7 days (not completed, not archived). */
+const dueSoonCount = computed(() => {
+  const today = localDateKey()
+  const cutoff = dateInDays(7)
+  return assignmentsStore.assignments.filter(
+    a => a.dueDate >= today && a.dueDate <= cutoff && a.status !== 'completed' && a.feedStatus !== 'archived'
+  ).length
+})
+
 /** Count of tasks scheduled within the current Mon–Sun week. */
 const weekTaskCount = computed(() => {
   const now = new Date()
@@ -61,7 +76,7 @@ const sections = computed(() => [
   {
     label: 'Plan',
     items: [
-      { name: 'Assignments', path: '/assignments', count: assignmentsStore.upcomingAssignments.length },
+      { name: 'Assignments', path: '/assignments', count: dueSoonCount.value },
       { name: 'Planner', path: '/planner', count: weekTaskCount.value },
       ...(COURSE_PLANNER
         ? [{ name: 'Courses', path: '/course-planner', count: coursesStore.courses.length }]
