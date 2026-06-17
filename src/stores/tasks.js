@@ -4,13 +4,12 @@ import { useAssignmentsStore } from './assignments'
 import { persistTaskToSupabase, deleteTaskFromSupabase } from '../services/taskSync'
 import { useToast } from '../composables/useToast'
 
-// Groups are stored locally (not in Supabase) so no DB migration is needed.
-// The overlay is a { [taskId]: groupName } map persisted in localStorage and
-// merged back onto tasks after every Supabase hydration.
-const GROUPS_KEY = 'plannr_task_groups'
+// Key used by the old localStorage-only group overlay. Kept here only for the
+// one-time migration that syncs existing groups up to Supabase on first load.
+const LEGACY_GROUPS_KEY = 'plannr_task_groups'
 
-function loadGroupsOverlay() {
-  try { return JSON.parse(localStorage.getItem(GROUPS_KEY) || '{}') }
+function loadLegacyGroupsOverlay() {
+  try { return JSON.parse(localStorage.getItem(LEGACY_GROUPS_KEY) || '{}') }
   catch { return {} }
 }
 
@@ -18,15 +17,9 @@ export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref([])
   const loading = ref(false)
 
-  const groupsOverlay = ref(loadGroupsOverlay())
-
-  function saveGroupsOverlay() {
-    localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOverlay.value))
-  }
-
   /** Sorted list of all unique group names currently in use. */
   const taskGroups = computed(() =>
-    [...new Set(Object.values(groupsOverlay.value).filter(Boolean))].sort()
+    [...new Set(tasks.value.map(t => t.group).filter(Boolean))].sort()
   )
 
   /** Local-timezone `YYYY-MM-DD` key  avoid `toISOString` here (UTC drift). */
@@ -97,13 +90,10 @@ export const useTasksStore = defineStore('tasks', () => {
       priority: tasks.value.length + 1,
       priorityLevel: 'normal',
       supabaseTaskId: null,
+      group: null,
       ...task,
     }
     tasks.value.push(newTask)
-    if (newTask.group) {
-      groupsOverlay.value[newTask.id] = newTask.group
-      saveGroupsOverlay()
-    }
     void persistAndStamp(newTask)
     return newTask
   }
@@ -122,45 +112,36 @@ export const useTasksStore = defineStore('tasks', () => {
       useAssignmentsStore().updateProgress(tasks.value[index].assignmentId)
     }
 
-    if ('group' in updates) {
-      if (updates.group) {
-        groupsOverlay.value[id] = updates.group
-      } else {
-        delete groupsOverlay.value[id]
-      }
-      saveGroupsOverlay()
-    }
-
     void persistAndStamp(tasks.value[index])
   }
 
   function deleteTask(id) {
     const task = tasks.value.find(t => t.id === id)
     tasks.value = tasks.value.filter(t => t.id !== id)
-    delete groupsOverlay.value[id]
-    saveGroupsOverlay()
     const dbId = task?.supabaseTaskId || task?.id
     if (dbId) void deleteTaskFromSupabase(dbId)
   }
 
-  /** Rename every task in a group atomically. */
+  /** Rename every task in a group atomically and persist each changed row. */
   function renameGroup(oldName, newName) {
     const trimmed = (newName || '').trim()
     if (!trimmed || trimmed === oldName) return
-    for (const [taskId, g] of Object.entries(groupsOverlay.value)) {
-      if (g === oldName) groupsOverlay.value[taskId] = trimmed
-    }
+    const affectedIds = tasks.value.filter(t => t.group === oldName).map(t => t.id)
     tasks.value = tasks.value.map(t => t.group === oldName ? { ...t, group: trimmed } : t)
-    saveGroupsOverlay()
+    affectedIds.forEach(id => {
+      const t = tasks.value.find(t => t.id === id)
+      if (t) void persistAndStamp(t)
+    })
   }
 
-  /** Remove all group assignments for the given group name. */
+  /** Remove all group assignments for the given group name and persist each changed row. */
   function deleteGroup(name) {
-    for (const [taskId, g] of Object.entries(groupsOverlay.value)) {
-      if (g === name) delete groupsOverlay.value[taskId]
-    }
+    const affectedIds = tasks.value.filter(t => t.group === name).map(t => t.id)
     tasks.value = tasks.value.map(t => t.group === name ? { ...t, group: null } : t)
-    saveGroupsOverlay()
+    affectedIds.forEach(id => {
+      const t = tasks.value.find(t => t.id === id)
+      if (t) void persistAndStamp(t)
+    })
   }
 
   /**
@@ -191,17 +172,36 @@ export const useTasksStore = defineStore('tasks', () => {
   function removeLocalTask(id) {
     if (!id) return
     tasks.value = tasks.value.filter(t => t.id !== id && t.supabaseTaskId !== id)
-    if (groupsOverlay.value[id]) {
-      delete groupsOverlay.value[id]
-      saveGroupsOverlay()
-    }
   }
 
-  /** Replace tasks from Supabase hydration, re-applying the local groups overlay. */
+  /**
+   * Replace tasks from Supabase hydration.
+   *
+   * Groups now come from the DB via `mapDbTaskRow` (the `group_name` column).
+   * On the first load after upgrading from the old localStorage-only approach,
+   * the legacy overlay is applied as a fallback for tasks whose DB row has no
+   * group yet, and each such task is immediately re-persisted so the group lands
+   * in Supabase. The localStorage key is cleared once all persists confirm.
+   */
   function hydrateFromSupabase(list) {
+    const legacy = loadLegacyGroupsOverlay()
+    const hasLegacy = Object.keys(legacy).length > 0
+
     tasks.value = Array.isArray(list)
-      ? list.map(t => ({ ...t, group: groupsOverlay.value[t.id] || t.group || null }))
+      ? list.map(t => ({ ...t, group: t.group || legacy[t.id] || null }))
       : []
+
+    if (hasLegacy) {
+      const toMigrate = tasks.value.filter(t => t.group && legacy[t.id])
+      if (toMigrate.length) {
+        void Promise.all(toMigrate.map(t => persistAndStamp(t, { silent: true })))
+          .then(results => {
+            if (results.every(Boolean)) localStorage.removeItem(LEGACY_GROUPS_KEY)
+          })
+      } else {
+        localStorage.removeItem(LEGACY_GROUPS_KEY)
+      }
+    }
   }
 
   function getTasksByAssignment(assignmentId) {

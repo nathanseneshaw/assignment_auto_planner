@@ -122,3 +122,29 @@ test('mergeTaskLists: empty db snapshot keeps all local tasks (no wipe  original
   const merged = mergeTaskLists([], localTasks)
   assert.equal(merged.length, 2)
 })
+
+test('buildTaskRow: includes group_name from task.group', () => {
+  const row = buildTaskRow(
+    { id: 'g1', title: 'Grouped', group: 'Study', scheduledDate: '', priority: 1 },
+    { userId: 'u1', now: '2026-06-17T00:00:00.000Z' },
+  )
+  assert.equal(row.group_name, 'Study')
+})
+
+test('buildTaskRow: group_name is null when task has no group', () => {
+  const row = buildTaskRow(
+    { id: 'g2', title: 'Solo', scheduledDate: '', priority: 1 },
+    { userId: 'u1', now: '2026-06-17T00:00:00.000Z' },
+  )
+  assert.equal(row.group_name, null)
+})
+
+test('mapDbTaskRow: maps group_name to group field', () => {
+  const t = mapDbTaskRow({ id: 'r3', title: 'X', group_name: 'Study', priority: 3 })
+  assert.equal(t.group, 'Study')
+})
+
+test('mapDbTaskRow: group is null when group_name is absent', () => {
+  const t = mapDbTaskRow({ id: 'r4', title: 'Y', priority: 3 })
+  assert.equal(t.group, null)
+})

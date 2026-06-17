@@ -44,6 +44,7 @@ export function buildTaskRow(
     scheduled_date: normalizeScheduledDate(task.scheduledDate),
     priority: task.priority ?? 0,
     completed: task.completed ?? false,
+    group_name: task.group || null,
     updated_at: now || new Date().toISOString(),
   }
 }
@@ -64,6 +65,7 @@ export function mapDbTaskRow(row, { assignment = null, courseName = null } = {})
     priority,
     priorityLevel: priorityLevelFromPriority(priority),
     completed: row.completed ?? false,
+    group: row.group_name || null,
     assignmentId: assignment?.id || row.assignment_id || null,
     courseId: row.course_id || assignment?.courseId || null,
     courseName: assignment?.courseName || courseName || null,

@@ -400,18 +400,16 @@ describe('removeLocalTask', () => {
   })
 })
 
-// ── hydrateFromSupabase (group overlay) ──────────────────────────────────────
+// ── hydrateFromSupabase (groups from DB) ─────────────────────────────────────
 
-describe('hydrateFromSupabase group overlay', () => {
-  it('re-applies local group labels onto hydrated tasks', () => {
+describe('hydrateFromSupabase (groups from DB)', () => {
+  it('preserves a group carried on the DB task row', () => {
     const store = useTasksStore()
-    const t = store.addTask({ title: 'Grouped locally', group: 'Study' })
-    // Server snapshot won't carry the group (it's stored locally only)
-    store.hydrateFromSupabase([{ id: t.id, title: 'Grouped locally', supabaseTaskId: 'sb-1' }])
+    store.hydrateFromSupabase([{ id: 'h1', title: 'Grouped', group: 'Study' }])
     expect(store.tasks[0].group).toBe('Study')
   })
 
-  it('falls back to null when no overlay entry exists for a task', () => {
+  it('uses null when the DB task has no group', () => {
     const store = useTasksStore()
     store.hydrateFromSupabase([{ id: 'x', title: 'No group', supabaseTaskId: 'sb-x' }])
     expect(store.tasks[0].group).toBeNull()
