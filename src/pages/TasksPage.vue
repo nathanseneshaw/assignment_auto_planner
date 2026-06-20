@@ -611,20 +611,22 @@ onMounted(() => {
                           <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       </button>
-                      <span
-                        class="flex-1 text-[12px] leading-snug"
-                        :class="subtask.completed ? 'text-gray-400 dark:text-gray-600 line-through' : 'text-gray-600 dark:text-gray-300'"
-                      >{{ subtask.title }}</span>
-                      <button
-                        type="button"
-                        class="shrink-0 opacity-0 group-hover/stask:opacity-100 p-0.5 text-gray-300 hover:text-danger-500 dark:text-gray-600 dark:hover:text-danger-400 transition-colors"
-                        title="Delete subtask"
-                        @click.stop="subtasksStore.deleteSubtask(subtask.id)"
-                      >
-                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div class="flex-1 flex items-center gap-1 min-w-0">
+                        <span
+                          class="text-[12px] leading-snug"
+                          :class="subtask.completed ? 'text-gray-400 dark:text-gray-600 line-through' : 'text-gray-600 dark:text-gray-300'"
+                        >{{ subtask.title }}</span>
+                        <button
+                          type="button"
+                          class="shrink-0 p-0.5 text-gray-400 hover:text-danger-500 dark:text-gray-400 dark:hover:text-danger-400 transition-colors"
+                          title="Delete subtask"
+                          @click.stop="subtasksStore.deleteSubtask(subtask.id)"
+                        >
+                          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
 
                     <!-- Inline add input or add button -->
