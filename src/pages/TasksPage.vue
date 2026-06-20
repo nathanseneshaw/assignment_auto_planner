@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useTasksStore } from '../stores/tasks'
 import { useAssignmentsStore } from '../stores/assignments'
 import { useCoursesStore } from '../stores/courses'
+import { useSubtasksStore } from '../stores/subtasks'
 import { Dropdown, ConfirmDialog } from '../components/ui'
 import TaskFormModal from '../components/features/TaskFormModal.vue'
 
@@ -12,12 +13,43 @@ const router = useRouter()
 const tasksStore = useTasksStore()
 const assignmentsStore = useAssignmentsStore()
 const coursesStore = useCoursesStore()
+const subtasksStore = useSubtasksStore()
 
 // ── Modal + delete dialog state ───────────────────────────────────────────
 const showModal = ref(false)
 const editingTask = ref(null)
 const showDeleteConfirm = ref(false)
 const taskToDelete = ref(null)
+
+// ── Subtask row expand + inline add ─────────────────────────────────────
+const expandedTasks = ref({})
+const newSubtaskByTask = ref({})
+const addingSubtaskForTask = ref({})
+
+function toggleTaskExpand(taskId) {
+  const next = !expandedTasks.value[taskId]
+  expandedTasks.value = { ...expandedTasks.value, [taskId]: next }
+  if (!next) {
+    addingSubtaskForTask.value = { ...addingSubtaskForTask.value, [taskId]: false }
+    newSubtaskByTask.value = { ...newSubtaskByTask.value, [taskId]: '' }
+  }
+}
+
+function startAddingSubtask(taskId) {
+  addingSubtaskForTask.value = { ...addingSubtaskForTask.value, [taskId]: true }
+}
+
+function cancelAddingSubtask(taskId) {
+  addingSubtaskForTask.value = { ...addingSubtaskForTask.value, [taskId]: false }
+  newSubtaskByTask.value = { ...newSubtaskByTask.value, [taskId]: '' }
+}
+
+async function addSubtaskInline(taskId) {
+  const title = (newSubtaskByTask.value[taskId] || '').trim()
+  if (!title) { cancelAddingSubtask(taskId); return }
+  await subtasksStore.addSubtask(taskId, title)
+  newSubtaskByTask.value = { ...newSubtaskByTask.value, [taskId]: '' }
+}
 
 // ── View state: date filter · status filter · search · group ─────────────────
 const filterDate = ref('all')   // 'today' | 'week' | 'all'
@@ -453,12 +485,13 @@ onMounted(() => {
               <div
                 v-for="task in group.tasks"
                 :key="task.id"
-                class="group flex items-start gap-3 py-3 border-b border-dotted border-paper-line dark:border-gray-700/60"
+                class="group flex items-start gap-3 py-3 border-b border-dotted border-paper-line dark:border-gray-700/60 cursor-pointer"
+                @click="toggleTaskExpand(task.id)"
               >
                 <!-- Checkbox -->
                 <button
                   type="button"
-                  @click="tasksStore.toggleTaskComplete(task.id)"
+                  @click.stop="tasksStore.toggleTaskComplete(task.id)"
                   class="mt-0.5 shrink-0 w-[18px] h-[18px] rounded-full border flex items-center justify-center transition-colors"
                   :class="task.completed
                     ? 'bg-primary-600 border-primary-600 text-white'
@@ -518,7 +551,7 @@ onMounted(() => {
                       type="button"
                       class="inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 rounded-full border border-gray-200/80 dark:border-gray-700/60 text-gray-500 dark:text-gray-400 hover:border-primary-300/80 hover:text-primary-700 dark:hover:text-primary-400 transition-colors"
                       :title="`Filter by group: ${task.group}`"
-                      @click="filterGroup = task.group"
+                      @click.stop="filterGroup = task.group"
                     >
                       <svg class="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
@@ -536,6 +569,113 @@ onMounted(() => {
                       </svg>
                       <span class="truncate">{{ getAssignmentTitle(task) }}</span>
                     </span>
+
+                    <!-- Subtask count indicator -->
+                    <template v-if="subtasksStore.subtaskCountByTask[task.id]">
+                      <span class="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+                      <span
+                        class="inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 rounded-full border transition-colors"
+                        :class="subtasksStore.subtaskCountByTask[task.id].completed === subtasksStore.subtaskCountByTask[task.id].total
+                          ? 'border-primary-200 dark:border-primary-800/60 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/60'"
+                      >
+                        <svg class="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                        </svg>
+                        {{ subtasksStore.subtaskCountByTask[task.id].completed }}/{{ subtasksStore.subtaskCountByTask[task.id].total }}
+                      </span>
+                    </template>
+
+                  </div>
+
+                  <!-- Subtasks: revealed on row click -->
+                  <div
+                    v-if="expandedTasks[task.id]"
+                    class="mt-2.5 space-y-1.5"
+                  >
+                    <!-- Subtask rows -->
+                    <div
+                      v-for="subtask in subtasksStore.getSubtasksForTask(task.id)"
+                      :key="subtask.id"
+                      class="group/stask flex items-center gap-2"
+                    >
+                      <button
+                        type="button"
+                        class="shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors"
+                        :class="subtask.completed
+                          ? 'bg-primary-600 border-primary-600 text-white'
+                          : 'border-gray-300 dark:border-gray-600 hover:border-primary-500 dark:hover:border-primary-400'"
+                        @click.stop="subtasksStore.toggleSubtask(subtask.id)"
+                      >
+                        <svg v-if="subtask.completed" class="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </button>
+                      <span
+                        class="flex-1 text-[12px] leading-snug"
+                        :class="subtask.completed ? 'text-gray-400 dark:text-gray-600 line-through' : 'text-gray-600 dark:text-gray-300'"
+                      >{{ subtask.title }}</span>
+                      <button
+                        type="button"
+                        class="shrink-0 opacity-0 group-hover/stask:opacity-100 p-0.5 text-gray-300 hover:text-danger-500 dark:text-gray-600 dark:hover:text-danger-400 transition-colors"
+                        title="Delete subtask"
+                        @click.stop="subtasksStore.deleteSubtask(subtask.id)"
+                      >
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <!-- Inline add input or add button -->
+                    <template v-if="addingSubtaskForTask[task.id]">
+                      <div class="flex items-center gap-2" @click.stop>
+                        <input
+                          :value="newSubtaskByTask[task.id] || ''"
+                          @input="newSubtaskByTask = { ...newSubtaskByTask, [task.id]: $event.target.value }"
+                          @keydown.enter.stop="addSubtaskInline(task.id)"
+                          @keydown.escape.stop="cancelAddingSubtask(task.id)"
+                          @blur="!(newSubtaskByTask[task.id] || '').trim() && cancelAddingSubtask(task.id)"
+                          type="text"
+                          placeholder="Subtask name…"
+                          autofocus
+                          class="flex-1 text-[12px] bg-transparent border-b border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-600 focus:outline-none focus:border-primary-400 dark:focus:border-primary-500 py-0.5 transition-colors duration-150"
+                        />
+                        <button
+                          type="button"
+                          class="shrink-0 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors disabled:opacity-30"
+                          :disabled="!(newSubtaskByTask[task.id] || '').trim()"
+                          @click.stop="addSubtaskInline(task.id)"
+                          title="Save subtask"
+                        >
+                          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="shrink-0 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+                          @click.stop="cancelAddingSubtask(task.id)"
+                          title="Cancel"
+                        >
+                          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                        @click.stop="startAddingSubtask(task.id)"
+                      >
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add subtask
+                      </button>
+                    </template>
                   </div>
                 </div>
 
@@ -659,3 +799,4 @@ onMounted(() => {
     />
   </div>
 </template>
+

@@ -152,7 +152,7 @@ function cellClass(day) {
 </script>
 
 <template>
-  <div class="dot-grid relative pt-1 pb-12">
+  <div class="relative pt-1 pb-12">
     <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-x-10 gap-y-10">
 
       <!-- ══ Center column ═══════════════════════════════════════════════ -->
@@ -411,16 +411,3 @@ function cellClass(day) {
     </div>
   </div>
 </template>
-
-<style scoped>
-/* Subtle "journal" dot grid behind the dashboard, matching the mockup canvas. */
-.dot-grid {
-  background-image: radial-gradient(var(--color-paper-line) 1px, transparent 1px);
-  background-size: 22px 22px;
-  background-position: -1px -1px;
-}
-
-.dark .dot-grid {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-}
-</style>

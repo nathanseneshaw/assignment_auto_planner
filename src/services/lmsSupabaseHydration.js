@@ -11,6 +11,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useCoursesStore } from '../stores/courses'
 import { useAssignmentsStore } from '../stores/assignments'
 import { useTasksStore } from '../stores/tasks'
+import { useSubtasksStore } from '../stores/subtasks'
 import { mapDbTaskRow, mergeTaskLists } from './taskSyncCore'
 
 /** Color palette assigned round-robin so hydration is deterministic per-position. */
@@ -229,6 +230,16 @@ export async function hydrateLmsStoresFromSupabase() {
     console.warn('[lmsSupabaseHydration] tasks', tErr.message || tErr)
   }
 
+  const { data: subtaskRows, error: stErr } = await supabase
+    .from('subtasks')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('sort_order', { ascending: true })
+
+  if (stErr) {
+    console.warn('[lmsSupabaseHydration] subtasks', stErr.message || stErr)
+  }
+
   const courses = (courseRows || []).map((row, i) => mapCourseRow(row, i))
   // O(1) lookup so we can stitch course names onto assignments cheaply.
   const courseById = Object.fromEntries(courses.map((c) => [c.id, c]))
@@ -255,5 +266,9 @@ export async function hydrateLmsStoresFromSupabase() {
     // Self-heal: re-attempt any task whose insert never confirmed. Idempotent
     // upsert keyed on id, so retries can't duplicate. Fire-and-forget.
     void tasksStore.retryPendingPersists()
+  }
+
+  if (!stErr) {
+    useSubtasksStore().hydrateFromSupabase(subtaskRows || [])
   }
 }

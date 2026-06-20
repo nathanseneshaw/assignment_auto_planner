@@ -7,6 +7,7 @@ import ToastContainer from './components/ui/ToastContainer.vue'
 import { useCoursesStore } from './stores/courses'
 import { useAssignmentsStore } from './stores/assignments'
 import { useTasksStore } from './stores/tasks'
+import { useSubtasksStore } from './stores/subtasks'
 import { useAuthStore } from './stores/auth'
 import { useProfileStore } from './stores/profile'
 import { isSupabaseConfigured } from './lib/supabase'
@@ -27,6 +28,7 @@ if (isElectron && typeof document !== 'undefined') {
 const coursesStore = useCoursesStore()
 const assignmentsStore = useAssignmentsStore()
 const tasksStore = useTasksStore()
+const subtasksStore = useSubtasksStore()
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 
@@ -62,6 +64,7 @@ watch(
       coursesStore.clearAll()
       assignmentsStore.clearAll()
       tasksStore.clearAll()
+      subtasksStore.clearAll()
     }
   }
 )

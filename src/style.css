@@ -107,13 +107,27 @@
   }
 }
 
-/* ── Layout background: warm "journal" paper in light, deep stone in dark ── */
+/* ── Layout background: warm "journal" paper with subtle dot grid in light, deep stone in dark ── */
+@keyframes dot-drift {
+  from { background-position: -1px -1px; }
+  to   { background-position: 21px 21px; }
+}
+
 .main-layout-bg {
-  background: var(--color-paper);
+  background-color: var(--color-paper);
+  background-image: radial-gradient(rgba(185, 180, 168, 0.5) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: -1px -1px;
+  animation: dot-drift 30s linear infinite;
 }
 
 .dark .main-layout-bg {
-  background: var(--color-gray-900);
+  background-color: var(--color-gray-900);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main-layout-bg { animation: none; }
 }
 
 /* ── Electron custom title bar ──

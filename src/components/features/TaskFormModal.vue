@@ -273,6 +273,7 @@ function handleSubmit() {
         <label class="eyebrow text-gray-500 dark:text-gray-400">Assignment</label>
         <Dropdown v-model="assignmentId" :options="assignmentOptions" />
       </div>
+
     </form>
 
     <template #footer>

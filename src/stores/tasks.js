@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAssignmentsStore } from './assignments'
 import { persistTaskToSupabase, deleteTaskFromSupabase } from '../services/taskSync'
+import { useSubtasksStore } from './subtasks'
 import { useToast } from '../composables/useToast'
 
 // Key used by the old localStorage-only group overlay. Kept here only for the
@@ -118,6 +119,7 @@ export const useTasksStore = defineStore('tasks', () => {
   function deleteTask(id) {
     const task = tasks.value.find(t => t.id === id)
     tasks.value = tasks.value.filter(t => t.id !== id)
+    useSubtasksStore().removeSubtasksForTask(id)
     const dbId = task?.supabaseTaskId || task?.id
     if (dbId) void deleteTaskFromSupabase(dbId)
   }
