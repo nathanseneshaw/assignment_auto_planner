@@ -28,3 +28,6 @@ dist-ssr
 release
 .env*
 .env*.local
+
+# Local dev notes (not for version control)
+scraper-status.md

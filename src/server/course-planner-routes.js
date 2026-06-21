@@ -34,6 +34,11 @@ import * as utep from './course-planner/utep-scraper.js'
 import * as stmarys from './course-planner/stmarys-scraper.js'
 import * as tcu from './course-planner/tcu-scraper.js'
 import * as twu from './course-planner/twu-scraper.js'
+import * as mit from './course-planner/mit-scraper.js'
+import * as stanford from './course-planner/stanford-scraper.js'
+import * as yale from './course-planner/yale-scraper.js'
+import * as upenn from './course-planner/upenn-scraper.js'
+import * as columbia from './course-planner/columbia-scraper.js'
 
 const router = Router()
 
@@ -195,6 +200,41 @@ const SCHOOLS = {
     // Colleague Self-Service exposes capacity / enrolled / available seats.
     enrollmentDataAvailable: true,
     scraper: twu,
+  },
+  mit: {
+    code: 'mit',
+    name: 'Massachusetts Institute of Technology',
+    // Hydrant catalog JSON has meeting times but no live seat / open-closed data.
+    enrollmentDataAvailable: false,
+    scraper: mit,
+  },
+  stanford: {
+    code: 'stanford',
+    name: 'Stanford University',
+    // ExploreCourses XML exposes numEnrolled / maxEnrolled + open/closed status.
+    enrollmentDataAvailable: true,
+    scraper: stanford,
+  },
+  yale: {
+    code: 'yale',
+    name: 'Yale University',
+    // FOSE search exposes current enrollment + open/closed but no section capacity.
+    enrollmentDataAvailable: false,
+    scraper: yale,
+  },
+  upenn: {
+    code: 'upenn',
+    name: 'University of Pennsylvania',
+    // CourseLeaf CLSS "fose" search exposes open/closed + meeting times but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: upenn,
+  },
+  columbia: {
+    code: 'columbia',
+    name: 'Columbia University',
+    // Directory of Classes exposes live enrolled + max counts; meeting times moved to Vergil (login).
+    enrollmentDataAvailable: true,
+    scraper: columbia,
   },
 }
 

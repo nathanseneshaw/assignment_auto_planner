@@ -4,6 +4,7 @@ import { useCoursePlannerStore } from '../stores/coursePlanner'
 import { useProfileStore } from '../stores/profile'
 import { Button, Dropdown, Modal } from '../components/ui'
 import { listSchools } from '../services/coursePlannerApi.js'
+import { schoolLogo } from '../lib/schoolLogos'
 
 const planner = useCoursePlannerStore()
 const profileStore = useProfileStore()
@@ -38,6 +39,9 @@ watch(supportedSchools, (list) => {
 const currentSchoolMeta = computed(() =>
   supportedSchools.value.find((s) => s.code === planner.schoolCode) || null
 )
+
+// Bundled logo for the current school, '' when none (drives the hero badge).
+const schoolLogoUrl = computed(() => schoolLogo(planner.schoolCode))
 
 // --- Dropdown option arrays ---
 const termOptions = computed(() => [
@@ -424,7 +428,13 @@ function saveWork() {
     <!-- ══ Hero ════════════════════════════════════════════════════════════ -->
     <header class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
       <div class="min-w-0">
-        <p class="eyebrow text-gray-400 dark:text-gray-500">
+        <p class="eyebrow text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+          <img
+            v-if="schoolLogoUrl"
+            :src="schoolLogoUrl"
+            :alt="schoolName"
+            class="w-4 h-4 rounded object-cover bg-white ring-1 ring-black/5 dark:ring-white/10 shrink-0"
+          />
           {{ schoolName || 'Course catalog' }}
         </p>
         <h1 class="display mt-1.5 text-4xl sm:text-5xl text-gray-900 dark:text-gray-50">

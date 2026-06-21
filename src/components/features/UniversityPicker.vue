@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { schoolLogo } from '../../lib/schoolLogos'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -42,6 +43,22 @@ function initials(label) {
     .join('')
 }
 
+// A school's bundled logo wins over the initials badge. If an image 404s or
+// fails to decode we record its value and quietly fall back to the badge.
+const failedLogos = ref(new Set())
+
+function showLogo(value) {
+  return Boolean(schoolLogo(value)) && !failedLogos.value.has(value)
+}
+
+function onLogoError(value) {
+  // Replace the Set so Vue's reactivity picks up the change.
+  failedLogos.value = new Set(failedLogos.value).add(value)
+}
+
+// "Not set" carries no code; expose the logo resolver to the template.
+const logoFor = schoolLogo
+
 // "Not set" is always the first option (value === '')
 const notSetOption = computed(() => props.options.find((o) => o.value === '') || { value: '', label: 'Not set — pick later' })
 const schoolOptions = computed(() => props.options.filter((o) => o.value !== ''))
@@ -68,7 +85,15 @@ function select(value) {
     <!-- Selected school chip / summary line -->
     <div class="flex items-center gap-2.5 h-6">
       <template v-if="modelValue && selectedLabel">
+        <img
+          v-if="showLogo(modelValue)"
+          :src="logoFor(modelValue)"
+          :alt="selectedLabel"
+          class="w-5 h-5 rounded object-cover bg-white ring-1 ring-black/5 dark:ring-white/10 shrink-0"
+          @error="onLogoError(modelValue)"
+        />
         <div
+          v-else
           class="w-4 h-4 rounded shrink-0"
           :style="{ backgroundColor: badgeColor(selectedLabel) }"
           aria-hidden="true"
@@ -163,12 +188,21 @@ function select(value) {
               ]"
               @click="select(option.value)"
             >
-              <!-- School badge -->
+              <!-- School badge — real logo when bundled, initials otherwise -->
               <div
-                class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0 select-none"
-                :style="{ backgroundColor: badgeColor(option.label) }"
+                class="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 select-none"
+                :class="showLogo(option.value) ? 'bg-white ring-1 ring-black/5 dark:ring-white/10' : ''"
+                :style="showLogo(option.value) ? null : { backgroundColor: badgeColor(option.label) }"
               >
-                {{ initials(option.label) }}
+                <img
+                  v-if="showLogo(option.value)"
+                  :src="logoFor(option.value)"
+                  :alt="option.label"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                  @error="onLogoError(option.value)"
+                />
+                <span v-else class="text-white text-[10px] font-bold">{{ initials(option.label) }}</span>
               </div>
 
               <!-- Name -->
