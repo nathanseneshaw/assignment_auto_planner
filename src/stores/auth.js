@@ -24,6 +24,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Guard against `init()` being called twice (it wires up a global listener).
   let initialized = false
+  // Cross-tab nudge channel for email changes confirmed in the link tab.
+  let authChannel = null
 
   const isAuthenticated = computed(() => !!session.value)
 
@@ -72,7 +74,45 @@ export const useAuthStore = defineStore('auth', () => {
       if (user.value) syncProfileFromAuth(user.value)
     })
 
+    // Step 3: pick up an email change confirmed in another tab/device.
+    // The email-change link tab never establishes a session of its own
+    // (detectSessionInUrl is off), so it can't push the new email here. Instead:
+    //   - same browser: it broadcasts on 'plannr-auth'; we refresh on the nudge.
+    //   - cross-device: no broadcast arrives, so we also refresh whenever this
+    //     tab regains focus, which catches the user coming back to the app.
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        authChannel = new BroadcastChannel('plannr-auth')
+        authChannel.onmessage = (e) => {
+          if (e?.data?.type === 'email-changed') refreshUser()
+        }
+      } catch {
+        /* BroadcastChannel unavailable — the visibility refresh below covers it. */
+      }
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') refreshUser()
+      })
+    }
+
     ready.value = true
+  }
+
+  /**
+   * Re-pull the signed-in user from Supabase so a change applied elsewhere
+   * (notably an email change confirmed from the link tab) is reflected here.
+   * Refreshing the session mints a token carrying the current email, which
+   * flows through onAuthStateChange; we also set state directly so the update
+   * lands even if no event fires. No-op when signed out.
+   */
+  async function refreshUser() {
+    if (!supabase || !session.value) return
+    const { data, error } = await supabase.auth.refreshSession()
+    if (error || !data?.session) return
+    session.value = data.session
+    user.value = data.session.user ?? null
+    if (user.value) syncProfileFromAuth(user.value)
   }
 
   /** Email/password sign-in. Returns Supabase's `{ data, error }` shape unchanged. */
@@ -86,8 +126,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Create an account. Redirects the confirmation email back to the in-app
-   * dashboard so the user lands authenticated after clicking the link.
+   * Create an account. The confirmation email links to a dedicated /auth/confirm
+   * page (not /dashboard): clicking it confirms the email and tells the user to
+   * close that tab, while the original tab they signed up in detects the
+   * confirmation and signs them into the dashboard automatically.
    */
   async function signUp(email, password, fullName) {
     if (!supabase) {
@@ -95,7 +137,7 @@ export const useAuthStore = defineStore('auth', () => {
         error: { message: 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' },
       }
     }
-    const redirectTo = `${window.location.origin}/dashboard`
+    const redirectTo = `${window.location.origin}/auth/confirm`
     return supabase.auth.signUp({
       email,
       password,
@@ -104,6 +146,46 @@ export const useAuthStore = defineStore('auth', () => {
         data: { full_name: fullName },
       },
     })
+  }
+
+  /**
+   * Verify the user's *current* password before a sensitive change. Supabase's
+   * updateUser({ password }) only needs the active session, so we re-check the
+   * current password ourselves by signing in again with it. The re-sign-in
+   * returns a fresh session for the same user, which is harmless.
+   */
+  async function reauthenticatePassword(password) {
+    if (!supabase) {
+      return { error: { message: 'Supabase is not configured.' } }
+    }
+    const email = user.value?.email
+    if (!email) {
+      return { error: { message: 'You are not signed in.' } }
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    return { error }
+  }
+
+  /** Set a new password for the signed-in user. Returns Supabase's `{ data, error }`. */
+  async function updatePassword(newPassword) {
+    if (!supabase) {
+      return { error: { message: 'Supabase is not configured.' } }
+    }
+    return supabase.auth.updateUser({ password: newPassword })
+  }
+
+  /**
+   * Start an email change. Supabase emails a confirmation link to the *new*
+   * address; clicking it lands on /auth/verify-email (a "you can close this
+   * tab" page) and applies the change. The email itself goes out through
+   * whatever SMTP provider Supabase Auth is configured with (Resend here).
+   */
+  async function updateEmail(newEmail) {
+    if (!supabase) {
+      return { error: { message: 'Supabase is not configured.' } }
+    }
+    const redirectTo = `${window.location.origin}/auth/verify-email`
+    return supabase.auth.updateUser({ email: newEmail }, { emailRedirectTo: redirectTo })
   }
 
   /** Clear the current session (server- and client-side). */
@@ -128,6 +210,10 @@ export const useAuthStore = defineStore('auth', () => {
     init,
     signInWithPassword,
     signUp,
+    reauthenticatePassword,
+    updatePassword,
+    updateEmail,
+    refreshUser,
     signOut,
   }
 })

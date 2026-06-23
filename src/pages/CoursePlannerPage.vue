@@ -547,7 +547,7 @@ function saveWork() {
           v-if="currentSchoolMeta && !currentSchoolMeta.enrollmentDataAvailable"
           class="text-xs text-gray-500 dark:text-gray-400 mt-3"
         >
-          {{ currentSchoolMeta.name }} does not expose exact seat counts publicly — only open / closed status is shown.
+          {{ currentSchoolMeta.name }} does not expose exact seat counts publicly. Only open / closed status is shown.
         </p>
       </div>
 
@@ -653,7 +653,7 @@ function saveWork() {
                 <span
                   v-else-if="isSectionUnavailable(section)"
                   class="shrink-0 inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-danger-50 dark:bg-danger-900/30 text-danger-600 dark:text-danger-300 border border-danger-200 dark:border-danger-800/60 cursor-not-allowed select-none"
-                  :title="unavailableReason(section) === 'full' ? 'This section is at capacity — registration is closed.' : 'This section is closed — registration is not available.'"
+                  :title="unavailableReason(section) === 'full' ? 'This section is at capacity. Registration is closed.' : 'This section is closed. Registration is not available.'"
                 >
                   {{ unavailableReason(section) === 'full' ? 'Full' : 'Closed' }}
                 </span>
@@ -756,7 +756,7 @@ function saveWork() {
                   :title="block.kind === 'work'
                     ? `Work · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`
                     : isSectionUnavailable(block.section)
-                      ? `${block.section.subjectCode} ${block.section.courseNumber} · ${unavailableReason(block.section) === 'full' ? 'Full — at capacity' : 'Closed'}`
+                      ? `${block.section.subjectCode} ${block.section.courseNumber} · ${unavailableReason(block.section) === 'full' ? 'Full (at capacity)' : 'Closed'}`
                       : `${block.section.subjectCode} ${block.section.courseNumber} · ${block.section.title} · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`"
                 >
                   <div class="font-bold leading-tight truncate">

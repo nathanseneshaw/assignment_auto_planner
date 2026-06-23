@@ -60,7 +60,7 @@ function onLogoError(value) {
 const logoFor = schoolLogo
 
 // "Not set" is always the first option (value === '')
-const notSetOption = computed(() => props.options.find((o) => o.value === '') || { value: '', label: 'Not set — pick later' })
+const notSetOption = computed(() => props.options.find((o) => o.value === '') || { value: '', label: 'Not set - pick later' })
 const schoolOptions = computed(() => props.options.filter((o) => o.value !== ''))
 
 const filteredSchools = computed(() => {

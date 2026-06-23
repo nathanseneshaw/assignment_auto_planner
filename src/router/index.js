@@ -17,7 +17,7 @@
  */
 import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { isSupabaseConfigured } from '../lib/supabase'
+import { isSupabaseConfigured, consumeAuthCallbackPin } from '../lib/supabase'
 import { IS_ELECTRON_BUILD } from '../lib/platform'
 
 // Electron has no marketing page: `/` is an auth-aware entry point. The
@@ -55,6 +55,26 @@ const routes = [
     name: 'Register',
     component: () => import('../pages/RegisterPage.vue'),
     meta: { title: 'Create account', authPage: true, guestOnly: true },
+  },
+  {
+    // Target of the signup confirmation email link. Public + standalone (no
+    // sidebar): clicking the link confirms the email and shows a "close this
+    // tab" message. Deliberately NOT guestOnly  the link signs the user in on
+    // this tab, and we don't want the guard bouncing them off the page.
+    path: '/auth/confirm',
+    name: 'AuthConfirm',
+    component: () => import('../pages/AuthConfirmPage.vue'),
+    meta: { title: 'Email confirmed', authPage: true },
+  },
+  {
+    // Target of the email-change confirmation link (sent to the user's new
+    // address from Settings). Public + standalone, same rationale as
+    // /auth/confirm: the link applies the change and we just show a "close this
+    // tab" message. Deliberately NOT guestOnly.
+    path: '/auth/verify-email',
+    name: 'VerifyEmail',
+    component: () => import('../pages/VerifyEmailPage.vue'),
+    meta: { title: 'Email verified', authPage: true },
   },
   {
     path: '/dashboard',
@@ -117,6 +137,20 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   // Browser tab title  set on every nav, not just initial mount.
   document.title = `${to.meta.title} | Plannr`
+
+  // Email-confirmation / email-change link tabs boot with a Supabase token in
+  // the URL. Pin THIS tab to the dedicated "close this tab" page instead of
+  // letting it flow into the app. Holds even when Supabase fell back to the
+  // Site URL because the redirect was not allowlisted (which would otherwise
+  // drop the tab on the root). One-shot (consumeAuthCallbackPin consumes it) so
+  // the user is not trapped on the confirm page once they navigate away. The
+  // original registration tab booted without a token, so it is unaffected and
+  // still signs itself in via the poll on RegisterPage.
+  const pinTarget = consumeAuthCallbackPin()
+  if (pinTarget && to.path !== pinTarget) {
+    next({ path: pinTarget })
+    return
+  }
 
   const authStore = useAuthStore()
 

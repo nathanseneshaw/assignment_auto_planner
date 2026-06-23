@@ -142,9 +142,9 @@ const sections = computed(() => {
 const emptyCopy = computed(() => {
   switch (activeTab.value) {
     case 'overdue':
-      return { title: 'Nothing overdue — nicely done.', sub: 'You’re all caught up here.' }
+      return { title: 'Nothing overdue. Nicely done.', sub: 'You’re all caught up here.' }
     case 'upcoming':
-      return { title: 'Nothing due in the next 7 days.', sub: 'You\'re clear for now — check back as deadlines approach.' }
+      return { title: 'Nothing due in the next 7 days.', sub: 'You\'re clear for now. Check back as deadlines approach.' }
     case 'completed':
       return { title: 'Nothing completed yet.', sub: 'Check items off and they’ll collect here.' }
     case 'archived':
@@ -436,7 +436,7 @@ onMounted(() => {
                     <span
                       v-if="isArchived(assignment)"
                       class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wide border bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200/70 dark:border-amber-800/60"
-                      title="Removed from your calendar feed — kept here for your records."
+                      title="Removed from your calendar feed. Kept here for your records."
                     >
                       <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 01-2 2M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M10 12h4" />

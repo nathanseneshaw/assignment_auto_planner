@@ -277,7 +277,7 @@ function handleModalClose() {
         <svg class="w-3.5 h-3.5 mt-0.5 shrink-0" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm.75 4a.75.75 0 0 0-1.5 0v3.5a.75.75 0 0 0 1.5 0V5Zm-.75 6a.875.875 0 1 0 0-1.75A.875.875 0 0 0 8 11Z"/>
         </svg>
-        <span>Syllabus was too long to send in full — we used the first ~50 000 and last 5 000 characters. A few middle items may be missing; add them below before saving.</span>
+        <span>Syllabus was too long to send in full. We used the first ~50 000 and last 5 000 characters. A few middle items may be missing; add them below before saving.</span>
       </div>
 
       <!-- Course section -->
@@ -304,7 +304,7 @@ function handleModalClose() {
           <div class="flex-1 h-px bg-paper-line dark:bg-gray-700/60"></div>
         </div>
         <p class="text-[11px] text-gray-400 dark:text-gray-500 mb-4">
-          Rows without a due date won't be saved — fill one in or remove the row.
+          Rows without a due date won't be saved. Fill one in or remove the row.
         </p>
 
         <!-- Column headers -->
@@ -315,7 +315,7 @@ function handleModalClose() {
         </div>
 
         <div v-if="draft.assignments.length === 0" class="text-sm text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-6 text-center">
-          No assignments detected — click "Add row" to enter them manually.
+          No assignments detected. Click "Add row" to enter them manually.
         </div>
 
         <ul v-else class="space-y-1.5">

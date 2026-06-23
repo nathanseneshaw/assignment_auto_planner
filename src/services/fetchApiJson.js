@@ -46,7 +46,7 @@ export async function fetchApiJson(url, init = {}) {
       if (timedOut) {
         const e = new Error(
           `The request took too long (over ${Math.round(timeoutMs / 1000)}s) and was cancelled. ` +
-            'The catalog server may be waking up — please try again in a moment.'
+            'The catalog server may be waking up. Please try again in a moment.'
         )
         e.name = 'TimeoutError'
         throw e

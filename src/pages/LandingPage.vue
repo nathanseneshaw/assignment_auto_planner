@@ -20,9 +20,9 @@ const installerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/
 const previewAccount = { name: 'Alex Rivera', email: 'alex.rivera@school.edu', initials: 'AR' }
 
 const previewTasks = [
-  'Read Chapter 7 — Thermodynamics',
+  'Read Chapter 7: Thermodynamics',
   'Draft thesis for English essay',
-  'Problem Set 4 — Linear Algebra',
+  'Problem Set 4: Linear Algebra',
   'Review lecture notes for Bio midterm',
   'Outline slides for group project',
 ]

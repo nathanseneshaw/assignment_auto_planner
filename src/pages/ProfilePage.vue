@@ -10,6 +10,8 @@ import { isSupabaseConfigured } from '../lib/supabase'
 import IcsFeedsManager from '../components/features/IcsFeedsManager.vue'
 import SyllabusParser from '../components/SyllabusParser.vue'
 import UniversityPicker from '../components/features/UniversityPicker.vue'
+import ChangePasswordModal from '../components/features/ChangePasswordModal.vue'
+import ChangeEmailModal from '../components/features/ChangeEmailModal.vue'
 import { listSchools } from '../services/coursePlannerApi.js'
 import { COURSE_PLANNER } from '../config/featureFlags.js'
 import { useCoursePlannerStore } from '../stores/coursePlanner'
@@ -177,22 +179,6 @@ const ON_TRACK_THRESHOLD = 50
 const onTrackCount = computed(
   () => coursesStore.courses.filter((c) => courseProgress(c.id) >= ON_TRACK_THRESHOLD).length
 )
-
-// Editorial "This semester" summary, assembled entirely from real data: the two
-// most-active courses, the live streak, and how many courses are on track.
-const semester = computed(() => {
-  const byActivity = [...coursesStore.courses].sort(
-    (a, b) =>
-      (assignmentsStore.assignmentsByCourse[b.id]?.length || 0) -
-      (assignmentsStore.assignmentsByCourse[a.id]?.length || 0)
-  )
-  return {
-    courses: byActivity.slice(0, 2).map((c) => c.name).filter(Boolean),
-    streak: planningStreak.value,
-    onTrack: onTrackCount.value,
-    total: coursesStore.courses.length,
-  }
-})
 
 // ── Activity heatmap ──────────────────────────────────────────────────────────
 
@@ -366,6 +352,11 @@ const schoolOptions = computed(() =>
   )
 )
 
+// ── Account & security ─────────────────────────────────────────────────────────
+
+const showPasswordModal = ref(false)
+const showEmailModal = ref(false)
+
 // ── Session ───────────────────────────────────────────────────────────────────
 
 const signingOut = ref(false)
@@ -487,18 +478,44 @@ async function confirmUnenroll() {
       </div>
     </header>
 
-    <!-- ── This semester ── -->
-    <section v-if="semester.courses.length" class="py-7 border-t border-paper-line dark:border-gray-700/60">
-      <div class="flex items-baseline justify-between gap-4 mb-4">
-        <h2 class="display text-[15px] text-gray-900 dark:text-gray-100">This semester</h2>
-        <span class="eyebrow text-gray-400 dark:text-gray-500">{{ currentTerm.label }}</span>
+    <!-- ── Account & security ── -->
+    <section
+      v-if="isSupabaseConfigured && authStore.user"
+      class="py-7 border-t border-paper-line dark:border-gray-700/60"
+    >
+      <div class="flex items-baseline justify-between gap-4 mb-1">
+        <h2 class="display text-[15px] text-gray-900 dark:text-gray-100">Account &amp; security</h2>
+        <span class="eyebrow text-gray-400 dark:text-gray-500">Sign-in details</span>
       </div>
-      <p class="font-serif text-[15px] leading-relaxed text-gray-600 dark:text-gray-300">
-        <template v-if="semester.courses.length >= 2">Balancing <em class="text-gray-800 dark:text-gray-200">{{ semester.courses[0] }}</em> and <em class="text-gray-800 dark:text-gray-200">{{ semester.courses[1] }}</em> this term.</template>
-        <template v-else>Focused on <em class="text-gray-800 dark:text-gray-200">{{ semester.courses[0] }}</em> this term.</template>
-        <template v-if="semester.streak > 0"> <span class="font-medium text-gray-800 dark:text-gray-200">{{ semester.streak }} day{{ semester.streak === 1 ? '' : 's' }} into a planning streak.</span></template>
-        <template v-if="semester.total"> Aiming to keep all {{ semester.total }} course{{ semester.total === 1 ? '' : 's' }} on track  {{ semester.onTrack }} {{ semester.onTrack === 1 ? 'is' : 'are' }} there now.</template>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+        Update the email and password you use to sign in to Plannr.
       </p>
+      <div class="divide-y divide-paper-line dark:divide-gray-700/50">
+        <!-- Email -->
+        <div class="flex items-center justify-between gap-4 py-3.5">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Email</p>
+            <p class="text-[12px] text-gray-500 dark:text-gray-400 font-mono truncate mt-0.5">
+              {{ accountDisplayEmail || 'Not set' }}
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" class="shrink-0" @click="showEmailModal = true">
+            Change email
+          </Button>
+        </div>
+        <!-- Password -->
+        <div class="flex items-center justify-between gap-4 py-3.5">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Password</p>
+            <p class="text-[12px] text-gray-500 dark:text-gray-400 font-mono truncate mt-0.5">
+              ••••••••
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" class="shrink-0" @click="showPasswordModal = true">
+            Change password
+          </Button>
+        </div>
+      </div>
     </section>
 
     <!-- ── At a glance ── -->
@@ -719,5 +736,9 @@ async function confirmUnenroll() {
         <p v-if="unenrollError" class="text-sm text-danger-600 dark:text-danger-400">{{ unenrollError }}</p>
       </div>
     </ConfirmDialog>
+
+    <!-- Account modals (Teleport to <body>, so placement here is layout-neutral). -->
+    <ChangePasswordModal v-model="showPasswordModal" />
+    <ChangeEmailModal v-model="showEmailModal" />
   </div>
 </template>

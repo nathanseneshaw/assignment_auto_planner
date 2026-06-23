@@ -10,6 +10,7 @@ vi.mock('../../lib/supabase', () => ({
       onAuthStateChange: vi.fn().mockReturnValue({}),
       signInWithPassword: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } }, error: null }),
       signUp: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' }, session: null }, error: null }),
+      updateUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } }, error: null }),
       signOut: vi.fn().mockResolvedValue({}),
     },
   },
@@ -173,7 +174,7 @@ describe('signUp', () => {
       email: 'new@example.com',
       password: 'pass123',
       options: {
-        emailRedirectTo: expect.stringContaining('/dashboard'),
+        emailRedirectTo: expect.stringContaining('/auth/confirm'),
         data: { full_name: 'Jane Doe' },
       },
     })
@@ -195,6 +196,81 @@ describe('signUp', () => {
     const store = useAuthStore()
     const result = await store.signUp('taken@example.com', 'pass123', 'Jane')
     expect(result.error?.message).toBe('Email already registered')
+  })
+})
+
+// ── reauthenticatePassword ────────────────────────────────────────────────────
+
+describe('reauthenticatePassword', () => {
+  it('verifies the current password against the signed-in user email', async () => {
+    const store = useAuthStore()
+    store.user = { id: 'u1', email: 'me@example.com' }
+    await store.reauthenticatePassword('current-pass')
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'me@example.com',
+      password: 'current-pass',
+    })
+  })
+
+  it('returns an error when not signed in', async () => {
+    const store = useAuthStore()
+    const result = await store.reauthenticatePassword('whatever')
+    expect(result.error).toBeTruthy()
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a wrong-password error from supabase', async () => {
+    supabase.auth.signInWithPassword.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Invalid login credentials' },
+    })
+    const store = useAuthStore()
+    store.user = { id: 'u1', email: 'me@example.com' }
+    const result = await store.reauthenticatePassword('wrong')
+    expect(result.error?.message).toBe('Invalid login credentials')
+  })
+})
+
+// ── updatePassword ────────────────────────────────────────────────────────────
+
+describe('updatePassword', () => {
+  it('delegates to supabase.auth.updateUser with the new password', async () => {
+    const store = useAuthStore()
+    await store.updatePassword('new-pass-123')
+    expect(supabase.auth.updateUser).toHaveBeenCalledWith({ password: 'new-pass-123' })
+  })
+
+  it('returns an error when supabase rejects the update', async () => {
+    supabase.auth.updateUser.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Password should be at least 6 characters' },
+    })
+    const store = useAuthStore()
+    const result = await store.updatePassword('123')
+    expect(result.error?.message).toBe('Password should be at least 6 characters')
+  })
+})
+
+// ── updateEmail ───────────────────────────────────────────────────────────────
+
+describe('updateEmail', () => {
+  it('delegates to supabase.auth.updateUser with the new email and a verify redirect', async () => {
+    const store = useAuthStore()
+    await store.updateEmail('new@example.com')
+    expect(supabase.auth.updateUser).toHaveBeenCalledWith(
+      { email: 'new@example.com' },
+      { emailRedirectTo: expect.stringContaining('/auth/verify-email') }
+    )
+  })
+
+  it('returns an error when supabase rejects the change', async () => {
+    supabase.auth.updateUser.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Email address already in use' },
+    })
+    const store = useAuthStore()
+    const result = await store.updateEmail('taken@example.com')
+    expect(result.error?.message).toBe('Email address already in use')
   })
 })
 
