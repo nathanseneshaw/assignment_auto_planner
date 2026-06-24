@@ -13,6 +13,7 @@
  */
 import { Router } from 'express'
 import { rateLimit } from 'express-rate-limit'
+import { selectCurrentAndNextTerms } from './course-planner/term-window.js'
 import * as rice from './course-planner/rice-scraper.js'
 import * as ttu from './course-planner/ttu-scraper.js'
 import * as tamu from './course-planner/tamu-scraper.js'
@@ -266,7 +267,9 @@ router.get('/api/course-planner/:school/terms', async (req, res) => {
   const entry = getScraper(req, res)
   if (!entry) return
   try {
-    const terms = await entry.scraper.getTerms()
+    // Every school's terms get the same treatment: uniform "Season YYYY" labels,
+    // trimmed to just the current term plus the next one (see term-window.js).
+    const terms = selectCurrentAndNextTerms(await entry.scraper.getTerms())
     res.json({ success: true, terms })
   } catch (err) {
     handleError(res, err, `${entry.code} terms`)

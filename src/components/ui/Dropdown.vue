@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
   modelValue: {
@@ -28,35 +28,99 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'change'])
 
 const open = ref(false)
-const containerRef = ref(null)
+// Direction the panel opens. Flipped to `up` when the trigger sits near the
+// bottom of the viewport (e.g. the Course field at the foot of a modal) so the
+// choices stay visible without scrolling.
+const dropUp = ref(false)
 const triggerRef = ref(null)
+const panelRef = ref(null)
 
 const selectedLabel = computed(
   () => props.options.find((o) => String(o.value) === String(props.modelValue))?.label ?? '',
 )
 
+// ── positioning (teleported + fixed so it escapes modal `overflow` clipping) ──
+const PANEL_MAX = 280
+const ITEM_H = 36 // approx height of one option row
+const PANEL_VPAD = 8 // panel's own py-1
+const MARGIN = 8
+const panelStyle = ref({})
+
+function reposition() {
+  const el = triggerRef.value
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  const estimated = Math.min(PANEL_MAX, props.options.length * ITEM_H + PANEL_VPAD)
+  const spaceBelow = window.innerHeight - r.bottom - MARGIN
+  const spaceAbove = r.top - MARGIN
+  // Prefer opening downward; only flip up when there's too little room below and
+  // genuinely more room above.
+  dropUp.value = spaceBelow < estimated && spaceAbove > spaceBelow
+  const available = Math.max(120, Math.min(PANEL_MAX, dropUp.value ? spaceAbove : spaceBelow))
+  const height = Math.min(estimated, available)
+  const top = dropUp.value ? r.top - height - MARGIN : r.bottom + MARGIN
+  panelStyle.value = {
+    position: 'fixed',
+    top: `${Math.max(MARGIN, top)}px`,
+    left: `${r.left}px`,
+    width: `${r.width}px`,
+    maxHeight: `${available}px`,
+  }
+}
+
+function openMenu() {
+  open.value = true
+  nextTick(reposition)
+}
+function closeMenu(focusTrigger = false) {
+  open.value = false
+  if (focusTrigger) triggerRef.value?.focus()
+}
+function toggleOpen() {
+  open.value ? closeMenu() : openMenu()
+}
+
+const enterActiveClass = computed(
+  () => `transition duration-150 ease-out ${dropUp.value ? 'origin-bottom' : 'origin-top'}`,
+)
+const leaveActiveClass = computed(
+  () => `transition duration-100 ease-in ${dropUp.value ? 'origin-bottom' : 'origin-top'}`,
+)
+
 function select(value) {
   emit('update:modelValue', value)
   emit('change', value)
+  closeMenu(true)
+}
+
+function onDocMousedown(e) {
+  if (!open.value) return
+  if (triggerRef.value?.contains(e.target)) return
+  if (panelRef.value?.contains(e.target)) return
   open.value = false
-  triggerRef.value?.focus()
 }
-
-function onOutsideClick(e) {
-  if (containerRef.value && !containerRef.value.contains(e.target)) {
-    open.value = false
-  }
-}
-
-function onKeydown(e) {
+function onDocKeydown(e) {
   if (e.key === 'Escape' && open.value) {
-    open.value = false
-    triggerRef.value?.focus()
+    e.preventDefault()
+    closeMenu(true)
   }
 }
+function onWinChange() {
+  if (open.value) reposition()
+}
 
-onMounted(() => document.addEventListener('mousedown', onOutsideClick))
-onUnmounted(() => document.removeEventListener('mousedown', onOutsideClick))
+onMounted(() => {
+  document.addEventListener('mousedown', onDocMousedown)
+  document.addEventListener('keydown', onDocKeydown)
+  window.addEventListener('resize', onWinChange)
+  window.addEventListener('scroll', onWinChange, true)
+})
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onDocMousedown)
+  document.removeEventListener('keydown', onDocKeydown)
+  window.removeEventListener('resize', onWinChange)
+  window.removeEventListener('scroll', onWinChange, true)
+})
 
 const triggerClasses = computed(() => [
   'w-full flex items-center justify-between gap-2 rounded-xl border bg-surface dark:bg-gray-800 text-left font-medium tracking-tight text-gray-900 dark:text-gray-100',
@@ -78,14 +142,14 @@ const chevronSize = computed(() => (props.size === 'sm' ? 'w-4 h-4' : 'w-[18px] 
       <span v-if="required" class="text-danger-500">*</span>
     </label>
 
-    <div ref="containerRef" class="relative" @keydown="onKeydown">
+    <div class="relative">
       <button
         ref="triggerRef"
         type="button"
         :aria-expanded="open"
         aria-haspopup="listbox"
         :class="triggerClasses"
-        @click="open = !open"
+        @click="toggleOpen"
       >
         <span class="truncate">{{ selectedLabel }}</span>
         <svg
@@ -100,50 +164,54 @@ const chevronSize = computed(() => (props.size === 'sm' ? 'w-4 h-4' : 'w-[18px] 
         </svg>
       </button>
 
-      <Transition
-        enter-active-class="transition duration-150 ease-out origin-top"
-        enter-from-class="opacity-0 scale-95"
-        enter-to-class="opacity-100 scale-100"
-        leave-active-class="transition duration-100 ease-in origin-top"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-95"
-      >
-        <div
-          v-if="open"
-          role="listbox"
-          class="absolute left-0 right-0 mt-1.5 z-50 rounded-xl border border-gray-200/80 dark:border-gray-700 bg-surface dark:bg-gray-800 py-1 shadow-[0_4px_20px_rgba(28,25,23,0.10),0_1px_4px_rgba(28,25,23,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
-          style="max-height: 280px; overflow-y: auto;"
+      <!-- Options panel (teleported so it escapes modal overflow clipping) -->
+      <Teleport to="body">
+        <Transition
+          :enter-active-class="enterActiveClass"
+          enter-from-class="opacity-0 scale-95"
+          enter-to-class="opacity-100 scale-100"
+          :leave-active-class="leaveActiveClass"
+          leave-from-class="opacity-100 scale-100"
+          leave-to-class="opacity-0 scale-95"
         >
-          <button
-            v-for="opt in options"
-            :key="opt.value"
-            type="button"
-            role="option"
-            :aria-selected="String(opt.value) === String(modelValue)"
-            class="w-full flex items-center justify-between gap-2 text-left font-medium tracking-tight transition-colors duration-100"
-            :class="[
-              size === 'sm' ? 'px-3 py-1.5 text-sm' : 'px-3.5 py-2 text-[14px]',
-              String(opt.value) === String(modelValue)
-                ? 'bg-gray-100/80 dark:bg-gray-700/70 text-gray-900 dark:text-gray-100'
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100',
-            ]"
-            @click="select(opt.value)"
+          <div
+            v-if="open"
+            ref="panelRef"
+            role="listbox"
+            :style="panelStyle"
+            class="z-[60] rounded-xl border border-gray-200/80 dark:border-gray-700 bg-surface dark:bg-gray-800 py-1 overflow-y-auto shadow-[0_4px_20px_rgba(28,25,23,0.10),0_1px_4px_rgba(28,25,23,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
           >
-            <span class="truncate">{{ opt.label }}</span>
-            <svg
-              v-if="String(opt.value) === String(modelValue)"
-              class="w-4 h-4 shrink-0 text-primary-700 dark:text-primary-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2.5"
-              aria-hidden="true"
+            <button
+              v-for="opt in options"
+              :key="opt.value"
+              type="button"
+              role="option"
+              :aria-selected="String(opt.value) === String(modelValue)"
+              class="w-full flex items-center justify-between gap-2 text-left font-medium tracking-tight transition-colors duration-100"
+              :class="[
+                size === 'sm' ? 'px-3 py-1.5 text-sm' : 'px-3.5 py-2 text-[14px]',
+                String(opt.value) === String(modelValue)
+                  ? 'bg-gray-100/80 dark:bg-gray-700/70 text-gray-900 dark:text-gray-100'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100',
+              ]"
+              @click="select(opt.value)"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </button>
-        </div>
-      </Transition>
+              <span class="truncate">{{ opt.label }}</span>
+              <svg
+                v-if="String(opt.value) === String(modelValue)"
+                class="w-4 h-4 shrink-0 text-primary-700 dark:text-primary-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2.5"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </button>
+          </div>
+        </Transition>
+      </Teleport>
     </div>
   </div>
 </template>

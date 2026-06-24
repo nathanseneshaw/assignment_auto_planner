@@ -583,7 +583,7 @@ function saveWork() {
       <div class="mt-6 grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-6">
 
         <!-- LEFT: results rail -->
-        <div class="min-w-0 flex flex-col">
+        <div class="min-w-0 flex flex-col lg:overflow-hidden">
           <div class="flex items-baseline justify-between border-b border-paper-line dark:border-gray-700/60 pb-2.5">
             <p class="eyebrow text-gray-400 dark:text-gray-500">
               Results
