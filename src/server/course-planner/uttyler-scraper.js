@@ -25,13 +25,24 @@
  *   5. A broad search returns a "your search will return over 50 classes, continue?"
  *      soft warning that must be acknowledged (#ICSave) to load the results.
  *
- * Only open/closed status is exposed — no seat counts.
+ * The results list exposes open/closed status; seat counts are filled in by
+ * walking each section's class-detail panel with the shared PeopleSoft helpers
+ * (the parked results session is reused as the first walker).
  */
 import { CookieJar } from 'tough-cookie'
 import makeFetchCookie from 'fetch-cookie'
 import * as cheerio from 'cheerio'
 import { cacheMemo } from './cache.js'
-import { parseSearchResults } from './peoplesoft.js'
+import {
+  parseSearchResults,
+  extractCdataHtml,
+  walkSeatQueue,
+  seatSessionCount,
+  seatWalkAllowed,
+  mapCrnToIndex,
+  stateNumOf,
+  icsidOf,
+} from './peoplesoft.js'
 
 const SCHOOL = 'uttyler'
 const BASE = 'https://tycs-prd.utshare.utsystem.edu'
@@ -222,56 +233,112 @@ export async function getSubjects(termCode) {
   )
 }
 
+/**
+ * Drive one guest session all the way to a term+career+subject results page.
+ * Returns { s, raw } (a live session parked on the results, plus the raw results
+ * response), 'not-offered' when the career's Subject dropdown lacks the subject,
+ * or null on the transient cold-session bounce (caller retries).
+ */
+async function openCareerResults({ termCode, subjectCode, career }) {
+  let s
+  try {
+    s = await sessionForTermCareer(termCode, career)
+  } catch {
+    return null
+  }
+  // Subject must appear in this career's dropdown, else it's not offered here.
+  if (!s.options(SEL.subject).some((o) => o.code === subjectCode)) return 'not-offered'
+
+  const inst = s.name(SEL.institution)
+  const term = s.name(SEL.term)
+  const careerField = s.name(SEL.career)
+  const subject = s.name(SEL.subject)
+  const ctx = { [inst]: INSTITUTION, [term]: termCode, [careerField]: career }
+
+  // Two criteria in one Search submit: Subject + catalog number >= 0 (which
+  // matches every course in the subject). icajax:'1' + changed make the
+  // component actually run the query — a plain full-page post silently swallows
+  // it — and return its soft warning.
+  const catName = s.name(SEL.catalog)
+  const matchName = s.name(SEL.match)
+  let html = await s.post(
+    SEARCH_BTN,
+    { ...ctx, [subject]: subjectCode, [matchName]: 'G', [catName]: '0' },
+    { icajax: '1', changed: true }
+  )
+
+  // A broad search trips "Your search will return over 50 classes, continue?";
+  // acknowledge it (#ICSave = the OK button) to load the full results page.
+  if (/return over \d+ class|Student SS Warning|SSR_SS_WARNING/i.test(html)) {
+    html = await s.post('#ICSave', {}, { icajax: '1' })
+  }
+
+  // A results page (or a legit "no classes found") vs a transient bounce back to
+  // the entry form — only the former is parseable; retry the latter.
+  if (!/SSR_CLSRSLT_WRK_GROUPBOX|SSR_CLSRCH_RSLT|did not return any|no classes found/i.test(html)) {
+    return null
+  }
+  return { s, raw: html }
+}
+
+/** A walkSeatQueue-compatible session from a parked results response. */
+function walkSessionFrom({ s, raw }) {
+  return {
+    cFetch: s.cFetch,
+    icsid: icsidOf(raw, ''),
+    stateNum: stateNumOf(raw, 2),
+    crnToIndex: mapCrnToIndex(extractCdataHtml(raw)),
+  }
+}
+
 /** Run one term+career+subject search, retrying the cold-session criteria bounce. */
 async function searchCareer({ termCode, subjectCode, career, termLabel, subjectLabel }, maxTries = 5) {
   for (let attempt = 0; attempt < maxTries; attempt++) {
-    let s
-    try {
-      s = await sessionForTermCareer(termCode, career)
-    } catch {
-      continue
-    }
-    // Subject must appear in this career's dropdown, else it's not offered here.
-    if (!s.options(SEL.subject).some((o) => o.code === subjectCode)) return []
-
-    const inst = s.name(SEL.institution)
-    const term = s.name(SEL.term)
-    const careerField = s.name(SEL.career)
-    const subject = s.name(SEL.subject)
-    const ctx = { [inst]: INSTITUTION, [term]: termCode, [careerField]: career }
-
-    // Two criteria in one Search submit: Subject + catalog number >= 0 (which
-    // matches every course in the subject). icajax:'1' + changed make the
-    // component actually run the query — a plain full-page post silently swallows
-    // it — and return its soft warning.
-    const catName = s.name(SEL.catalog)
-    const matchName = s.name(SEL.match)
-    let html = await s.post(
-      SEARCH_BTN,
-      { ...ctx, [subject]: subjectCode, [matchName]: 'G', [catName]: '0' },
-      { icajax: '1', changed: true }
-    )
-
-    // A broad search trips "Your search will return over 50 classes, continue?";
-    // acknowledge it (#ICSave = the OK button) to load the full results page.
-    if (/return over \d+ class|Student SS Warning|SSR_SS_WARNING/i.test(html)) {
-      html = await s.post('#ICSave', {}, { icajax: '1' })
-    }
-
-    // A results page (or a legit "no classes found") vs a transient bounce back to
-    // the entry form — only the former is parseable; retry the latter.
-    if (!/SSR_CLSRSLT_WRK_GROUPBOX|SSR_CLSRCH_RSLT|did not return any|no classes found/i.test(html)) {
-      continue
-    }
-
-    return parseSearchResults(html, {
+    const opened = await openCareerResults({ termCode, subjectCode, career })
+    if (opened === 'not-offered') return { sections: [], results: null }
+    if (!opened) continue
+    const sections = parseSearchResults(opened.raw, {
       school: SCHOOL,
       termCode,
       termLabel,
       subjectLabel: subjectLabel || subjectCode,
     })
+    return { sections, results: opened }
   }
   throw new Error(`UT Tyler search for ${subjectCode} (${career}) kept bouncing`)
+}
+
+// UT Tyler gets a smaller session pool than UH/UTA: every extra walk session
+// costs a full guest warm-up + term/career/search drive (~6 round trips).
+const MAX_WALK_SESSIONS = 4
+
+/**
+ * Walk class-detail panels for one career's sections (detail → BACK postbacks via
+ * the shared PeopleSoft helper), reusing the career's parked results session as
+ * the first worker and opening extra sessions for big subjects.
+ */
+async function fetchCareerSeats({ termCode, subjectCode, career, results, crns, sectionsByCrn }) {
+  if (!seatWalkAllowed(crns.length)) return
+  const queue = [...crns]
+  const retried = new Set() // shared one-retry budget across workers
+  const workerCount = Math.min(MAX_WALK_SESSIONS, seatSessionCount(queue.length))
+
+  async function worker(first) {
+    let opened = first ? results : null
+    if (!opened) {
+      opened = await openCareerResults({ termCode, subjectCode, career })
+      if (!opened || opened === 'not-offered') return
+    }
+    await walkSeatQueue({
+      url: CLASS_SEARCH,
+      session: walkSessionFrom(opened),
+      queue,
+      sectionsByCrn,
+      retried,
+    })
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, (_, i) => worker(i === 0)))
 }
 
 export async function getSections({ termCode, subjectCode, termLabel, subjectLabel }) {
@@ -282,21 +349,46 @@ export async function getSections({ termCode, subjectCode, termLabel, subjectLab
     const careers = known && known.size ? [...known] : CAREERS
 
     const byCrn = new Map()
+    const crnCareer = new Map() // crn -> career whose section object won the dedup
+    const careerResults = new Map() // career -> parked results session for the walk
     const settled = await Promise.allSettled(
       careers.map((career) =>
         searchCareer({ termCode, subjectCode, career, termLabel, subjectLabel })
       )
     )
     let lastErr = null
-    for (const result of settled) {
+    for (let i = 0; i < settled.length; i++) {
+      const result = settled[i]
       if (result.status === 'fulfilled') {
-        for (const sec of result.value) byCrn.set(sec.crn, sec) // dedup across careers
+        for (const sec of result.value.sections) {
+          byCrn.set(sec.crn, sec) // dedup across careers
+          crnCareer.set(sec.crn, careers[i])
+        }
+        if (result.value.results) careerResults.set(careers[i], result.value.results)
       } else {
         lastErr = result.reason // one flaky career shouldn't sink the others
       }
     }
     // Surface an error only if every career failed and none produced sections.
     if (!byCrn.size && lastErr) throw lastErr
+
+    // Seat counts: walk each career's own sections (a CRN deduped away from a
+    // career is walked under the career that won it).
+    await Promise.all(
+      careers.map((career) => {
+        const crns = [...crnCareer].filter(([, c]) => c === career).map(([crn]) => crn)
+        if (!crns.length) return null
+        return fetchCareerSeats({
+          termCode,
+          subjectCode,
+          career,
+          results: careerResults.get(career) || null,
+          crns,
+          sectionsByCrn: byCrn,
+        })
+      })
+    )
+
     return [...byCrn.values()]
   })
 }

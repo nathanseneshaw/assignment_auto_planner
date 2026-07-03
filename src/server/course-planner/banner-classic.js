@@ -16,8 +16,12 @@
  *   2. POST {base}{prefix}/bwckgens.p_proc_term_date   -> <select name=sel_subj> subject options
  *   3. POST {base}{prefix}/bwckschd.p_get_crse_unsec   -> "Class Schedule Listing" HTML
  *
- * The listing carries meeting times + instructors but NO seat counts, so
- * enrollment.* stays null and callers report enrollmentDataAvailable:false.
+ * The listing carries meeting times + instructors but NO seat counts. Those live
+ * on the public per-CRN detail page (bwckschd.p_disp_detail_sched), whose
+ * "Registration Availability" table has Capacity / Actual / Remaining, so after
+ * parsing the listing we fetch every section's detail page (bounded concurrency)
+ * and fill enrollment.* from it. The bulk "Look Up Classes" page (bwskfcls) that
+ * carries Cap/Act/Rem in one request is login-gated on all our schools.
  */
 import { CookieJar } from 'tough-cookie'
 import makeFetchCookie from 'fetch-cookie'
@@ -126,6 +130,41 @@ export function createBannerClassicScraper({ school, base, prefix }) {
     return p.toString()
   }
 
+  /** Seats row of the detail page's "Registration Availability" table. */
+  async function fetchSeats(cFetch, termCode, crn) {
+    const res = await cFetch(
+      `${root}/bwckschd.p_disp_detail_sched?term_in=${encodeURIComponent(termCode)}&crn_in=${encodeURIComponent(crn)}`,
+      { headers: { 'User-Agent': UA, Referer: schedUrl } }
+    )
+    const html = await res.text()
+    // <th ...><SPAN ...>Seats</SPAN></th> <td>Capacity</td> <td>Actual</td> <td>Remaining</td>
+    const m = html.match(
+      />\s*Seats\s*<\/SPAN>\s*<\/th>\s*<td[^>]*>\s*(-?\d+)\s*<\/td>\s*<td[^>]*>\s*(-?\d+)\s*<\/td>\s*<td[^>]*>\s*(-?\d+)\s*<\/td>/i
+    )
+    if (!m) return null
+    const [, max, current, available] = m.map(Number)
+    return { max, current, available }
+  }
+
+  /** Fill enrollment + open/closed status from per-CRN detail pages, N at a time. */
+  async function enrichWithSeats(cFetch, termCode, sections) {
+    const queue = [...sections]
+    async function worker() {
+      for (let s = queue.shift(); s; s = queue.shift()) {
+        try {
+          const seats = await fetchSeats(cFetch, termCode, s.crn)
+          if (seats) {
+            s.enrollment = seats
+            s.status = seats.available > 0 ? 'open' : 'closed'
+          }
+        } catch {
+          // One flaky detail page shouldn't sink the listing — leave nulls.
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: DETAIL_CONCURRENCY }, worker))
+  }
+
   async function getSections({ termCode, subjectCode, termLabel, subjectLabel }) {
     return cacheMemo(`${school}:sections:${termCode}:${subjectCode}`, async () => {
       const cFetch = await warmSession()
@@ -140,12 +179,18 @@ export function createBannerClassicScraper({ school, base, prefix }) {
           body: sectionSearchBody(termCode, subjectCode),
         })
       ).text()
-      return parseListing(html, { school, termCode, termLabel, subjectLabel })
+      const sections = parseListing(html, { school, termCode, termLabel, subjectLabel })
+      await enrichWithSeats(cFetch, termCode, sections)
+      return sections
     })
   }
 
   return { getTerms, getSubjects, getSections }
 }
+
+/** Parallel detail-page fetches per listing — enough to keep a big subject fast
+ *  without hammering these older Banner hosts. */
+const DETAIL_CONCURRENCY = 8
 
 /** Parse a Banner "Class Schedule Listing" page into the unified Section shape. */
 function parseListing(html, { school, termCode, termLabel, subjectLabel }) {

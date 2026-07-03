@@ -10,7 +10,8 @@
  *      rejected. We pair the subject with "catalog number >= 0", which matches
  *      every course in the subject.
  *
- * Only open/closed status is exposed — no seat counts.
+ * The results list exposes open/closed status; seat counts are filled in by the
+ * shared class-detail walk (enrichSectionsWithSeats) afterwards.
  */
 import * as cheerio from 'cheerio'
 import { cacheMemo } from './cache.js'
@@ -21,6 +22,7 @@ import {
   postForm,
   runClassSearch,
   extractCdataHtml,
+  enrichSectionsWithSeats,
 } from './peoplesoft.js'
 
 const SCHOOL = 'uta'
@@ -110,30 +112,33 @@ export async function getSubjects(termCode) {
 }
 
 export async function getSections({ termCode, subjectCode, termLabel, subjectLabel }) {
-  return cacheMemo(`${SCHOOL}:sections:${termCode}:${subjectCode}`, () =>
-    runClassSearch({
+  const applyCriteria = ($, body) => {
+    const instName = $('select[name^="CLASS_SRCH_WRK2_INSTITUTION"]').attr('name')
+    const strmName = $('select[name^="CLASS_SRCH_WRK2_STRM"]').attr('name')
+    const subjName = $('input[name^="SSR_CLSRCH_WRK_SUBJECT$"]').attr('name')
+    const catName = $('input[name^="SSR_CLSRCH_WRK_CATALOG_NBR"]').attr('name')
+    const matchName = $('select[name^="SSR_CLSRCH_WRK_SSR_EXACT_MATCH1"]').attr('name')
+
+    if (instName) body.set(instName, INSTITUTION)
+    if (strmName) body.set(strmName, termCode)
+    if (subjName) body.set(subjName, subjectCode)
+    // Second criterion: catalog number >= 0 → matches every course in the subject.
+    if (catName) body.set(catName, '0')
+    if (matchName) body.set(matchName, 'G')
+    $('input[name^="SSR_CLSRCH_WRK_SSR_OPEN_ONLY"]').each((_, el) =>
+      body.delete($(el).attr('name'))
+    )
+  }
+  return cacheMemo(`${SCHOOL}:sections:${termCode}:${subjectCode}`, async () => {
+    const sections = await runClassSearch({
       url: URL,
       school: SCHOOL,
       termCode,
       termLabel,
       subjectLabel,
-      applyCriteria: ($, body) => {
-        const instName = $('select[name^="CLASS_SRCH_WRK2_INSTITUTION"]').attr('name')
-        const strmName = $('select[name^="CLASS_SRCH_WRK2_STRM"]').attr('name')
-        const subjName = $('input[name^="SSR_CLSRCH_WRK_SUBJECT$"]').attr('name')
-        const catName = $('input[name^="SSR_CLSRCH_WRK_CATALOG_NBR"]').attr('name')
-        const matchName = $('select[name^="SSR_CLSRCH_WRK_SSR_EXACT_MATCH1"]').attr('name')
-
-        if (instName) body.set(instName, INSTITUTION)
-        if (strmName) body.set(strmName, termCode)
-        if (subjName) body.set(subjName, subjectCode)
-        // Second criterion: catalog number >= 0 → matches every course in the subject.
-        if (catName) body.set(catName, '0')
-        if (matchName) body.set(matchName, 'G')
-        $('input[name^="SSR_CLSRCH_WRK_SSR_OPEN_ONLY"]').each((_, el) =>
-          body.delete($(el).attr('name'))
-        )
-      },
+      applyCriteria,
     })
-  )
+    await enrichSectionsWithSeats({ url: URL, applyCriteria, sections })
+    return sections
+  })
 }

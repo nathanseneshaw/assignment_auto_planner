@@ -4,8 +4,8 @@
  * Lamar (Beaumont) runs Banner 8 "classic" self-service. The modern portal is
  * login-gated, but the legacy Class Schedule Listing at ssbprod.lamar.edu/btdb is
  * public (Texas HB 2504 "Public Access to Course Information"). The shared
- * banner-classic factory does the work. Meeting times + instructors are
- * available; seat counts are not.
+ * banner-classic factory does the work. Meeting times, instructors and seat
+ * counts (via per-CRN detail pages) are all available.
  */
 import { createBannerClassicScraper } from './banner-classic.js'
 

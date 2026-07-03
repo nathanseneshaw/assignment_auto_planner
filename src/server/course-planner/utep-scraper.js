@@ -4,8 +4,8 @@
  * UTEP runs Banner 8 "classic" self-service ("Goldmine"). The modern SSB +
  * portal are CAS/Duo login-gated, but the legacy Class Schedule Listing at
  * goldmine.utep.edu/prod is public (Texas HB 2504 "Public Access to Course
- * Information"). Shared banner-classic factory does the work. Meeting times +
- * instructors are available; seat counts are not.
+ * Information"). Shared banner-classic factory does the work. Meeting times,
+ * instructors and seat counts (via per-CRN detail pages) are all available.
  */
 import { createBannerClassicScraper } from './banner-classic.js'
 

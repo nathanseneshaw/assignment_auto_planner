@@ -40,6 +40,7 @@ import * as stanford from './course-planner/stanford-scraper.js'
 import * as yale from './course-planner/yale-scraper.js'
 import * as upenn from './course-planner/upenn-scraper.js'
 import * as columbia from './course-planner/columbia-scraper.js'
+import * as utd from './course-planner/utd-scraper.js'
 
 const router = Router()
 
@@ -107,36 +108,36 @@ const SCHOOLS = {
   uh: {
     code: 'uh',
     name: 'University of Houston',
-    // PeopleSoft public class search shows only open/closed, not seat counts.
-    enrollmentDataAvailable: false,
+    // PeopleSoft class-detail walk fills capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
     scraper: uh,
   },
   uhd: {
     code: 'uhd',
     name: 'University of Houston–Downtown',
-    // Same UH-System PeopleSoft class search; only open/closed, no seat counts.
-    enrollmentDataAvailable: false,
+    // Same UH-System PeopleSoft; class-detail walk fills seat counts.
+    enrollmentDataAvailable: true,
     scraper: uhd,
   },
   uhcl: {
     code: 'uhcl',
     name: 'University of Houston–Clear Lake',
-    // Same UH-System PeopleSoft class search; only open/closed, no seat counts.
-    enrollmentDataAvailable: false,
+    // Same UH-System PeopleSoft; class-detail walk fills seat counts.
+    enrollmentDataAvailable: true,
     scraper: uhcl,
   },
   uta: {
     code: 'uta',
     name: 'University of Texas at Arlington',
-    // PeopleSoft public class search shows only open/closed, not seat counts.
-    enrollmentDataAvailable: false,
+    // PeopleSoft class-detail walk fills capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
     scraper: uta,
   },
   uttyler: {
     code: 'uttyler',
     name: 'University of Texas at Tyler',
-    // PeopleSoft guest class search shows only open/closed, not seat counts.
-    enrollmentDataAvailable: false,
+    // PeopleSoft guest class-detail walk fills capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
     scraper: uttyler,
   },
   utrgv: {
@@ -149,22 +150,22 @@ const SCHOOLS = {
   utsa: {
     code: 'utsa',
     name: 'University of Texas at San Antonio',
-    // Banner classic schedule listing has meeting times but no seat counts.
-    enrollmentDataAvailable: false,
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
     scraper: utsa,
   },
   utep: {
     code: 'utep',
     name: 'University of Texas at El Paso',
-    // Banner classic schedule listing has meeting times but no seat counts.
-    enrollmentDataAvailable: false,
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
     scraper: utep,
   },
   stmarys: {
     code: 'stmarys',
     name: "St. Mary's University",
-    // Banner classic schedule listing has meeting times but no seat counts.
-    enrollmentDataAvailable: false,
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
     scraper: stmarys,
   },
   tcu: {
@@ -184,15 +185,15 @@ const SCHOOLS = {
   lamar: {
     code: 'lamar',
     name: 'Lamar University',
-    // Banner classic schedule listing has meeting times but no seat counts.
-    enrollmentDataAvailable: false,
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
     scraper: lamar,
   },
   tamuv: {
     code: 'tamuv',
     name: 'Texas A&M University–Victoria',
-    // UH-System PeopleSoft class search; only open/closed, no seat counts.
-    enrollmentDataAvailable: false,
+    // UH-System PeopleSoft; class-detail walk fills seat counts.
+    enrollmentDataAvailable: true,
     scraper: tamuv,
   },
   twu: {
@@ -226,8 +227,8 @@ const SCHOOLS = {
   upenn: {
     code: 'upenn',
     name: 'University of Pennsylvania',
-    // CourseLeaf CLSS "fose" search exposes open/closed + meeting times but no seat counts.
-    enrollmentDataAvailable: false,
+    // CourseLeaf CLSS "fose" per-section details calls fill max + available seats.
+    enrollmentDataAvailable: true,
     scraper: upenn,
   },
   columbia: {
@@ -236,6 +237,13 @@ const SCHOOLS = {
     // Directory of Classes exposes live enrolled + max counts; meeting times moved to Vergil (login).
     enrollmentDataAvailable: true,
     scraper: columbia,
+  },
+  utd: {
+    code: 'utd',
+    name: 'University of Texas at Dallas',
+    // UTDNebula public API mirrors CourseBook data but exposes no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: utd,
   },
 }
 

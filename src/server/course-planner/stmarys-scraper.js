@@ -5,7 +5,8 @@
  * Schedule Listing at appssbprd.stmarytx.edu/BPRD with no login. Shared
  * banner-classic factory does the work. Note St. Mary's uses short subject
  * codes (AC=Accounting, BL=Biology, EN=English, MT=Math) and a "Wintermester"
- * term type. Meeting times + instructors are available; seat counts are not.
+ * term type. Meeting times, instructors and seat counts (via per-CRN detail
+ * pages) are all available.
  */
 import { createBannerClassicScraper } from './banner-classic.js'
 

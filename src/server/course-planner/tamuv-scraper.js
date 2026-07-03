@@ -3,8 +3,8 @@
  *
  * TAMU-Victoria (institution 00765) is hosted on the same public UH-System
  * PeopleSoft class search as UH main; only the institution code differs. Logic
- * lives in the shared peoplesoft-uh factory. Meeting times + open/closed status
- * are available; seat counts are not.
+ * lives in the shared peoplesoft-uh factory. Meeting times, open/closed status
+ * and seat counts (via the class-detail walk) are all available.
  */
 import { createUhSystemScraper } from './peoplesoft-uh.js'
 

@@ -10,9 +10,15 @@
  * current field values, then POST back with `ICAction` set to the Search button.
  * The response is an XML envelope whose CDATA blocks contain the results HTML.
  *
- * Results expose only an Open / Closed / Wait List status per section — no seat
- * counts — so callers should report enrollmentDataAvailable:false and the unified
- * shape's enrollment.* fields stay null.
+ * The results list exposes only an Open / Closed / Wait List status per section.
+ * Seat COUNTS live one click deeper: posting ICAction=MTG_CLASSNAME$N opens row
+ * N's class-detail panel, whose "Class Availability" box carries
+ * SSR_CLS_DTL_WRK_ENRL_CAP / _ENRL_TOT / _AVAILABLE_SEATS. Only IC bookkeeping
+ * fields are needed for that postback (no form snapshot), but the walk is
+ * stateful: detail → BACK → next detail, with ICStateNum advancing each post and
+ * no way to jump detail-to-detail. enrichSectionsWithSeats() therefore fans the
+ * CRN list out over a few parallel guest sessions, each re-running the search and
+ * walking its share of the queue.
  */
 import { CookieJar } from 'tough-cookie'
 import makeFetchCookie from 'fetch-cookie'
@@ -212,6 +218,171 @@ function parseMeeting(daytime, room) {
   const endTime = normalizeTime(m[3])
   if (!days.length || !startTime || !endTime) return null
   return { days, startTime, endTime, location: room || '' }
+}
+
+// ---- Seat counts via the class-detail walk ------------------------------------
+
+// Politeness bounds: a subject with more sections than this keeps null seats
+// (the walk would mean 500+ postbacks); otherwise we aim for ~a dozen sections
+// per parallel session.
+const MAX_SEAT_SECTIONS = 250
+const SEATS_PER_SESSION = 12
+const MAX_SEAT_SESSIONS = 6
+
+/** ICStateNum from a classic ICAJAX XML response (PS advances it every post). */
+export function stateNumOf(rawText, fallback) {
+  const m = rawText.match(/<FIELD id=['"]ICStateNum['"]><!\[CDATA\[(\d+)/)
+  return m ? Number(m[1]) : fallback
+}
+
+/** PS occasionally rotates ICSID; re-read it from a response (XML FIELD or form
+ *  input, either attribute order) and keep the fallback when absent. */
+export function icsidOf(text, fallback) {
+  const m =
+    text.match(/<FIELD id=['"]ICSID['"]><!\[CDATA\[([^\]]+)/) ||
+    text.match(/name=['"]ICSID['"][^>]*value=['"]([^'"]+)['"]/) ||
+    text.match(/value=['"]([^'"]+)['"][^>]*name=['"]ICSID['"]/)
+  return m ? m[1] : fallback
+}
+
+/** crn -> grid row index N (first row wins; split meetings repeat the CRN). */
+export function mapCrnToIndex(html) {
+  const $ = cheerio.load(html)
+  const byCrn = new Map()
+  $('[id^="MTG_CLASS_NBR$"]').each((_, el) => {
+    const id = $(el).attr('id') || ''
+    if (id.includes('$span$')) return
+    const n = (id.match(/\$(\d+)$/) || [])[1]
+    const crn = $(el).text().trim()
+    if (n != null && /^\d+$/.test(crn) && !byCrn.has(crn)) byCrn.set(crn, n)
+  })
+  return byCrn
+}
+
+function detailSeats(html) {
+  const grab = (field) => {
+    const m = html.match(new RegExp(`id=['"]SSR_CLS_DTL_WRK_${field}['"][^>]*>\\s*([\\d,]+)`))
+    return m ? Number(m[1].replace(/,/g, '')) : null
+  }
+  const max = grab('ENRL_CAP')
+  const current = grab('ENRL_TOT')
+  const available = grab('AVAILABLE_SEATS')
+  if (max == null && current == null && available == null) return null
+  return { max, current, available }
+}
+
+/** POST an IC-bookkeeping-only action (detail open / back) and return raw text. */
+async function postAction(cFetch, url, { icsid, action, stateNum }) {
+  const body = new URLSearchParams()
+  setIcAction(body, { icsid, action, stateNum })
+  return postForm(cFetch, url, body)
+}
+
+/**
+ * Drain a shared CRN queue on one live results session: for each CRN, open its
+ * class-detail panel (MTG_CLASSNAME$N), read the Class Availability numbers into
+ * the matching section, and post BACK. `session` is { cFetch, icsid, stateNum,
+ * crnToIndex } positioned on a results page. Stops (without throwing) as soon as
+ * the session state looks broken, so other workers can drain the remainder.
+ */
+export async function walkSeatQueue({ url, session, queue, sectionsByCrn, retried = new Set() }) {
+  // A worker that dies mid-CRN puts that CRN back (once) so a healthy worker
+  // can pick it up instead of silently dropping its seats.
+  const requeue = (crn) => {
+    if (retried.has(crn)) return
+    retried.add(crn)
+    queue.push(crn)
+  }
+  for (let crn = queue.shift(); crn != null; crn = queue.shift()) {
+    const idx = session.crnToIndex.get(crn)
+    if (idx == null) continue
+    try {
+      const rawDetail = await postAction(session.cFetch, url, {
+        icsid: session.icsid,
+        action: `MTG_CLASSNAME$${idx}`,
+        stateNum: session.stateNum,
+      })
+      session.stateNum = stateNumOf(rawDetail, session.stateNum + 1)
+      session.icsid = icsidOf(rawDetail, session.icsid)
+
+      const seats = detailSeats(extractCdataHtml(rawDetail))
+      if (seats) {
+        const section = sectionsByCrn.get(crn)
+        section.enrollment = seats
+        if (section.status === 'unknown' && seats.available != null) {
+          section.status = seats.available > 0 ? 'open' : 'closed'
+        }
+      }
+
+      const rawBack = await postAction(session.cFetch, url, {
+        icsid: session.icsid,
+        action: 'CLASS_SRCH_WRK2_SSR_PB_BACK',
+        stateNum: session.stateNum,
+      })
+      session.stateNum = stateNumOf(rawBack, session.stateNum + 1)
+      session.icsid = icsidOf(rawBack, session.icsid)
+      if (!seats) {
+        requeue(crn)
+        return // state is suspect — stop this worker, others drain the queue
+      }
+    } catch {
+      requeue(crn)
+      return // dead session: abandon this worker, the rest of the queue survives
+    }
+  }
+}
+
+/** How many parallel walk sessions a queue of N sections warrants. */
+export function seatSessionCount(n) {
+  return Math.min(MAX_SEAT_SESSIONS, Math.max(1, Math.ceil(n / SEATS_PER_SESSION)))
+}
+
+/** Whether a section list is small enough to walk seat details for. */
+export function seatWalkAllowed(n) {
+  return n > 0 && n <= MAX_SEAT_SECTIONS
+}
+
+/**
+ * Fill `enrollment` on already-parsed sections by walking each one's class-detail
+ * panel. Spawns a few parallel sessions, each re-running the same search (via
+ * `applyCriteria`, exactly as runClassSearch did) and then draining a shared CRN
+ * queue with detail → BACK postback pairs. Individual failures leave that
+ * section's enrollment null; they never fail the caller.
+ */
+export async function enrichSectionsWithSeats({ url, applyCriteria, sections }) {
+  const sectionsByCrn = new Map(sections.map((s) => [s.crn, s]))
+  const queue = sections.map((s) => s.crn).filter(Boolean)
+  if (!seatWalkAllowed(queue.length)) return
+  const retried = new Set() // shared one-retry budget across workers
+
+  async function openResultsSession() {
+    // Same cold-session bounce retry as runClassSearch, per worker session.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { cFetch, $, icsid } = await loadSearchForm(url)
+      const body = buildFormBody($)
+      setIcAction(body, { icsid, action: 'CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH' })
+      applyCriteria($, body)
+      const raw = await postForm(cFetch, url, body)
+      const html = extractCdataHtml(raw)
+      if (html.includes('SSR_CLSRSLT_WRK_GROUPBOX')) {
+        return {
+          cFetch,
+          icsid: icsidOf(raw, icsid),
+          stateNum: stateNumOf(raw, 2),
+          crnToIndex: mapCrnToIndex(html),
+        }
+      }
+    }
+    return null
+  }
+
+  async function worker() {
+    const session = await openResultsSession()
+    if (!session) return
+    await walkSeatQueue({ url, session, queue, sectionsByCrn, retried })
+  }
+
+  await Promise.all(Array.from({ length: seatSessionCount(queue.length) }, worker))
 }
 
 /** Instructors are comma-separated "First Last" names; drop placeholders. */

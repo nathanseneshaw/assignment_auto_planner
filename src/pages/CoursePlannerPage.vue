@@ -582,9 +582,12 @@ function saveWork() {
       <!-- ══ Calendar-forward layout: results rail + large weekly grid ═════ -->
       <div class="mt-6 grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-6">
 
-        <!-- LEFT: results rail -->
-        <div class="min-w-0 flex flex-col lg:overflow-hidden">
-          <div class="flex items-baseline justify-between border-b border-paper-line dark:border-gray-700/60 pb-2.5">
+        <!-- LEFT: results rail. On lg+ the inner column is absolutely positioned so
+             the rail never adds height to the grid row; the calendar sets the row
+             height and the results list scrolls within it. -->
+        <div class="min-w-0 relative">
+        <div class="min-w-0 flex flex-col lg:absolute lg:inset-0">
+          <div class="flex items-baseline justify-between border-b border-paper-line dark:border-gray-700/60 pb-2.5 shrink-0">
             <p class="eyebrow text-gray-400 dark:text-gray-500">
               Results
               <span v-if="filteredSections.length" class="text-gray-300 dark:text-gray-600">· {{ filteredSections.length }}</span>
@@ -606,7 +609,7 @@ function saveWork() {
           </div>
 
           <!-- List -->
-          <div v-else class="mt-3 flex-1 min-h-0 overflow-y-auto pr-1 space-y-2.5">
+          <div v-else class="mt-3 flex-1 min-h-0 overflow-y-auto pr-1 space-y-2.5 max-h-[70vh] lg:max-h-none">
             <div
               v-for="section in filteredSections"
               :key="section.crn"
@@ -669,6 +672,7 @@ function saveWork() {
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         <!-- RIGHT: weekly grid (the page hero) -->

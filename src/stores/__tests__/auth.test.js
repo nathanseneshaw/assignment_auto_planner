@@ -7,6 +7,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: {
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      refreshSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
       onAuthStateChange: vi.fn().mockReturnValue({}),
       signInWithPassword: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } }, error: null }),
       signUp: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' }, session: null }, error: null }),
@@ -17,6 +18,7 @@ vi.mock('../../lib/supabase', () => ({
 }))
 
 import { supabase } from '../../lib/supabase'
+import { useProfileStore } from '../profile.js'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -313,5 +315,78 @@ describe('onAuthStateChange', () => {
     expect(store.user).toBeNull()
     expect(store.session).toBeNull()
     expect(store.isAuthenticated).toBe(false)
+  })
+})
+
+// ── syncProfileFromAuth (account info mirrored into the profile store) ─────────
+//
+// The auth store is the single source of truth for the signed-in identity and
+// pushes email/name into the profile store so the rest of the app stays
+// auth-agnostic. These tests assert that mirror is correct at every entry point.
+
+describe('account info mirrored into the profile store', () => {
+  it('populates profile email + name from a restored session on init', async () => {
+    const user = { id: 'u1', email: 'restored@example.com', user_metadata: { full_name: 'Restored User' } }
+    supabase.auth.getSession.mockResolvedValueOnce({ data: { session: { access_token: 't', user } } })
+
+    await useAuthStore().init()
+
+    const profile = useProfileStore().profile
+    expect(profile.email).toBe('restored@example.com')
+    expect(profile.name).toBe('Restored User')
+  })
+
+  it('updates the profile when a SIGNED_IN event fires', async () => {
+    let cb
+    supabase.auth.onAuthStateChange.mockImplementationOnce((fn) => { cb = fn; return {} })
+    await useAuthStore().init()
+
+    cb('SIGNED_IN', {
+      access_token: 'tok',
+      user: { id: 'u2', email: 'signin@example.com', user_metadata: { full_name: 'Alice' } },
+    })
+
+    const profile = useProfileStore().profile
+    expect(profile.email).toBe('signin@example.com')
+    expect(profile.name).toBe('Alice')
+  })
+
+  it('falls back to user_metadata.name when full_name is absent', async () => {
+    const user = { id: 'u1', email: 'a@example.com', user_metadata: { name: 'Only Name' } }
+    supabase.auth.getSession.mockResolvedValueOnce({ data: { session: { access_token: 't', user } } })
+
+    await useAuthStore().init()
+    expect(useProfileStore().profile.name).toBe('Only Name')
+  })
+
+  it('keeps the existing profile name when auth metadata has no name', async () => {
+    useProfileStore().updateProfile({ name: 'Locally Set' })
+    const user = { id: 'u1', email: 'a@example.com', user_metadata: {} }
+    supabase.auth.getSession.mockResolvedValueOnce({ data: { session: { access_token: 't', user } } })
+
+    await useAuthStore().init()
+    const profile = useProfileStore().profile
+    expect(profile.name).toBe('Locally Set')
+    expect(profile.email).toBe('a@example.com')
+  })
+
+  it('mirrors a changed email into the profile via refreshUser', async () => {
+    const store = useAuthStore()
+    store.session = { access_token: 'old' }
+    store.user = { id: 'u1', email: 'old@example.com' }
+    supabase.auth.refreshSession.mockResolvedValueOnce({
+      data: { session: { access_token: 'new', user: { id: 'u1', email: 'new@example.com', user_metadata: {} } } },
+      error: null,
+    })
+
+    await store.refreshUser()
+
+    expect(store.user.email).toBe('new@example.com')
+    expect(useProfileStore().profile.email).toBe('new@example.com')
+  })
+
+  it('refreshUser is a no-op when signed out', async () => {
+    await useAuthStore().refreshUser()
+    expect(supabase.auth.refreshSession).not.toHaveBeenCalled()
   })
 })

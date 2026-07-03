@@ -9,11 +9,11 @@
  *     { "other": { "srcdb": "<term>" }, "criteria": [ {field,value}, ... ] }
  *
  * The search response carries everything we need except seat counts, credits and
- * room — those live behind a per-section `route=details` call. Fetching details
- * for every section (a single subject like CIS has 250+ sections) would mean
- * hundreds of requests per click, so we stay with the single search request and
- * report enrollmentDataAvailable:false. The search still exposes open/closed
- * status, meeting day/time, instructors and titles.
+ * room — those live behind a per-section `route=details` call. Its `seats` field
+ * is an HTML snippet with <span class="seats_max"> / <span class="seats_avail">,
+ * so after the search we fan out details calls (bounded concurrency) and fill
+ * enrollment from them; current = max - available. The search itself still
+ * supplies open/closed status, meeting day/time, instructors and titles.
  *
  *   Term codes  : 6-digit YYYY[10|20|30]  (10=Spring, 20=Summer, 30=Fall)
  *   fose meet_day: 0=Mon 1=Tue 2=Wed 3=Thu 4=Fri 5=Sat 6=Sun
@@ -79,12 +79,59 @@ export async function getSubjects(termCode) {
   )
 }
 
+// Parallel details calls per subject click. CIS-sized subjects (250+ sections)
+// finish in a few seconds without flooding the CourseLeaf backend.
+const DETAIL_CONCURRENCY = 10
+
+/** Pull { max, current, available } out of one section's fose details payload. */
+async function foseSeats(srcdb, r) {
+  const res = await fetch(`${BASE}/api/?page=fose&route=details`, {
+    method: 'POST',
+    headers: { 'User-Agent': UA, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      group: `code:${r.code}`,
+      key: `crn:${r.crn}`,
+      srcdb,
+      matched: `crn:${r.crn}`,
+    }),
+  })
+  if (!res.ok) return null
+  const details = await res.json()
+  // seats: '<strong>Maximum Enrollment:</strong> <span class="seats_max">200</span> /
+  //         <strong>Seats Avail:</strong> <span class="seats_avail">160</span>'
+  const seatsHtml = String(details?.seats || '')
+  const max = Number((seatsHtml.match(/seats_max[^>]*>\s*(\d+)/) || [])[1])
+  const available = Number((seatsHtml.match(/seats_avail[^>]*>\s*(-?\d+)/) || [])[1])
+  if (!Number.isFinite(max) || !Number.isFinite(available)) return null
+  return { max, current: Math.max(0, max - available), available }
+}
+
+/** Fill enrollment on the normalized sections from per-section details calls. */
+async function enrichWithSeats(srcdb, rawResults, sections) {
+  const queue = rawResults.map((r, i) => [r, sections[i]])
+  async function worker() {
+    for (let item = queue.shift(); item; item = queue.shift()) {
+      const [r, section] = item
+      try {
+        const seats = await foseSeats(srcdb, r)
+        if (seats) section.enrollment = seats
+      } catch {
+        // One flaky details call shouldn't sink the subject — leave nulls.
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: DETAIL_CONCURRENCY }, worker))
+}
+
 export async function getSections({ termCode, subjectCode, termLabel, subjectLabel }) {
   return cacheMemo(`${SCHOOL}:sections:${termCode}:${subjectCode}`, async () => {
     const data = await foseSearch(termCode, [{ field: 'subject', value: subjectCode }])
-    return (data.results || []).map((r) =>
+    const results = data.results || []
+    const sections = results.map((r) =>
       normalize(r, { termCode, subjectCode, termLabel, subjectLabel })
     )
+    await enrichWithSeats(termCode, results, sections)
+    return sections
   })
 }
 

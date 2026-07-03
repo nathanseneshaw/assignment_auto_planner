@@ -12,12 +12,12 @@
  *   00759 UH-Clear Lake
  *   00765 Texas A&M University-Victoria
  *
- * So every campus is the same scraper with a different institution code. Like
- * the base PeopleSoft engine, results expose only Open/Closed status and meeting
- * times — no seat counts — so callers report enrollmentDataAvailable:false.
+ * So every campus is the same scraper with a different institution code. The
+ * results list exposes Open/Closed status and meeting times; seat counts come
+ * from the shared class-detail walk (enrichSectionsWithSeats) afterwards.
  */
 import { cacheMemo } from './cache.js'
-import { loadSearchForm, runClassSearch } from './peoplesoft.js'
+import { loadSearchForm, runClassSearch, enrichSectionsWithSeats } from './peoplesoft.js'
 
 const URL =
   'https://saprd.my.uh.edu/psc/saprd/EMPLOYEE/HRMS/c/COMMUNITY_ACCESS.CLASS_SEARCH.GBL'
@@ -62,27 +62,30 @@ export function createUhSystemScraper({ school, institution }) {
   }
 
   async function getSections({ termCode, subjectCode, termLabel, subjectLabel }) {
-    return cacheMemo(`${school}:sections:${termCode}:${subjectCode}`, () =>
-      runClassSearch({
+    const applyCriteria = ($, body) => {
+      const instName = $('select[name^="CLASS_SRCH_WRK2_INSTITUTION"]').attr('name')
+      const strmName = $('select[name^="CLASS_SRCH_WRK2_STRM"]').attr('name')
+      const subjName = $('select[name^="SSR_CLSRCH_WRK_SUBJECT_SRCH"]').attr('name')
+      if (instName) body.set(instName, institution)
+      if (strmName) body.set(strmName, termCode)
+      if (subjName) body.set(subjName, subjectCode)
+      // Search all sections, not just open ones.
+      $('input[name^="SSR_CLSRCH_WRK_SSR_OPEN_ONLY"]').each((_, el) =>
+        body.delete($(el).attr('name'))
+      )
+    }
+    return cacheMemo(`${school}:sections:${termCode}:${subjectCode}`, async () => {
+      const sections = await runClassSearch({
         url: URL,
         school,
         termCode,
         termLabel,
         subjectLabel,
-        applyCriteria: ($, body) => {
-          const instName = $('select[name^="CLASS_SRCH_WRK2_INSTITUTION"]').attr('name')
-          const strmName = $('select[name^="CLASS_SRCH_WRK2_STRM"]').attr('name')
-          const subjName = $('select[name^="SSR_CLSRCH_WRK_SUBJECT_SRCH"]').attr('name')
-          if (instName) body.set(instName, institution)
-          if (strmName) body.set(strmName, termCode)
-          if (subjName) body.set(subjName, subjectCode)
-          // Search all sections, not just open ones.
-          $('input[name^="SSR_CLSRCH_WRK_SSR_OPEN_ONLY"]').each((_, el) =>
-            body.delete($(el).attr('name'))
-          )
-        },
+        applyCriteria,
       })
-    )
+      await enrichSectionsWithSeats({ url: URL, applyCriteria, sections })
+      return sections
+    })
   }
 
   return { getTerms, getSubjects, getSections }
