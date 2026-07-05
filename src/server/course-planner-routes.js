@@ -41,6 +41,16 @@ import * as yale from './course-planner/yale-scraper.js'
 import * as upenn from './course-planner/upenn-scraper.js'
 import * as columbia from './course-planner/columbia-scraper.js'
 import * as utd from './course-planner/utd-scraper.js'
+import * as cornell from './course-planner/cornell-scraper.js'
+import * as brown from './course-planner/brown-scraper.js'
+import * as gatech from './course-planner/gatech-scraper.js'
+import * as purdue from './course-planner/purdue-scraper.js'
+import * as osu from './course-planner/osu-scraper.js'
+import * as uiuc from './course-planner/uiuc-scraper.js'
+import * as umd from './course-planner/umd-scraper.js'
+import * as rutgers from './course-planner/rutgers-scraper.js'
+import * as wisc from './course-planner/wisc-scraper.js'
+import * as neu from './course-planner/neu-scraper.js'
 
 const router = Router()
 
@@ -244,6 +254,77 @@ const SCHOOLS = {
     // UTDNebula public API mirrors CourseBook data but exposes no seat counts.
     enrollmentDataAvailable: false,
     scraper: utd,
+  },
+  cornell: {
+    code: 'cornell',
+    name: 'Cornell University',
+    // Class Roster API exposes open/closed per section but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: cornell,
+  },
+  brown: {
+    code: 'brown',
+    name: 'Brown University',
+    // FOSE search gives current enrollment; per-section details fill max + available.
+    enrollmentDataAvailable: true,
+    scraper: brown,
+  },
+  gatech: {
+    code: 'gatech',
+    name: 'Georgia Institute of Technology',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: gatech,
+  },
+  purdue: {
+    code: 'purdue',
+    name: 'Purdue University',
+    // Per-CRN detail pages rate-ban the caller and bwskfcls is login-gated,
+    // so the seats walk is disabled: no enrollment data.
+    enrollmentDataAvailable: false,
+    scraper: purdue,
+  },
+  osu: {
+    code: 'osu',
+    name: 'The Ohio State University',
+    // Public class search exposes open/closed + current enrollment, no capacity.
+    enrollmentDataAvailable: false,
+    scraper: osu,
+  },
+  uiuc: {
+    code: 'uiuc',
+    name: 'University of Illinois Urbana-Champaign',
+    // CIS XML API exposes open/closed text only, no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: uiuc,
+  },
+  umd: {
+    code: 'umd',
+    name: 'University of Maryland',
+    // Testudo section markup carries live total + open seat counts.
+    enrollmentDataAvailable: true,
+    scraper: umd,
+  },
+  rutgers: {
+    code: 'rutgers',
+    name: 'Rutgers University–New Brunswick',
+    // SOC API exposes open/closed per section but no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: rutgers,
+  },
+  wisc: {
+    code: 'wisc',
+    name: 'University of Wisconsin–Madison',
+    // Enrollment packages carry capacity / enrolled / open seats.
+    enrollmentDataAvailable: true,
+    scraper: wisc,
+  },
+  neu: {
+    code: 'neu',
+    name: 'Northeastern University',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: neu,
   },
 }
 

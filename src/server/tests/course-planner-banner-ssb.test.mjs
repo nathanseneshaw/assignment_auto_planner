@@ -205,6 +205,55 @@ describe('banner-ssb getSections', () => {
     )
   })
 
+  it('walks pageOffset pages until totalCount rows are collected', async () => {
+    const s = createBannerScraper({ school: 'page-ssb', base: 'https://page.edu' })
+    const row = (crn) => ({ ...sectionPayload().data[0], courseReferenceNumber: crn })
+    globalThis.fetch = async (url) => {
+      if (url.includes('searchResults')) {
+        const offset = Number(new URL(url).searchParams.get('pageOffset'))
+        const data = offset === 0 ? [row('1'), row('2')] : [row('3')]
+        return { ...mockRes({ success: true, totalCount: 3, data }), url }
+      }
+      return { ...mockRes(''), url }
+    }
+    const sections = await s.getSections({ termCode: '202510', subjectCode: 'CS' })
+    assert.deepEqual(sections.map((x) => x.crn), ['1', '2', '3'])
+  })
+
+  it('retries once on a fresh session when the first search comes back empty', async () => {
+    const s = createBannerScraper({ school: 'retry-ssb', base: 'https://retry.edu' })
+    let sessions = 0
+    let searches = 0
+    globalThis.fetch = async (url) => {
+      if (url.includes('registration')) sessions += 1
+      if (url.includes('searchResults')) {
+        searches += 1
+        const payload =
+          searches === 1
+            ? { success: true, totalCount: 0, data: null } // broken term binding
+            : sectionPayload()
+        return { ...mockRes(payload), url }
+      }
+      return { ...mockRes(''), url }
+    }
+    const sections = await s.getSections({ termCode: '202510', subjectCode: 'CS' })
+    assert.equal(sections.length, 1)
+    assert.equal(sessions, 2, 'second attempt should run on a brand-new session')
+  })
+
+  it('sends Connection: close on every request when closeConnections is set', async () => {
+    const s = createBannerScraper({ school: 'close-ssb', base: 'https://close.edu', closeConnections: true })
+    const connectionHeaders = []
+    globalThis.fetch = async (url, opts = {}) => {
+      connectionHeaders.push((opts.headers || {}).Connection)
+      if (url.includes('searchResults')) return { ...mockRes(sectionPayload()), url }
+      return { ...mockRes(''), url }
+    }
+    await s.getSections({ termCode: '202510', subjectCode: 'CS' })
+    assert.ok(connectionHeaders.length >= 3)
+    assert.ok(connectionHeaders.every((h) => h === 'close'))
+  })
+
   it('handles mepCode by appending it to URLs', async () => {
     const seen = []
     const s = createBannerScraper({ school: 'mep-ssb', base: 'https://mep.edu', mepCode: 'TEST' })

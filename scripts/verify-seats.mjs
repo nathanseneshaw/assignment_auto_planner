@@ -10,6 +10,11 @@ const TARGETS = [
   { school: 'tamuv', mod: '../src/server/course-planner/tamuv-scraper.js', prefer: ['ACCT', 'BIOL'] },
   { school: 'uta', mod: '../src/server/course-planner/uta-scraper.js', prefer: ['ACCT', 'CSE'] },
   { school: 'uttyler', mod: '../src/server/course-planner/uttyler-scraper.js', prefer: ['ACCT', 'CSCI'] },
+  { school: 'brown', mod: '../src/server/course-planner/brown-scraper.js', prefer: ['CSCI', 'ECON'] },
+  { school: 'gatech', mod: '../src/server/course-planner/gatech-scraper.js', prefer: ['CS', 'ECON'] },
+  { school: 'umd', mod: '../src/server/course-planner/umd-scraper.js', prefer: ['CMSC', 'ECON'] },
+  { school: 'wisc', mod: '../src/server/course-planner/wisc-scraper.js', prefer: ['266', '296'] },
+  { school: 'neu', mod: '../src/server/course-planner/neu-scraper.js', prefer: ['CS', 'ECON'] },
 ]
 
 const which = process.argv[2] // optional filter

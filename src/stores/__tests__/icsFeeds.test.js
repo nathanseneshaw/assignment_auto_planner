@@ -187,6 +187,62 @@ describe('syncAll', () => {
   })
 })
 
+// ── syncOne (per-feed scoping) ────────────────────────────────────────────────
+
+describe('syncOne', () => {
+  it('marks only the clicked feed as syncing, not the others', async () => {
+    let resolveSync
+    icsService.syncOne.mockImplementationOnce(() => new Promise(r => { resolveSync = r }))
+    const store = useIcsFeedsStore()
+    store.feeds.push({ id: 'f1', url: 'https://a.com' }, { id: 'f2', url: 'https://b.com' })
+
+    const p = store.syncOne('f1')
+    expect(store.isSyncing('f1')).toBe(true)
+    expect(store.isSyncing('f2')).toBe(false) // the other feed stays idle
+    expect(store.syncing).toBe(true)
+
+    resolveSync({ changed: false, feeds: [] })
+    await p
+    expect(store.isSyncing('f1')).toBe(false)
+    expect(store.syncing).toBe(false)
+  })
+
+  it('blocks a second sync of the same feed but allows a different feed concurrently', async () => {
+    icsService.syncOne.mockImplementation(() => new Promise(() => {})) // never resolves
+    const store = useIcsFeedsStore()
+
+    store.syncOne('f1')
+    const dup = store.syncOne('f1') // same feed → blocked
+    expect(await dup).toBeNull()
+    expect(icsService.syncOne).toHaveBeenCalledTimes(1)
+
+    store.syncOne('f2') // different feed → proceeds
+    expect(icsService.syncOne).toHaveBeenCalledTimes(2)
+    expect(store.isSyncing('f1')).toBe(true)
+    expect(store.isSyncing('f2')).toBe(true)
+  })
+
+  it('clears the feed from the syncing set even when the request fails', async () => {
+    icsService.syncOne.mockRejectedValueOnce(new Error('Timeout'))
+    const store = useIcsFeedsStore()
+    try { await store.syncOne('f1') } catch {}
+    expect(store.isSyncing('f1')).toBe(false)
+    expect(store.syncing).toBe(false)
+    expect(store.lastError).toBe('Timeout')
+  })
+
+  it('reports every feed as syncing during a bulk syncAll', async () => {
+    let resolveSync
+    icsService.syncAll.mockImplementationOnce(() => new Promise(r => { resolveSync = r }))
+    const store = useIcsFeedsStore()
+    const p = store.syncAll()
+    expect(store.isSyncing('anything')).toBe(true) // bulk sync spins all rows
+    resolveSync({ changed: false, feeds: [] })
+    await p
+    expect(store.isSyncing('anything')).toBe(false)
+  })
+})
+
 // ── reset ─────────────────────────────────────────────────────────────────────
 
 describe('reset', () => {

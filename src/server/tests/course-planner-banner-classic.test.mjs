@@ -246,3 +246,54 @@ describe('banner-classic getSections', () => {
     assert.deepEqual(sec.instructors, ['Dr. Einstein'])
   })
 })
+
+// ── Purdue-style variants ─────────────────────────────────────────────────────
+
+describe('banner-classic Purdue variants', () => {
+  it('parses section headers marked th.ddlabel (Purdue skin)', async () => {
+    const html = `<html><body>
+      <table class="datadisplaytable">
+        <tr><th class="ddlabel"><a>Digital Literacy - 11989 - CS 10100 - LE1</a></th></tr>
+        <tr><td class="dddefault">3.000 Credits
+          <table class="datadisplaytable">
+            <tr><th class="ddheader">T</th><th>Time</th><th>Days</th><th>Where</th><th>D</th><th>S</th><th>Instructors</th></tr>
+            <tr>
+              <td class="dddefault">Lec</td><td class="dddefault">4:30 pm - 5:45 pm</td>
+              <td class="dddefault">TR</td><td class="dddefault">ME G061</td>
+              <td class="dddefault">-</td><td class="dddefault">A</td>
+              <td class="dddefault">Fabrizio Cicala (P)</td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>
+    </body></html>`
+    const s = createBannerClassicScraper({
+      school: 'classic-ddlabel', base: 'https://ddlabel.edu', prefix: '/prod', enrichSeats: false,
+    })
+    globalThis.fetch = async () => mockRes(html)
+    const sections = await s.getSections({ termCode: '202710', subjectCode: 'CS' })
+    assert.equal(sections.length, 1)
+    assert.equal(sections[0].crn, '11989')
+    assert.equal(sections[0].courseNumber, '10100')
+    assert.equal(sections[0].sectionNumber, 'LE1')
+    assert.equal(sections[0].credits, 3)
+    assert.deepEqual(sections[0].instructors, ['Fabrizio Cicala'])
+    assert.deepEqual(sections[0].meetings[0].days, ['T', 'R'])
+  })
+
+  it('enrichSeats:false never touches the per-CRN detail pages', async () => {
+    const html = buildListingHTML([{
+      title: 'Course', crn: '10001', subj: 'CS', num: '1000', sec: '001',
+      time: '9:00 am - 9:50 am', days: 'MW', room: 'HALL 1', credits: '3',
+    }])
+    const urls = []
+    const s = createBannerClassicScraper({
+      school: 'classic-noseats', base: 'https://noseats.edu', prefix: '/prod', enrichSeats: false,
+    })
+    globalThis.fetch = async (url) => { urls.push(url); return mockRes(html) }
+    const [sec] = await s.getSections({ termCode: '202710', subjectCode: 'CS' })
+    assert.equal(sec.enrollment.max, null)
+    assert.equal(sec.status, 'unknown')
+    assert.ok(!urls.some((u) => u.includes('p_disp_detail_sched')), 'no detail-page fetches expected')
+  })
+})

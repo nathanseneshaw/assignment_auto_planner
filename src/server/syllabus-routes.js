@@ -21,7 +21,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import crypto from 'node:crypto'
 import { requireUser } from './supabase-auth.js'
-import { syllabusParseRateLimit } from './rate-limit.js'
+import { syllabusParseRateLimit, syllabusSaveRateLimit } from './rate-limit.js'
 import { extractText } from './syllabus-extract.js'
 import { extractSyllabus } from './syllabus-claude.js'
 
@@ -118,7 +118,7 @@ router.post('/api/syllabus/parse', requireUser, syllabusParseRateLimit, (req, re
  * into an existing course, per the product decision to keep things simple.
  * The fresh `external_course_id` guarantees no collision with prior saves.
  */
-router.post('/api/syllabus/save', requireUser, async (req, res) => {
+router.post('/api/syllabus/save', requireUser, syllabusSaveRateLimit, async (req, res) => {
   const draft = req.body || {}
 
   // ---- Validate course ----
@@ -176,12 +176,12 @@ router.post('/api/syllabus/save', requireUser, async (req, res) => {
     .single()
 
   if (courseErr) {
+    // Log the full PostgREST error server-side; never leak schema/constraint
+    // internals (message/details/hint/code) to the client.
+    console.error('[POST /api/syllabus/save] courses insert:', courseErr)
     return res.status(500).json({
       success: false,
-      error: `courses insert: ${courseErr.message}`,
-      details: courseErr.details || null,
-      hint: courseErr.hint || null,
-      code: courseErr.code || null,
+      error: 'Failed to save the course.',
     })
   }
   if (!insertedCourse?.id) {
@@ -218,16 +218,15 @@ router.post('/api/syllabus/save', requireUser, async (req, res) => {
       .select('id')
 
     if (insErr) {
-      // Course is already in  surface the error but don't try to roll back.
-      // The user can edit the course on the assignments page or re-run save
-      // for the missing items.
+      // Course is already in  don't try to roll back. The user can edit the
+      // course on the assignments page or re-run save for the missing items.
+      // Log the full error server-side; return only a generic message + the
+      // courseId the client needs to recover, not the DB internals.
+      console.error('[POST /api/syllabus/save] assignments insert:', insErr)
       return res.status(500).json({
         success: false,
-        error: `assignments insert: ${insErr.message}`,
+        error: 'The course was saved, but its assignments could not be saved.',
         courseId,
-        details: insErr.details || null,
-        hint: insErr.hint || null,
-        code: insErr.code || null,
       })
     }
     assignmentsInserted = insertedRows?.length || 0

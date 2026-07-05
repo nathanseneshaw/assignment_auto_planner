@@ -35,21 +35,32 @@ function decodeEntities(s) {
     .trim()
 }
 
-export function createBannerScraper({ school, base, mepCode = '' }) {
+/**
+ * `closeConnections: true` sends "Connection: close" on every request. Needed
+ * when the school fronts Banner with a multi-node F5 pool (Georgia Tech): the
+ * BIGipServer persistence cookie is only issued on a fresh TCP connection, and
+ * without it Node's shared keep-alive pool sprays requests across nodes, so
+ * the node-local JSESSIONID term binding is silently lost (search "succeeds"
+ * with totalCount 0). Fresh connections make the cookie arrive every time.
+ */
+export function createBannerScraper({ school, base, mepCode = '', closeConnections = false }) {
   const mepQ = mepCode ? `?mepCode=${mepCode}` : ''
   const mepAmp = mepCode ? `&mepCode=${mepCode}` : ''
+  const baseHeaders = closeConnections
+    ? { 'User-Agent': UA, Connection: 'close' }
+    : { 'User-Agent': UA }
 
   /** A per-term Banner session: visit registration, then bind the term. */
   async function bannerSessionForTerm(termCode) {
     const jar = new CookieJar()
     const cFetch = makeFetchCookie(fetch, jar)
     await cFetch(`${base}/StudentRegistrationSsb/ssb/registration${mepQ}`, {
-      headers: { 'User-Agent': UA },
+      headers: baseHeaders,
     })
     await cFetch(`${base}/StudentRegistrationSsb/ssb/term/search?mode=search`, {
       method: 'POST',
       headers: {
-        'User-Agent': UA,
+        ...baseHeaders,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
@@ -70,11 +81,11 @@ export function createBannerScraper({ school, base, mepCode = '' }) {
         const jar = new CookieJar()
         const cFetch = makeFetchCookie(fetch, jar)
         await cFetch(`${base}/StudentRegistrationSsb/ssb/registration${mepQ}`, {
-          headers: { 'User-Agent': UA },
+          headers: baseHeaders,
         })
         const res = await cFetch(
           `${base}/StudentRegistrationSsb/ssb/classSearch/getTerms?searchTerm=&offset=1&max=200${mepAmp}`,
-          { headers: { 'User-Agent': UA } }
+          { headers: baseHeaders }
         )
         const data = await res.json()
         return (Array.isArray(data) ? data : []).map((t) => ({
@@ -93,7 +104,7 @@ export function createBannerScraper({ school, base, mepCode = '' }) {
         const cFetch = await bannerSessionForTerm(termCode)
         const res = await cFetch(
           `${base}/StudentRegistrationSsb/ssb/classSearch/get_subject?searchTerm=&term=${termCode}&offset=1&max=500${mepAmp}`,
-          { headers: { 'User-Agent': UA } }
+          { headers: baseHeaders }
         )
         const data = await res.json()
         return (Array.isArray(data) ? data : []).map((s) => ({
@@ -105,27 +116,49 @@ export function createBannerScraper({ school, base, mepCode = '' }) {
     )
   }
 
+  /** One searchResults page (Banner caps pageMaxSize at 500). */
+  async function fetchResultsPage(cFetch, termCode, subjectCode, pageOffset) {
+    const params = new URLSearchParams({
+      txt_subject: subjectCode,
+      txt_term: termCode,
+      pageOffset: String(pageOffset),
+      pageMaxSize: '500',
+      sortColumn: 'subjectDescription',
+      sortDirection: 'asc',
+    })
+    const res = await cFetch(
+      `${base}/StudentRegistrationSsb/ssb/searchResults/searchResults?${params}${mepAmp}`,
+      { headers: baseHeaders }
+    )
+    const json = await res.json()
+    if (!json || json.success === false) {
+      throw new Error(`${school} search returned no data`)
+    }
+    return json
+  }
+
   async function getSections({ termCode, subjectCode, termLabel, subjectLabel }) {
     return cacheMemo(`${school}:sections:${termCode}:${subjectCode}`, async () => {
-      const cFetch = await bannerSessionForTerm(termCode)
-      // Banner caps pageMaxSize around 500; one subject rarely exceeds that.
-      const params = new URLSearchParams({
-        txt_subject: subjectCode,
-        txt_term: termCode,
-        pageOffset: '0',
-        pageMaxSize: '500',
-        sortColumn: 'subjectDescription',
-        sortDirection: 'asc',
-      })
-      const res = await cFetch(
-        `${base}/StudentRegistrationSsb/ssb/searchResults/searchResults?${params}${mepAmp}`,
-        { headers: { 'User-Agent': UA } }
-      )
-      const json = await res.json()
-      if (!json || json.success === false) {
-        throw new Error(`${school} search returned no data`)
+      let cFetch = await bannerSessionForTerm(termCode)
+      let first = await fetchResultsPage(cFetch, termCode, subjectCode, 0)
+      // A fresh Banner session occasionally reports zero rows for a subject
+      // that has plenty (term binding didn't take, seen on Georgia Tech), and
+      // it reports totalCount 0 too - indistinguishable from a real empty
+      // subject. Subjects come from the same term so a truly empty one is
+      // rare; one retry on a brand-new session is cheap and shakes it loose.
+      if (!first.data?.length) {
+        cFetch = await bannerSessionForTerm(termCode)
+        first = await fetchResultsPage(cFetch, termCode, subjectCode, 0)
       }
-      const rows = Array.isArray(json.data) ? json.data : []
+      const rows = Array.isArray(first.data) ? [...first.data] : []
+      // Big subjects (e.g. Georgia Tech CS at ~1,700 sections) span multiple
+      // 500-row pages; keep the same session and walk the offsets.
+      const total = Number(first.totalCount) || rows.length
+      while (rows.length < total) {
+        const page = await fetchResultsPage(cFetch, termCode, subjectCode, rows.length)
+        if (!page.data?.length) break // defensive: never loop on a bad page
+        rows.push(...page.data)
+      }
       return rows.map((r) => normalize(r, school, termCode, termLabel, subjectLabel))
     })
   }

@@ -684,8 +684,8 @@ async function confirmUnenroll() {
         <span class="eyebrow text-gray-400 dark:text-gray-500">Manage sources</span>
       </div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
-        Pull assignments in automatically. Subscribe to one calendar feed (Canvas, Brightspace,
-        Blackboard) or import a syllabus. Re-open a connected source any time to re-sync.
+        Pull assignments in automatically. Subscribe to one or more calendar feeds (Canvas,
+        Brightspace, Blackboard) or import a syllabus. Re-open a connected source any time to re-sync.
       </p>
       <div>
         <IcsFeedsManager />

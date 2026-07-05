@@ -44,7 +44,14 @@ function decodeEntities(s) {
     .trim()
 }
 
-export function createBannerClassicScraper({ school, base, prefix }) {
+/**
+ * `enrichSeats: false` skips the per-CRN detail-page walk. Purdue serves the
+ * detail pages but rate-bans the IP after ~90 rapid hits (every response
+ * becomes a 519-byte "Information Page"), and its bulk bwskfcls page is
+ * login-gated - so at Purdue's subject sizes (600+ sections) there is no safe
+ * public seat source and sections ship with null enrollment / unknown status.
+ */
+export function createBannerClassicScraper({ school, base, prefix, enrichSeats = true }) {
   const root = `${base}${prefix}`
   const schedUrl = `${root}/bwckschd.p_disp_dyn_sched`
 
@@ -180,7 +187,7 @@ export function createBannerClassicScraper({ school, base, prefix }) {
         })
       ).text()
       const sections = parseListing(html, { school, termCode, termLabel, subjectLabel })
-      await enrichWithSeats(cFetch, termCode, sections)
+      if (enrichSeats) await enrichWithSeats(cFetch, termCode, sections)
       return sections
     })
   }
@@ -197,7 +204,10 @@ function parseListing(html, { school, termCode, termLabel, subjectLabel }) {
   const $ = cheerio.load(html)
   const out = []
 
-  $('th.ddtitle').each((_, th) => {
+  // Most schools mark section headers th.ddtitle; Purdue's customized skin
+  // uses th.ddlabel. The strict title regex below filters out any other
+  // ddlabel row headers (e.g. nothing on the listing page matches it).
+  $('th.ddtitle, th.ddlabel').each((_, th) => {
     const titleText = decodeEntities($(th).find('a').first().text() || $(th).text())
     // "Principles of Accounting I - 13215 - ACC 2013 - 002"
     const m = titleText.match(/^(.*) - (\d+) - (\S+)\s+(\S+) - (\S+)$/)

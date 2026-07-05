@@ -6,8 +6,13 @@
  * Supabase so the UI reflects what the server just upserted.
  *
  * State flags:
- * - `loading` : list fetch is in flight.
- * - `syncing` : a sync POST is in flight (mutually exclusive across all feeds).
+ * - `loading`     : list fetch is in flight.
+ * - `syncingAll`  : a bulk (all-feeds) sync POST is in flight.
+ * - `syncingIds`  : the set of individual feed ids currently syncing. A single
+ *                   feed's Sync button reflects only its own id, so clicking one
+ *                   row never shows the others as syncing.
+ * - `syncing`     : derived — true when anything (bulk or any single feed) is in
+ *                   flight. Kept for the auto-sync guard and legacy callers.
  * - `lastSyncResult` / `lastError` : surfaced to the UI for status badges.
  */
 import { defineStore } from 'pinia'
@@ -18,11 +23,24 @@ import { hydrateLmsStoresFromSupabase } from '../services/lmsSupabaseHydration'
 export const useIcsFeedsStore = defineStore('icsFeeds', () => {
   const feeds = ref([])
   const loading = ref(false)
-  const syncing = ref(false)
+  const syncingAll = ref(false)
+  const syncingIds = ref(new Set())
   const lastSyncResult = ref(null)
   const lastError = ref(null)
 
   const hasFeeds = computed(() => feeds.value.length > 0)
+
+  // True when any sync is in flight — a bulk sync or at least one single feed.
+  const syncing = computed(() => syncingAll.value || syncingIds.value.size > 0)
+
+  /**
+   * Whether a specific feed row should show its syncing state. True during a
+   * bulk sync (every feed is being refreshed) or when that feed is being synced
+   * on its own. Drives the per-row spinner so one click never spins the others.
+   */
+  function isSyncing(id) {
+    return syncingAll.value || syncingIds.value.has(id)
+  }
 
   /** Reload the saved feed list from the server. On failure clears local state. */
   async function fetchFeeds() {
@@ -87,8 +105,8 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
    * `syncing` so the user can't double-trigger.
    */
   async function syncAll() {
-    if (syncing.value) return null
-    syncing.value = true
+    if (syncingAll.value) return null
+    syncingAll.value = true
     lastError.value = null
     try {
       const result = await icsService.syncAll()
@@ -105,14 +123,19 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
       lastError.value = e?.message || String(e)
       throw e
     } finally {
-      syncing.value = false
+      syncingAll.value = false
     }
   }
 
-  /** Same as {@link syncAll} but scoped to a single feed id. */
+  /**
+   * Same as {@link syncAll} but scoped to a single feed id. Only that feed's row
+   * enters the syncing state; other feeds are untouched and can be synced
+   * concurrently. Guarded per-feed so the same row can't be double-triggered,
+   * and skipped entirely while a bulk sync is already refreshing everything.
+   */
   async function syncOne(id) {
-    if (syncing.value) return null
-    syncing.value = true
+    if (syncingAll.value || syncingIds.value.has(id)) return null
+    syncingIds.value.add(id)
     lastError.value = null
     try {
       const result = await icsService.syncOne(id)
@@ -126,7 +149,7 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
       lastError.value = e?.message || String(e)
       throw e
     } finally {
-      syncing.value = false
+      syncingIds.value.delete(id)
     }
   }
 
@@ -135,7 +158,8 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     feeds.value = []
     lastSyncResult.value = null
     lastError.value = null
-    syncing.value = false
+    syncingAll.value = false
+    syncingIds.value = new Set()
     loading.value = false
   }
 
@@ -143,6 +167,9 @@ export const useIcsFeedsStore = defineStore('icsFeeds', () => {
     feeds,
     loading,
     syncing,
+    syncingAll,
+    syncingIds,
+    isSyncing,
     lastSyncResult,
     lastError,
     hasFeeds,

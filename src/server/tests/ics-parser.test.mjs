@@ -345,3 +345,38 @@ describe('parseAndExpand', () => {
     assert.equal(occurrences[0].uid, 'unique-id-123@lms')
   })
 })
+
+// Regression guard for the RRULE-expansion DoS: a hostile feed must not be able
+// to make one recurring event explode into a huge number of occurrences (which
+// would pin the event loop / exhaust memory on the shared server). See the
+// sub-daily skip + occurrence cap in expandEvent.
+describe('parseAndExpand — RRULE expansion is bounded (DoS guard)', () => {
+  const recurring = (rrule) => ics(vevent({
+    UID: 'rec@test',
+    SUMMARY: 'Recurring',
+    DTSTART: '20260101T000000Z',
+    DTEND: '20260101T010000Z',
+    RRULE: rrule,
+  }))
+
+  for (const freq of ['SECONDLY', 'MINUTELY', 'HOURLY']) {
+    it(`collapses sub-daily FREQ=${freq} to a single occurrence (no explosion)`, () => {
+      const t0 = process.hrtime.bigint()
+      const { occurrences } = parseAndExpand(recurring(`FREQ=${freq}`))
+      const ms = Number(process.hrtime.bigint() - t0) / 1e6
+      assert.equal(occurrences.length, 1)
+      assert.ok(ms < 2000, `expansion took ${ms}ms — should be near-instant`)
+    })
+  }
+
+  it('bounds an unbounded high-COUNT daily rule to the occurrence cap', () => {
+    const { occurrences } = parseAndExpand(recurring('FREQ=DAILY;COUNT=999999'))
+    assert.ok(occurrences.length > 0, 'legit daily rule should still expand')
+    assert.ok(occurrences.length <= 1000, `expected <= 1000, got ${occurrences.length}`)
+  })
+
+  it('still expands a legitimate weekly rule normally', () => {
+    const { occurrences } = parseAndExpand(recurring('FREQ=WEEKLY'))
+    assert.ok(occurrences.length > 1 && occurrences.length <= 1000)
+  })
+})

@@ -3,6 +3,29 @@ import ical from 'node-ical'
 const DESCRIPTION_MAX = 16 * 1024
 const RRULE_PAST_DAYS = 30
 const RRULE_FUTURE_DAYS = 365
+// Hard cap on how many occurrences a single recurring event may expand into.
+// Without it, a hostile feed can force huge Date allocations and pin the event
+// loop (a DoS). 1000 comfortably covers any real assignment cadence over the
+// [now-30d, now+365d] window (daily ≈ 395, weekly ≈ 56).
+const RRULE_MAX_OCCURRENCES = 1000
+// Sub-daily recurrence (HOURLY/MINUTELY/SECONDLY) is never a legitimate
+// assignment cadence and is the payload of the RRULE-expansion DoS: over a
+// 395-day window it would generate millions of occurrences. We refuse to expand
+// those and treat the event as a single one.
+//
+// node-ical's RRULE engine differs by version: pre-0.26 used the `rrule` lib
+// (numeric FREQ: HOURLY=4, MINUTELY=5, SECONDLY=6); 0.26+ uses `rrule-temporal`
+// (string FREQ: 'HOURLY' / 'MINUTELY' / 'SECONDLY'). We detect both so the guard
+// holds regardless of which is installed.
+const SUB_DAILY_FREQ_STRINGS = new Set(['HOURLY', 'MINUTELY', 'SECONDLY'])
+const SUB_DAILY_FREQ_NUMBERS = new Set([4, 5, 6])
+
+function isSubDailyFreq(rrule) {
+  const freq = rrule?.options?.freq
+  if (typeof freq === 'string') return SUB_DAILY_FREQ_STRINGS.has(freq.toUpperCase())
+  if (typeof freq === 'number') return SUB_DAILY_FREQ_NUMBERS.has(freq)
+  return false
+}
 
 /**
  * Parse an ICS text body into { calendarName, events }.
@@ -285,14 +308,22 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
   const baseEnd = event.type === 'VTODO' ? null : toDate(event.end)
   const effectiveEnd = baseDue || baseEnd || baseStart
 
-  if (event.rrule) {
+  // Skip expanding sub-daily recurrences (the DoS payload); such an event falls
+  // through to the single-occurrence path below instead.
+  if (event.rrule && !isSubDailyFreq(event.rrule)) {
     const now = Date.now()
     const windowStart = new Date(now - RRULE_PAST_DAYS * 24 * 60 * 60 * 1000)
     const windowEnd = new Date(now + RRULE_FUTURE_DAYS * 24 * 60 * 60 * 1000)
 
     let occurrences = []
     try {
-      occurrences = event.rrule.between(windowStart, windowEnd, true) || []
+      // Bound the window to the cap. rrule-temporal (node-ical 0.26+) ignores the
+      // iterator arg and instead throws past its own internal iteration ceiling,
+      // so we defensively slice the returned array; with sub-daily rules already
+      // excluded above, allowed frequencies (daily/weekly/…) stay well under the
+      // cap over this window anyway.
+      const all = event.rrule.between(windowStart, windowEnd, true) || []
+      occurrences = all.length > RRULE_MAX_OCCURRENCES ? all.slice(0, RRULE_MAX_OCCURRENCES) : all
     } catch {
       occurrences = []
     }
