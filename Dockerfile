@@ -4,9 +4,9 @@
 # Production image for the Plannr Express API, deployed on Render.
 #
 # The API server is self-contained under src/server and runs off the repo-root
-# dependencies (there is no src/server/package.json). The Vue frontend is built
-# and hosted separately and points at this API via VITE_API_BASE, so it is
-# intentionally NOT bundled in this image.
+# dependencies (src/server/package.json only declares type:module and must stay
+# dependency-free). The Vue frontend is built and hosted separately and points
+# at this API via VITE_API_BASE, so it is intentionally NOT bundled in this image.
 #
 # Required env vars on Render (Dashboard → Environment):
 #   SUPABASE_URL, SUPABASE_ANON_KEY  — ICS feed + auth routes

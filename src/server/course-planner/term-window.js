@@ -51,13 +51,17 @@ export function parseTerm(term) {
   let year = null
   // Academic-year range like "2025-2026" or "2025-26" (Stanford). Fall belongs
   // to the first calendar year (Sep–Dec); Winter/Spring/Summer to the second.
+  // Only consecutive years count as a range: labels with embedded date spans
+  // ("Summer 2026 26-MAY-2026 - 31-JUL-2026", Texas State) also match this
+  // regex ("2026 - 31" → 2031) and must fall through to plain-year parsing.
   const range = raw.match(/\b(20\d{2})\s*[-/–]\s*(20\d{2}|\d{2})\b/)
   if (range) {
     const y1 = Number(range[1])
     const y2 =
       range[2].length === 2 ? Number(String(y1).slice(0, 2) + range[2]) : Number(range[2])
-    year = season === 'Fall' ? y1 : y2
-  } else {
+    if (y2 === y1 + 1) year = season === 'Fall' ? y1 : y2
+  }
+  if (!year) {
     // Lookarounds (not \b) so a letter can abut the digits: "FALL2026".
     const full = raw.match(/(?<!\d)(19|20)\d{2}(?!\d)/)
     if (full) {

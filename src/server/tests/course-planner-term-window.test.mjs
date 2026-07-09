@@ -38,6 +38,14 @@ describe('parseTerm', () => {
   it('range + Summer → second year', () => assert.equal(label('2025-2026 Summer'), 'Summer 2026'))
   it('handles "2025-26" short range', () => assert.equal(label('2025-26 Autumn'), 'Fall 2025'))
 
+  // Embedded date spans must not be mistaken for academic-year ranges: in
+  // "…26-MAY-2026 - 31-JUL-2026" the "2026 - 31" match is non-consecutive,
+  // so the plain season year wins (Texas State).
+  it('ignores date spans in labels (Texas State)', () =>
+    assert.equal(label('Summer 2026 26-MAY-2026 - 31-JUL-2026'), 'Summer 2026'))
+  it('ignores date spans for Spring terms', () =>
+    assert.equal(label('Spring 2026 20-JAN-2026 - 13-MAY-2026 (View Only)'), 'Spring 2026'))
+
   it('returns null with no season', () => assert.equal(parseTerm({ code: 'x', label: '2026' }), null))
   it('returns null with no year', () => assert.equal(parseTerm({ code: 'x', label: 'Fall' }), null))
   it('returns null for empty label', () => assert.equal(parseTerm({ code: 'x', label: '' }), null))

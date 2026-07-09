@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { useTasksStore } from '../stores/tasks'
-import { useAssignmentsStore } from '../stores/assignments'
-import { Card } from '../components/ui'
+import { useTasksStore } from '../../stores/tasks'
+import { useAssignmentsStore } from '../../stores/assignments'
+import { Card } from '../ui'
 
 const tasksStore = useTasksStore()
 const assignmentsStore = useAssignmentsStore()

@@ -1,10 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Button, Input, Modal, DatePicker } from './ui'
-import IntegrationRow from './features/IntegrationRow.vue'
-import * as syllabusService from '../services/syllabusService'
-import { hydrateLmsStoresFromSupabase } from '../services/lmsSupabaseHydration'
-import { useAuthStore } from '../stores/auth'
+import { Button, Input, Modal, DatePicker } from '../ui'
+import IntegrationRow from './IntegrationRow.vue'
+import * as syllabusService from '../../services/syllabusService'
+import { hydrateLmsStoresFromSupabase } from '../../services/lmsSupabaseHydration'
+import { useAuthStore } from '../../stores/auth'
 
 const authStore = useAuthStore()
 

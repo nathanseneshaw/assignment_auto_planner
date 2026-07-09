@@ -51,6 +51,26 @@ import * as umd from './course-planner/umd-scraper.js'
 import * as rutgers from './course-planner/rutgers-scraper.js'
 import * as wisc from './course-planner/wisc-scraper.js'
 import * as neu from './course-planner/neu-scraper.js'
+import * as temple from './course-planner/temple-scraper.js'
+import * as rpi from './course-planner/rpi-scraper.js'
+import * as boulder from './course-planner/boulder-scraper.js'
+import * as oregonstate from './course-planner/oregonstate-scraper.js'
+import * as wm from './course-planner/wm-scraper.js'
+import * as ncsu from './course-planner/ncsu-scraper.js'
+import * as vt from './course-planner/vt-scraper.js'
+import * as utah from './course-planner/utah-scraper.js'
+import * as uci from './course-planner/uci-scraper.js'
+import * as iowa from './course-planner/iowa-scraper.js'
+import * as nd from './course-planner/nd-scraper.js'
+import * as dartmouth from './course-planner/dartmouth-scraper.js'
+import * as utk from './course-planner/utk-scraper.js'
+import * as wvu from './course-planner/wvu-scraper.js'
+import * as auburn from './course-planner/auburn-scraper.js'
+import * as alabama from './course-planner/alabama-scraper.js'
+import * as gwu from './course-planner/gwu-scraper.js'
+import * as iastate from './course-planner/iastate-scraper.js'
+import * as ku from './course-planner/ku-scraper.js'
+import * as msstate from './course-planner/msstate-scraper.js'
 
 const router = Router()
 
@@ -325,6 +345,146 @@ const SCHOOLS = {
     // Banner 9 SSB exposes max / enrolled / available seats.
     enrollmentDataAvailable: true,
     scraper: neu,
+  },
+  temple: {
+    code: 'temple',
+    name: 'Temple University',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: temple,
+  },
+  rpi: {
+    code: 'rpi',
+    name: 'Rensselaer Polytechnic Institute',
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
+    scraper: rpi,
+  },
+  boulder: {
+    code: 'boulder',
+    name: 'University of Colorado Boulder',
+    // FOSE per-section details fill max + available seats.
+    enrollmentDataAvailable: true,
+    scraper: boulder,
+  },
+  oregonstate: {
+    code: 'oregonstate',
+    name: 'Oregon State University',
+    // FOSE per-section details carry max / enrolled / available fields.
+    enrollmentDataAvailable: true,
+    scraper: oregonstate,
+  },
+  wm: {
+    code: 'wm',
+    name: 'William & Mary',
+    // FOSE per-section details fill max + available seats.
+    enrollmentDataAvailable: true,
+    scraper: wm,
+  },
+  ncsu: {
+    code: 'ncsu',
+    name: 'NC State University',
+    // Coursecat "Avail." column carries live open/total seats per section.
+    enrollmentDataAvailable: true,
+    scraper: ncsu,
+  },
+  vt: {
+    code: 'vt',
+    name: 'Virginia Tech',
+    // Timetable shows capacity only; live enrollment needs a Hokie SPA login.
+    enrollmentDataAvailable: false,
+    scraper: vt,
+  },
+  utah: {
+    code: 'utah',
+    name: 'University of Utah',
+    // Class schedule cards carry live "Seats Available" (no max/current).
+    enrollmentDataAvailable: true,
+    scraper: utah,
+  },
+  uci: {
+    code: 'uci',
+    name: 'University of California, Irvine',
+    // WebSoc XML carries max enrolled + current enrollment per section.
+    enrollmentDataAvailable: true,
+    scraper: uci,
+  },
+  iowa: {
+    code: 'iowa',
+    name: 'University of Iowa',
+    // MAUI sections API carries maxEnroll / currentEnroll per section.
+    enrollmentDataAvailable: true,
+    scraper: iowa,
+  },
+  nd: {
+    code: 'nd',
+    name: 'University of Notre Dame',
+    // FOSE per-section details fill max + available seats.
+    enrollmentDataAvailable: true,
+    scraper: nd,
+  },
+  dartmouth: {
+    code: 'dartmouth',
+    name: 'Dartmouth College',
+    // FOSE per-section details fill max + available seats.
+    enrollmentDataAvailable: true,
+    scraper: dartmouth,
+  },
+  utk: {
+    code: 'utk',
+    name: 'University of Tennessee, Knoxville',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: utk,
+  },
+  wvu: {
+    code: 'wvu',
+    name: 'West Virginia University',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: wvu,
+  },
+  auburn: {
+    code: 'auburn',
+    name: 'Auburn University',
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
+    scraper: auburn,
+  },
+  alabama: {
+    code: 'alabama',
+    name: 'University of Alabama',
+    // Public detail pages omit the seats table (login-gated in myBama).
+    enrollmentDataAvailable: false,
+    scraper: alabama,
+  },
+  gwu: {
+    code: 'gwu',
+    name: 'George Washington University',
+    // Schedule of Classes shows OPEN/CLOSED text only, no seat counts.
+    enrollmentDataAvailable: false,
+    scraper: gwu,
+  },
+  iastate: {
+    code: 'iastate',
+    name: 'Iowa State University',
+    // Workday API carries live open-seat counts per section (no max/current).
+    enrollmentDataAvailable: true,
+    scraper: iastate,
+  },
+  ku: {
+    code: 'ku',
+    name: 'University of Kansas',
+    // Seats popover carries full "enrolled out of maximum" counts per section.
+    enrollmentDataAvailable: true,
+    scraper: ku,
+  },
+  msstate: {
+    code: 'msstate',
+    name: 'Mississippi State University',
+    // Master Schedule JSON carries total + available seats per section.
+    enrollmentDataAvailable: true,
+    scraper: msstate,
   },
 }
 

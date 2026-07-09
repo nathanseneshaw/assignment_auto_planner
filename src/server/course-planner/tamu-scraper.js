@@ -22,7 +22,7 @@ const BASE = 'https://howdyportal.tamu.edu'
 const UA = 'Mozilla/5.0 (compatible; Plannr/1.0)'
 
 export async function getTerms() {
-  return cacheMemo(
+  const terms = await cacheMemo(
     'tamu:terms',
     async () => {
       const res = await fetch(`${BASE}/api/all-terms`, { headers: { 'User-Agent': UA } })
@@ -37,6 +37,11 @@ export async function getTerms() {
     },
     60 * 60 * 1000
   )
+  // Every season has Galveston / Qatar / "Half Year Term" siblings listed BEFORE
+  // "<Season> YYYY - College Station"; their labels parse to the same Season+Year
+  // and would shadow the main campus in the term-window dedup.
+  const filtered = terms.filter((t) => /college station/i.test(t.label))
+  return filtered.length ? filtered : terms
 }
 
 /** Fetches + normalises ONE term's sections; cached so subject queries reuse it. */

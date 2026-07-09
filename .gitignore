@@ -29,5 +29,5 @@ release
 .env*
 .env*.local
 
-# Local dev notes (not for version control)
-scraper-status.md
+# Local dev notes / docs (not for version control)
+*.md

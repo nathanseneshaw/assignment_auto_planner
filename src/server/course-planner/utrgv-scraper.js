@@ -15,6 +15,13 @@ const impl = createBannerScraper({
   base: 'https://assist.utrgv.edu',
 })
 
-export const getTerms = impl.getTerms
+// UTRGV lists School-of-Medicine cohort terms ("Fall-Spr 2026-27 SOM Y4") and
+// "FALL 2026 MODULE 2" mini-terms before the real "FALL 2026"; their labels
+// parse to the same Season+Year and would shadow it in the term-window dedup.
+export async function getTerms() {
+  const terms = await impl.getTerms()
+  const filtered = terms.filter((t) => !/fall-spr|\bSOM\b|\bSOPM\b|module/i.test(t.label))
+  return filtered.length ? filtered : terms
+}
 export const getSubjects = impl.getSubjects
 export const getSections = impl.getSections

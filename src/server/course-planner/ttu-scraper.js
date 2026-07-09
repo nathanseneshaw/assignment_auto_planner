@@ -98,6 +98,17 @@ async function bannerSessionForTerm(termCode) {
 
 /** Terms requires the JSESSIONID from the /registration GET  otherwise 500. */
 export async function getTerms() {
+  const terms = await getTermsRaw()
+  // TTU lists Law / Vet School / "Early|Late ... TTU Online" mini-terms before
+  // the main "Season YYYY TTU" term; their labels parse to the same Season+Year
+  // and would shadow the real semester in the term-window dedup.
+  const filtered = terms.filter(
+    (t) => !/\b(law|vet school|online|view only)\b|^\s*(early|late)\b/i.test(t.label)
+  )
+  return filtered.length ? filtered : terms
+}
+
+async function getTermsRaw() {
   return cacheMemo(
     'ttu:terms',
     async () => {
