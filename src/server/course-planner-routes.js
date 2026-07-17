@@ -14,6 +14,7 @@
 import { Router } from 'express'
 import { rateLimit } from 'express-rate-limit'
 import { selectCurrentAndNextTerms } from './course-planner/term-window.js'
+import { dedupeMeetings } from './course-planner/util.js'
 import * as rice from './course-planner/rice-scraper.js'
 import * as ttu from './course-planner/ttu-scraper.js'
 import * as tamu from './course-planner/tamu-scraper.js'
@@ -557,6 +558,12 @@ router.get('/api/course-planner/:school/sections', async (req, res) => {
       termLabel: String(req.query.termLabel || ''),
       subjectLabel: String(req.query.subjectLabel || ''),
     })
+    // Central safety net for every school: some feeds emit one meeting row per
+    // calendar date, which collapse to identical weekly blocks. Dedupe here so
+    // no scraper can render stacked duplicate slots or skew the builder's math.
+    for (const s of sections) {
+      if (Array.isArray(s.meetings)) s.meetings = dedupeMeetings(s.meetings)
+    }
     res.json({ success: true, count: sections.length, sections })
   } catch (err) {
     handleError(res, err, `${entry.code} sections`)

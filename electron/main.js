@@ -138,12 +138,19 @@ function createWindow() {
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    // Custom title bar: hide the native caption bar (and its buttons) while
-    // keeping the standard window frame behaviors — resize, Aero Snap, drop
-    // shadow, Win11 rounded corners. We draw our own min/max/close buttons in
-    // the renderer (see TitleBar.vue), wired through the window:* IPC below.
+    // Native-look title bar: hide the caption bar but let the OS draw the real
+    // Windows min/max/close buttons as an overlay in the top-right (same setup
+    // as the Claude desktop app). The renderer paints the bar itself as a plain
+    // drag region (see TitleBar.vue) and re-tints the overlay on theme change
+    // via the window:setTitleBarOverlay IPC below. Keeps all standard frame
+    // behaviors — resize, Aero Snap, drop shadow, Win11 rounded corners.
     // `backgroundColor` matches light paper to avoid a white flash on load.
     titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#e9e6dd', // --color-paper; renderer re-tints for dark mode
+      symbolColor: '#1c1917', // --color-gray-900
+      height: 48, // keep in sync with --titlebar-h in src/style.css
+    },
     backgroundColor: '#f4f1e8',
     // Runtime taskbar/window icon. `build.icon` in package.json only sets the
     // packaged-app icon resource; during `electron:dev` the BrowserWindow
@@ -162,14 +169,6 @@ function createWindow() {
 
   installNavigationGuards(win)
 
-  // Keep the renderer's maximize/restore button icon in sync when the window is
-  // maximized by any means (our button, double-click on the bar, Aero Snap).
-  const sendMaxState = () => {
-    if (!win.isDestroyed()) win.webContents.send('window:maximized-changed', win.isMaximized())
-  }
-  win.on('maximize', sendMaxState)
-  win.on('unmaximize', sendMaxState)
-
   if (isDev) {
     win.loadURL('http://localhost:5173')
   } else {
@@ -177,24 +176,23 @@ function createWindow() {
   }
 }
 
-// Custom title-bar window controls, driven by the renderer's TitleBar.vue.
-// Each resolves the calling window from its WebContents so it stays correct
-// even if a second window is ever opened.
-ipcMain.handle('window:minimize', (event) => {
-  BrowserWindow.fromWebContents(event.sender)?.minimize()
-})
-ipcMain.handle('window:toggleMaximize', (event) => {
+// Re-tint the native window-controls overlay when the renderer's theme
+// changes (light/dark). Colors are validated to plain hex so a compromised
+// renderer can't feed setTitleBarOverlay something that throws.
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
+ipcMain.handle('window:setTitleBarOverlay', (event, opts) => {
   const win = BrowserWindow.fromWebContents(event.sender)
-  if (!win) return false
-  if (win.isMaximized()) win.unmaximize()
-  else win.maximize()
-  return win.isMaximized()
-})
-ipcMain.handle('window:close', (event) => {
-  BrowserWindow.fromWebContents(event.sender)?.close()
-})
-ipcMain.handle('window:isMaximized', (event) => {
-  return Boolean(BrowserWindow.fromWebContents(event.sender)?.isMaximized())
+  // setTitleBarOverlay only exists where the overlay does (Windows/Linux).
+  if (!win || typeof win.setTitleBarOverlay !== 'function') return
+  const color = typeof opts?.color === 'string' && HEX_COLOR.test(opts.color) ? opts.color : null
+  const symbolColor =
+    typeof opts?.symbolColor === 'string' && HEX_COLOR.test(opts.symbolColor) ? opts.symbolColor : null
+  if (!color || !symbolColor) return
+  try {
+    win.setTitleBarOverlay({ color, symbolColor })
+  } catch (err) {
+    logger.warn('setTitleBarOverlay failed:', err)
+  }
 })
 
 app.whenReady().then(() => {

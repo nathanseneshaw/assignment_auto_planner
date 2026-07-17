@@ -130,81 +130,30 @@
   .main-layout-bg { animation: none; }
 }
 
-/* ── Electron custom title bar ──
+/* ── Electron title bar ──
    The native caption bar is hidden (titleBarStyle:'hidden'); the OS draws the
-   min/max/close buttons into a short overlay on the right. `.app-titlebar` is
-   the visible bar that holds them, and the app layout below is nudged down by
-   its height. All rules are scoped to `.is-electron` on <html> (set at runtime
-   in App.vue), so the browser build is completely unaffected. */
+   real min/max/close buttons into an overlay in the top-right (titleBarOverlay
+   in electron/main.js, same setup as the Claude desktop app). `.app-titlebar`
+   is the borderless draggable strip they sit on; it matches the app background
+   so it flows into the layout with no dividing line, and the layout below is
+   nudged down by its height. Rules are scoped to `.is-electron` on <html>
+   (set at runtime in App.vue), so the browser build is completely unaffected. */
 html.is-electron {
-  --titlebar-h: 40px;
+  --titlebar-h: 48px; /* keep in sync with titleBarOverlay.height in electron/main.js */
 }
 
 .app-titlebar {
   position: fixed;
   inset: 0 0 auto 0;
-  height: var(--titlebar-h, 55px);
+  height: var(--titlebar-h, 40px);
   z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 8px;
   background: var(--color-paper);
-  border-bottom: 1px solid var(--color-paper-line);
   -webkit-app-region: drag; /* grab anywhere on the bar to move the window */
   app-region: drag;
 }
 
 .dark .app-titlebar {
   background: var(--color-gray-900);
-  border-bottom-color: var(--color-gray-700);
-}
-
-/* Custom min/max/close buttons  compact and vertically centered in the bar. */
-.app-titlebar__controls {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.titlebar-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  color: var(--color-gray-500);
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.titlebar-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.titlebar-btn:hover {
-  background: var(--color-gray-200);
-  color: var(--color-gray-800);
-}
-
-.titlebar-btn:focus-visible {
-  outline: 2px solid var(--color-primary-500);
-  outline-offset: -2px;
-}
-
-.titlebar-btn--close:hover {
-  background: var(--color-danger-600);
-  color: #fff;
-}
-
-.dark .titlebar-btn {
-  color: var(--color-gray-400);
-}
-
-.dark .titlebar-btn:hover {
-  background: var(--color-gray-700);
-  color: var(--color-gray-100);
 }
 
 /* Anything interactive that ends up in a drag region stays clickable. */
@@ -213,10 +162,22 @@ html.is-electron :where(button, a, input, select, textarea, label, [role="button
   app-region: no-drag;
 }
 
-/* Push the fixed sidebar, scrolling content, and sticky top bar below the bar. */
+/* The sidebar reaches the very top of the window, above the title-bar strip
+   (z-index 60), so the Plannr logo sits in the caption area like Claude
+   desktop. Its logo row shrinks to the caption height and becomes a drag
+   region of its own; interactive children stay clickable via the global
+   no-drag rule below. Content and top bar are still nudged below the strip. */
 html.is-electron .app-sidebar {
-  top: var(--titlebar-h);
-  height: calc(100vh - var(--titlebar-h));
+  top: 0;
+  height: 100vh;
+  z-index: 70;
+}
+
+html.is-electron .app-sidebar-header {
+  height: var(--titlebar-h);
+  margin-bottom: 10px; /* air between the caption-height logo row and the nav */
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 html.is-electron .app-content {

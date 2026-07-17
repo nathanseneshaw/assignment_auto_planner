@@ -12,9 +12,12 @@ import SyllabusParser from '../components/features/SyllabusParser.vue'
 import UniversityPicker from '../components/features/UniversityPicker.vue'
 import ChangePasswordModal from '../components/features/ChangePasswordModal.vue'
 import ChangeEmailModal from '../components/features/ChangeEmailModal.vue'
+import SoftwareUpdate from '../components/common/SoftwareUpdate.vue'
 import { listSchools } from '../services/coursePlannerApi.js'
 import { COURSE_PLANNER } from '../config/featureFlags.js'
+import { isElectron } from '../lib/platform'
 import { useCoursePlannerStore } from '../stores/coursePlanner'
+import { useScheduleBuilderStore } from '../stores/scheduleBuilder'
 
 const router = useRouter()
 const profileStore = useProfileStore()
@@ -23,6 +26,7 @@ const authStore = useAuthStore()
 const assignmentsStore = useAssignmentsStore()
 const coursesStore = useCoursesStore()
 const plannerStore = useCoursePlannerStore()
+const builderStore = useScheduleBuilderStore()
 
 // ── Identity ──────────────────────────────────────────────────────────────────
 
@@ -331,6 +335,7 @@ const selectedSchool = computed({
     // Switching schools clears the Course Planner (search state + saved weekly
     // plan) so courses from the previous school don't linger.
     plannerStore.resetForSchoolChange()
+    builderStore.resetForSchoolChange()
   },
 })
 
@@ -711,6 +716,17 @@ async function confirmUnenroll() {
       <p class="text-xs text-gray-400 dark:text-gray-500 mt-3">
         Schools marked "limited enrollment data" expose only open / closed status, not exact seat counts.
       </p>
+    </section>
+
+    <!-- ── Software update (desktop app only) ── -->
+    <section v-if="isElectron" class="py-7 border-t border-paper-line dark:border-gray-700/60">
+      <div class="flex items-baseline justify-between gap-4 mb-1">
+        <h2 class="display text-[15px] text-gray-900 dark:text-gray-100">Software update</h2>
+        <span class="eyebrow text-gray-400 dark:text-gray-500">Desktop app</span>
+      </div>
+      <div class="mt-1 divide-y divide-paper-line dark:divide-gray-700/50">
+        <SoftwareUpdate />
+      </div>
     </section>
 
     <!-- Unenroll confirmation (Teleports to <body>, so nesting here is layout-neutral

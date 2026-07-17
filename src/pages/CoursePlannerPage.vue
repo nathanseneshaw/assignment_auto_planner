@@ -1,12 +1,17 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useCoursePlannerStore } from '../stores/coursePlanner'
+import { useScheduleBuilderStore } from '../stores/scheduleBuilder'
 import { useProfileStore } from '../stores/profile'
-import { Button, Dropdown, Modal } from '../components/ui'
+import { Button, ConfirmDialog, Dropdown, Modal, TimePicker } from '../components/ui'
+import BuilderPanel from '../components/features/course-planner/BuilderPanel.vue'
+import ComboNavigator from '../components/features/course-planner/ComboNavigator.vue'
 import { listSchools } from '../services/coursePlannerApi.js'
 import { schoolLogo } from '../lib/schoolLogos'
+import { DAYS, toMinutes, formatClock, formatHour, meetingSummary } from '../utils/scheduleTime.js'
 
 const planner = useCoursePlannerStore()
+const builder = useScheduleBuilderStore()
 const profileStore = useProfileStore()
 
 // Friendly label for the user's current school (fetched once from the API).
@@ -73,18 +78,22 @@ const filteredSections = computed(() => {
   })
 })
 
+// --- Browse | Builder mode ---
+// Builder mode swaps the left rail for the Schedule Builder and, once combos
+// exist, previews the active combo on the grid instead of the saved plan.
+const mode = ref('browse')
+
+const previewing = computed(
+  () => mode.value === 'builder' && builder.previewSections.length > 0
+)
+
+const gridSections = computed(() =>
+  previewing.value ? builder.previewSections : planner.savedSections
+)
+
 // --- Weekly calendar grid ---
 // Slots run 7am–10pm; each row = 30 minutes; we position blocks absolutely
 // inside a per-day column.
-const DAYS = [
-  { code: 'M', label: 'Mon' },
-  { code: 'T', label: 'Tue' },
-  { code: 'W', label: 'Wed' },
-  { code: 'R', label: 'Thu' },
-  { code: 'F', label: 'Fri' },
-  { code: 'S', label: 'Sat' },
-  { code: 'U', label: 'Sun' },
-]
 const HOUR_START = 7
 const HOUR_END = 22
 const ROW_HEIGHT_PX = 28 // per 30-min slot
@@ -168,7 +177,7 @@ function layoutColumn(blocks) {
 const dayBlocks = computed(() => {
   const byDay = Object.fromEntries(DAYS.map((d) => [d.code, []]))
 
-  for (const section of planner.savedSections) {
+  for (const section of gridSections.value) {
     for (const m of section.meetings || []) {
       if (!m.startTime || !m.endTime) continue
       const base = makeBlock({
@@ -205,7 +214,7 @@ const dayBlocks = computed(() => {
 })
 
 const unscheduledSaved = computed(() =>
-  planner.savedSections.filter((s) => !s.meetings.some((m) => m.startTime && m.endTime && m.days.length))
+  gridSections.value.filter((s) => !s.meetings.some((m) => m.startTime && m.endTime && m.days.length))
 )
 
 // --- Conflict detection ---
@@ -255,9 +264,10 @@ function conflictDaysLabel(dayCodes) {
   return dayCodes.map((c) => map[c] || c).join(', ')
 }
 
-// One-line summary under the "Your week" heading.
+// One-line summary under the "Your week" heading. In browse mode gridSections
+// IS the saved plan; while previewing it reflects the combo on screen.
 const weekSummary = computed(() => {
-  const c = planner.savedSections.length
+  const c = gridSections.value.length
   const w = planner.workShifts.length
   const parts = []
   if (c) parts.push(`${c} ${c === 1 ? 'course' : 'courses'}`)
@@ -266,35 +276,8 @@ const weekSummary = computed(() => {
 })
 
 // --- Helpers ---
-
-function formatHour(h) {
-  const hh = h === 0 ? 12 : h > 12 ? h - 12 : h
-  return `${hh}${h < 12 ? 'am' : 'pm'}`
-}
-
-function toMinutes(hhmm) {
-  const [h, m] = String(hhmm).split(':').map(Number)
-  return h * 60 + m
-}
-
-function meetingSummary(meetings) {
-  if (!meetings || !meetings.length) return 'TBA'
-  return meetings
-    .filter((m) => m.startTime && m.endTime)
-    .map((m) => `${(m.days || []).map(dayLong).join(',')}, ${formatClock(m.startTime)}–${formatClock(m.endTime)}`)
-    .join(' • ') || 'TBA'
-}
-
-function dayLong(c) {
-  return { M: 'M', T: 'Tu', W: 'W', R: 'Th', F: 'F', S: 'Sa', U: 'Su' }[c] || c
-}
-
-function formatClock(hhmm) {
-  const [h, m] = String(hhmm).split(':').map(Number)
-  const hh = h === 0 ? 12 : h > 12 ? h - 12 : h
-  const suf = h < 12 ? 'am' : 'pm'
-  return `${hh}:${String(m).padStart(2, '0')}${suf}`
-}
+// Day/time formatting helpers now live in src/utils/scheduleTime.js (shared
+// with the schedule builder engine) and are imported at the top of the file.
 
 const PALETTE = [
   { bg: 'bg-blue-50 dark:bg-blue-900/40', text: 'text-blue-800 dark:text-blue-200', border: 'border-l-blue-400 dark:border-l-blue-500' },
@@ -337,6 +320,31 @@ function unavailableReason(section) {
 
 function isSectionUnavailable(section) {
   return unavailableReason(section) !== null
+}
+
+/** First instructor plus a +N overflow hint - calendar block space is tight. */
+function instructorLabel(section) {
+  const list = section.instructors || []
+  if (!list.length) return ''
+  return list.length > 1 ? `${list[0]} +${list.length - 1}` : list[0]
+}
+
+/** Hover tooltip for a calendar block, including the instructor(s) when known. */
+function blockTitle(block) {
+  if (block.kind === 'work') {
+    return `Work · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`
+  }
+  const s = block.section
+  if (isSectionUnavailable(s)) {
+    return `${s.subjectCode} ${s.courseNumber} · ${unavailableReason(s) === 'full' ? 'Full (at capacity)' : 'Closed'}`
+  }
+  const parts = [
+    `${s.subjectCode} ${s.courseNumber}`,
+    s.title,
+    `${formatClock(block.startTime)}–${formatClock(block.endTime)}`,
+  ]
+  if (s.instructors?.length) parts.push(s.instructors.join(', '))
+  return parts.join(' · ')
 }
 
 // Per-day calendar tinting: weekends recede a touch from the weekday columns.
@@ -420,6 +428,22 @@ function saveWork() {
     }))
   )
   workModalOpen.value = false
+}
+
+// --- Apply a generated combo ---
+// Replacing the saved plan is destructive, so it sits behind a confirm dialog.
+const applyDialogOpen = ref(false)
+
+const applyMessage = computed(() => {
+  const n = planner.savedSections.length
+  return `Replace your saved plan for ${schoolName.value || 'your school'}? Your current ${n} saved ${n === 1 ? 'section' : 'sections'} will be removed.`
+})
+
+function confirmApply() {
+  const combo = builder.activeCombo
+  if (!combo) return
+  planner.applyCombo(combo.sections)
+  mode.value = 'browse'
 }
 </script>
 
@@ -587,15 +611,44 @@ function saveWork() {
              height and the results list scrolls within it. -->
         <div class="min-w-0 relative">
         <div class="min-w-0 flex flex-col lg:absolute lg:inset-0">
-          <div class="flex items-baseline justify-between border-b border-paper-line dark:border-gray-700/60 pb-2.5 shrink-0">
+          <div class="flex items-center justify-between gap-2 border-b border-paper-line dark:border-gray-700/60 pb-2.5 shrink-0">
             <p class="eyebrow text-gray-400 dark:text-gray-500">
-              Results
-              <span v-if="filteredSections.length" class="text-gray-300 dark:text-gray-600">· {{ filteredSections.length }}</span>
+              <template v-if="mode === 'browse'">
+                Results
+                <span v-if="filteredSections.length" class="text-gray-300 dark:text-gray-600">· {{ filteredSections.length }}</span>
+              </template>
+              <template v-else>Schedule Builder</template>
             </p>
+            <!-- Browse | Builder segmented toggle -->
+            <div class="inline-flex shrink-0 rounded-lg border border-paper-line dark:border-gray-700/60 bg-surface/60 dark:bg-gray-800/40 p-0.5">
+              <button
+                type="button"
+                class="px-2.5 py-1 rounded-md text-[11px] font-semibold tracking-wide transition-colors duration-150"
+                :class="mode === 'browse'
+                  ? 'bg-primary-900 text-white shadow-sm shadow-primary-900/15'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'"
+                @click="mode = 'browse'"
+              >
+                Browse
+              </button>
+              <button
+                type="button"
+                class="px-2.5 py-1 rounded-md text-[11px] font-semibold tracking-wide transition-colors duration-150"
+                :class="mode === 'builder'
+                  ? 'bg-primary-900 text-white shadow-sm shadow-primary-900/15'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'"
+                @click="mode = 'builder'"
+              >
+                Builder
+              </button>
+            </div>
           </div>
 
+          <!-- Builder rail -->
+          <BuilderPanel v-if="mode === 'builder'" />
+
           <!-- States -->
-          <div v-if="planner.loading.sections" class="py-14 text-center font-mono text-[12px] text-gray-400 dark:text-gray-500">
+          <div v-else-if="planner.loading.sections" class="py-14 text-center font-mono text-[12px] text-gray-400 dark:text-gray-500">
             Loading sections…
           </div>
           <div v-else-if="planner.errors.sections" class="py-14 text-center text-sm text-rust-600 dark:text-rust-500">
@@ -691,6 +744,20 @@ function saveWork() {
             </Button>
           </div>
 
+          <!-- Builder preview banner + combo navigation -->
+          <div
+            v-if="previewing"
+            class="px-5 py-2.5 border-b border-warning-300/60 dark:border-warning-500/25 bg-warning-50/80 dark:bg-warning-500/[0.07]"
+          >
+            <p class="eyebrow text-warning-700 dark:text-warning-400">
+              Previewing a generated schedule - not saved yet
+            </p>
+          </div>
+          <ComboNavigator
+            v-if="mode === 'builder' && builder.generated && builder.combos.length"
+            @apply="applyDialogOpen = true"
+          />
+
           <div class="overflow-x-auto">
             <div class="grid grid-cols-[3.25rem_repeat(7,minmax(5rem,1fr))] min-w-[44rem]">
               <!-- Day header row -->
@@ -757,11 +824,7 @@ function saveWork() {
                     left: `calc(${block.leftPct}% + 2px)`,
                     width: `calc(${block.widthPct}% - 4px)`,
                   }"
-                  :title="block.kind === 'work'
-                    ? `Work · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`
-                    : isSectionUnavailable(block.section)
-                      ? `${block.section.subjectCode} ${block.section.courseNumber} · ${unavailableReason(block.section) === 'full' ? 'Full (at capacity)' : 'Closed'}`
-                      : `${block.section.subjectCode} ${block.section.courseNumber} · ${block.section.title} · ${formatClock(block.startTime)}–${formatClock(block.endTime)}`"
+                  :title="blockTitle(block)"
                 >
                   <div class="font-bold leading-tight truncate">
                     <template v-if="block.kind === 'work'">Work</template>
@@ -785,6 +848,12 @@ function saveWork() {
                   >
                     {{ formatClock(block.startTime) }}–{{ formatClock(block.endTime) }}
                   </div>
+                  <div
+                    v-if="block.kind === 'course' && !isSectionUnavailable(block.section) && block.heightPx >= 46 && instructorLabel(block.section)"
+                    class="mt-0.5 text-[9px] opacity-70 leading-none truncate"
+                  >
+                    {{ instructorLabel(block.section) }}
+                  </div>
                 </div>
               </div>
             </div>
@@ -792,7 +861,9 @@ function saveWork() {
 
           <!-- Unscheduled (TBA) saved sections -->
           <div v-if="unscheduledSaved.length" class="px-5 py-4 border-t border-paper-line dark:border-gray-700/60">
-            <p class="eyebrow text-gray-400 dark:text-gray-500 mb-2.5">Saved · no meeting time</p>
+            <p class="eyebrow text-gray-400 dark:text-gray-500 mb-2.5">
+              {{ previewing ? 'Previewing · no meeting time' : 'Saved · no meeting time' }}
+            </p>
             <ul class="space-y-2">
               <li
                 v-for="s in unscheduledSaved"
@@ -801,7 +872,9 @@ function saveWork() {
               >
                 <span class="truncate flex items-center gap-1.5 min-w-0">
                   <span class="font-semibold text-gray-900 dark:text-gray-100">{{ s.subjectCode }} {{ s.courseNumber }}</span>
-                  <span class="text-gray-500 dark:text-gray-400 truncate">{{ s.sectionNumber }} · {{ s.title }}</span>
+                  <span class="text-gray-500 dark:text-gray-400 truncate">
+                    {{ s.sectionNumber }} · {{ s.title }}<template v-if="s.instructors && s.instructors.length"> · {{ s.instructors.join(', ') }}</template>
+                  </span>
                   <span
                     v-if="isSectionUnavailable(s)"
                     class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-danger-50 dark:bg-danger-900/30 text-danger-600 dark:text-danger-300 border border-danger-200 dark:border-danger-800/60"
@@ -810,6 +883,7 @@ function saveWork() {
                   </span>
                 </span>
                 <button
+                  v-if="!previewing"
                   class="text-xs font-medium text-rust-600 dark:text-rust-500 hover:underline shrink-0"
                   @click="planner.removeSection(s)"
                 >
@@ -875,19 +949,11 @@ function saveWork() {
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-1.5">
                 <label class="eyebrow text-gray-500 dark:text-gray-400">Start</label>
-                <input
-                  v-model="shift.startTime"
-                  type="time"
-                  class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-surface dark:bg-gray-800 text-[15px] font-medium tracking-tight text-gray-900 dark:text-gray-100 dark:[color-scheme:dark] hover:border-gray-300/90 dark:hover:border-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 dark:focus-visible:border-primary-600/60 transition-[border-color,box-shadow] duration-200"
-                />
+                <TimePicker v-model="shift.startTime" placeholder="Start time" />
               </div>
               <div class="space-y-1.5">
                 <label class="eyebrow text-gray-500 dark:text-gray-400">End</label>
-                <input
-                  v-model="shift.endTime"
-                  type="time"
-                  class="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-surface dark:bg-gray-800 text-[15px] font-medium tracking-tight text-gray-900 dark:text-gray-100 dark:[color-scheme:dark] hover:border-gray-300/90 dark:hover:border-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20 focus-visible:border-primary-300/80 dark:focus-visible:border-primary-600/60 transition-[border-color,box-shadow] duration-200"
-                />
+                <TimePicker v-model="shift.endTime" placeholder="End time" />
               </div>
             </div>
 
@@ -924,6 +990,17 @@ function saveWork() {
           </div>
         </template>
       </Modal>
+
+      <!-- ══ Apply combo confirmation ══════════════════════════════════════ -->
+      <ConfirmDialog
+        v-model="applyDialogOpen"
+        variant="warning"
+        title="Replace saved plan?"
+        :message="applyMessage"
+        confirm-text="Replace plan"
+        cancel-text="Keep current plan"
+        @confirm="confirmApply"
+      />
     </template>
   </div>
 </template>

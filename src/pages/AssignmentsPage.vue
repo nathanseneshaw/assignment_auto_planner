@@ -376,9 +376,16 @@ onMounted(() => {
           </button>
         </div>
 
-        <!-- Sections -->
-        <div v-if="sections.length">
-          <section v-for="section in sections" :key="section.key" class="mt-7 first:mt-5">
+        <!-- Sections (solid surface so the paper dot-grid doesn't show through) -->
+        <div
+          v-if="sections.length"
+          class="mt-5 rounded-2xl border border-paper-line dark:border-gray-700/60 bg-surface dark:bg-gray-800 shadow-sm shadow-gray-900/[0.03] px-5 sm:px-6"
+        >
+          <section
+            v-for="section in sections"
+            :key="section.key"
+            class="py-5 border-b border-paper-line dark:border-gray-700/60 last:border-b-0"
+          >
             <p
               class="eyebrow mb-1"
               :class="section.tone === 'rust' ? 'text-rust-600 dark:text-rust-500' : 'text-gray-400'"
@@ -391,7 +398,7 @@ onMounted(() => {
               <div
                 v-for="assignment in section.items"
                 :key="assignment.id"
-                class="group flex items-start gap-3 py-3 border-b border-dotted border-paper-line dark:border-gray-700/60"
+                class="group flex items-start gap-3 py-3 border-b border-dotted border-paper-line dark:border-gray-700/60 last:border-b-0"
               >
                 <!-- Checkbox -->
                 <button

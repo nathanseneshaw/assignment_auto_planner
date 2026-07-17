@@ -91,6 +91,33 @@ export function daysFromBooleans({
   return out
 }
 
+/**
+ * Collapse exact-duplicate meeting rows into one (first occurrence wins).
+ *
+ * Some sources list a separate meeting per calendar DATE for biweekly or
+ * limited-date meetings (UTD's Nebula feed does this for its lab sections).
+ * Once the date range is dropped down to the weekly {days, time, location}
+ * shape, those rows arrive identical, and the calendar then stacks them as N
+ * side-by-side slivers in one slot while the builder's gap/conflict math
+ * double-counts them. Keyed on days + start + end + location; day order is
+ * normalised so ['M','W'] and ['W','M'] dedupe, but genuinely distinct
+ * meetings (different day, time, or room) are always kept.
+ */
+export function dedupeMeetings(meetings) {
+  if (!Array.isArray(meetings)) return []
+  const seen = new Set()
+  const out = []
+  for (const m of meetings) {
+    if (!m) continue
+    const days = Array.isArray(m.days) ? [...m.days].sort().join(',') : ''
+    const key = `${days}|${m.startTime || ''}|${m.endTime || ''}|${m.location || ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(m)
+  }
+  return out
+}
+
 /** Coerces "12", "12.0", "1 TO 3" → 12 / 1 / null. Returns null for non-numeric. */
 export function parseCredits(raw) {
   if (raw === null || raw === undefined) return null
