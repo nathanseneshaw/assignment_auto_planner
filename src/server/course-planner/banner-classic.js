@@ -51,9 +51,23 @@ function decodeEntities(s) {
  * login-gated - so at Purdue's subject sizes (600+ sections) there is no safe
  * public seat source and sections ship with null enrollment / unknown status.
  */
-export function createBannerClassicScraper({ school, base, prefix, enrichSeats = true }) {
+/**
+ * `trailingSlash: true` appends a `/` to every mod_plsql procedure path (before
+ * any query string). George Mason fronts its Banner with an OPNET accelerator
+ * that 404s the bare `.../bwckschd.p_disp_dyn_sched` form but serves the real
+ * page at `.../bwckschd.p_disp_dyn_sched/`; the POST procedures and the per-CRN
+ * detail page need the slash too. Off by default so no existing school changes.
+ */
+export function createBannerClassicScraper({
+  school,
+  base,
+  prefix,
+  enrichSeats = true,
+  trailingSlash = false,
+}) {
   const root = `${base}${prefix}`
-  const schedUrl = `${root}/bwckschd.p_disp_dyn_sched`
+  const slash = trailingSlash ? '/' : ''
+  const schedUrl = `${root}/bwckschd.p_disp_dyn_sched${slash}`
 
   /** A fresh cookie-jar session warmed up by loading the term-select page. */
   async function warmSession() {
@@ -87,7 +101,7 @@ export function createBannerClassicScraper({ school, base, prefix, enrichSeats =
       async () => {
         const cFetch = await warmSession()
         const html = await (
-          await cFetch(`${root}/bwckgens.p_proc_term_date`, {
+          await cFetch(`${root}/bwckgens.p_proc_term_date${slash}`, {
             method: 'POST',
             headers: {
               'User-Agent': UA,
@@ -140,7 +154,7 @@ export function createBannerClassicScraper({ school, base, prefix, enrichSeats =
   /** Seats row of the detail page's "Registration Availability" table. */
   async function fetchSeats(cFetch, termCode, crn) {
     const res = await cFetch(
-      `${root}/bwckschd.p_disp_detail_sched?term_in=${encodeURIComponent(termCode)}&crn_in=${encodeURIComponent(crn)}`,
+      `${root}/bwckschd.p_disp_detail_sched${slash}?term_in=${encodeURIComponent(termCode)}&crn_in=${encodeURIComponent(crn)}`,
       { headers: { 'User-Agent': UA, Referer: schedUrl } }
     )
     const html = await res.text()
@@ -176,7 +190,7 @@ export function createBannerClassicScraper({ school, base, prefix, enrichSeats =
     return cacheMemo(`${school}:sections:${termCode}:${subjectCode}`, async () => {
       const cFetch = await warmSession()
       const html = await (
-        await cFetch(`${root}/bwckschd.p_get_crse_unsec`, {
+        await cFetch(`${root}/bwckschd.p_get_crse_unsec${slash}`, {
           method: 'POST',
           headers: {
             'User-Agent': UA,

@@ -35,6 +35,16 @@ const TARGETS = [
   { school: 'iastate', mod: '../src/server/course-planner/iastate-scraper.js', prefer: ['COMS', 'ECON'] },
   { school: 'ku', mod: '../src/server/course-planner/ku-scraper.js', prefer: ['EECS', 'ECON'] },
   { school: 'msstate', mod: '../src/server/course-planner/msstate-scraper.js', prefer: ['CSE', 'EC'] },
+  { school: 'gmu', mod: '../src/server/course-planner/gmu-scraper.js', prefer: ['CS', 'ACCT'] },
+  { school: 'unm', mod: '../src/server/course-planner/unm-scraper.js', prefer: ['CS', 'ECON'] },
+  { school: 'ballstate', mod: '../src/server/course-planner/ballstate-scraper.js', prefer: ['CS', 'ECON'] },
+  { school: 'wmich', mod: '../src/server/course-planner/wmich-scraper.js', prefer: ['CS', 'ECON'] },
+  { school: 'wichita', mod: '../src/server/course-planner/wichita-scraper.js', prefer: ['CS', 'ECON'] },
+  { school: 'uidaho', mod: '../src/server/course-planner/uidaho-scraper.js', prefer: ['CS', 'ECON'] },
+  { school: 'cofc', mod: '../src/server/course-planner/cofc-scraper.js', prefer: ['CSCI', 'ECON'] },
+  { school: 'uncc', mod: '../src/server/course-planner/uncc-scraper.js', prefer: ['ITCS', 'ECON'] },
+  { school: 'udel', mod: '../src/server/course-planner/udel-scraper.js', prefer: ['CISC', 'ACCT'] },
+  { school: 'odu', mod: '../src/server/course-planner/odu-scraper.js', prefer: ['CS', 'ECON'] },
 ]
 
 const which = process.argv[2] // optional filter

@@ -72,6 +72,16 @@ import * as gwu from './course-planner/gwu-scraper.js'
 import * as iastate from './course-planner/iastate-scraper.js'
 import * as ku from './course-planner/ku-scraper.js'
 import * as msstate from './course-planner/msstate-scraper.js'
+import * as gmu from './course-planner/gmu-scraper.js'
+import * as unm from './course-planner/unm-scraper.js'
+import * as ballstate from './course-planner/ballstate-scraper.js'
+import * as wmich from './course-planner/wmich-scraper.js'
+import * as wichita from './course-planner/wichita-scraper.js'
+import * as uidaho from './course-planner/uidaho-scraper.js'
+import * as cofc from './course-planner/cofc-scraper.js'
+import * as uncc from './course-planner/uncc-scraper.js'
+import * as udel from './course-planner/udel-scraper.js'
+import * as odu from './course-planner/odu-scraper.js'
 
 const router = Router()
 
@@ -486,6 +496,76 @@ const SCHOOLS = {
     // Master Schedule JSON carries total + available seats per section.
     enrollmentDataAvailable: true,
     scraper: msstate,
+  },
+  gmu: {
+    code: 'gmu',
+    name: 'George Mason University',
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
+    scraper: gmu,
+  },
+  unm: {
+    code: 'unm',
+    name: 'University of New Mexico',
+    // Banner 9 SSB exposes max / enrolled / available seats (no instructors).
+    enrollmentDataAvailable: true,
+    scraper: unm,
+  },
+  ballstate: {
+    code: 'ballstate',
+    name: 'Ball State University',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: ballstate,
+  },
+  wmich: {
+    code: 'wmich',
+    name: 'Western Michigan University',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: wmich,
+  },
+  wichita: {
+    code: 'wichita',
+    name: 'Wichita State University',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: wichita,
+  },
+  uidaho: {
+    code: 'uidaho',
+    name: 'University of Idaho',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: uidaho,
+  },
+  cofc: {
+    code: 'cofc',
+    name: 'College of Charleston',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: cofc,
+  },
+  uncc: {
+    code: 'uncc',
+    name: 'UNC Charlotte',
+    // Banner 9 SSB exposes max / enrolled / available seats (CS subject = ITCS).
+    enrollmentDataAvailable: true,
+    scraper: uncc,
+  },
+  udel: {
+    code: 'udel',
+    name: 'University of Delaware',
+    // Course Search "Open seats" carries available + capacity per section.
+    enrollmentDataAvailable: true,
+    scraper: udel,
+  },
+  odu: {
+    code: 'odu',
+    name: 'Old Dominion University',
+    // Course Search JSON carries live "current of max" enrollment per section.
+    enrollmentDataAvailable: true,
+    scraper: odu,
   },
 }
 
