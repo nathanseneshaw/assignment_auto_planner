@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAssignmentsStore } from '../stores/assignments'
 import { useCoursesStore } from '../stores/courses'
 import { Modal, Input, Dropdown, DatePicker, Button, ConfirmDialog } from '../components/ui'
-import { resolveAssignmentCourseName, importSourceLabel } from '../utils/assignmentDisplay.js'
+import { resolveAssignmentCourseName, importSourceLabel, courseDotColor } from '../utils/assignmentDisplay.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -134,7 +134,7 @@ const sections = computed(() => {
     out.push({ key: 'completed', label: 'Completed', tone: 'muted', items: completedList.value })
   }
   if ((tab === 'all' || tab === 'archived') && archivedList.value.length) {
-    out.push({ key: 'archived', label: 'Removed from calendar', tone: 'muted', items: archivedList.value })
+    out.push({ key: 'archived', label: 'Archived', tone: 'muted', items: archivedList.value })
   }
   return out
 })
@@ -148,7 +148,7 @@ const emptyCopy = computed(() => {
     case 'completed':
       return { title: 'Nothing completed yet.', sub: 'Check items off and they’ll collect here.' }
     case 'archived':
-      return { title: 'Nothing archived.', sub: 'Assignments removed from your calendar feed are kept here.' }
+      return { title: 'Nothing archived.', sub: 'Assignments that leave your calendar feed are archived here.' }
     default:
       return { title: 'No assignments yet.', sub: 'Add one manually or connect a calendar feed.' }
   }
@@ -171,24 +171,9 @@ const overviewRows = computed(() => {
 // ── Course swatches ──────────────────────────────────────────────────────
 // Map the stored course color (e.g. "bg-blue-100") to a solid dot. Listing the
 // literals keeps them in Tailwind's JIT scan so the classes are generated.
-const DOT_BY_BG = {
-  'bg-blue-100': 'bg-blue-500',
-  'bg-green-100': 'bg-green-500',
-  'bg-purple-100': 'bg-purple-500',
-  'bg-orange-100': 'bg-orange-500',
-  'bg-pink-100': 'bg-pink-500',
-  'bg-teal-100': 'bg-teal-500',
-  'bg-indigo-100': 'bg-indigo-500',
-  'bg-red-100': 'bg-red-500',
-}
-
-function dotColor(color) {
-  return (color && DOT_BY_BG[color.bg]) || 'bg-gray-400'
-}
-
 function assignmentDot(assignment) {
   const c = assignment.courseId ? coursesStore.getCourseById(assignment.courseId) : null
-  return c ? dotColor(c.color) : 'bg-gray-400'
+  return c ? courseDotColor(c.color) : 'bg-gray-400'
 }
 
 const courseFilters = computed(() => {
@@ -198,7 +183,7 @@ const courseFilters = computed(() => {
       id: c.id,
       name: c.name,
       count: all.filter((a) => a.courseId === c.id).length,
-      dot: dotColor(c.color),
+      dot: courseDotColor(c.color),
     }))
     .filter((c) => c.count > 0)
 })
@@ -253,6 +238,18 @@ function maybeOpenAddModalFromRoute() {
   if (route.query.action === 'add') {
     openAddModal()
     const { action, ...restQuery } = route.query
+    router.replace({ path: route.path, query: restQuery })
+  }
+}
+
+// Deep link from the dashboard course rail: ?course=<id> preselects that
+// course's filter, then the param is stripped so a refresh shows everything.
+function maybeApplyCourseFromRoute() {
+  const id = route.query.course
+  if (id && coursesStore.getCourseById(id)) {
+    activeTab.value = 'all'
+    filterCourse.value = id
+    const { course, ...restQuery } = route.query
     router.replace({ path: route.path, query: restQuery })
   }
 }
@@ -319,6 +316,7 @@ function toggleAssignmentComplete(assignment) {
 
 onMounted(() => {
   maybeOpenAddModalFromRoute()
+  maybeApplyCourseFromRoute()
 })
 </script>
 
@@ -443,12 +441,12 @@ onMounted(() => {
                     <span
                       v-if="isArchived(assignment)"
                       class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wide border bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200/70 dark:border-amber-800/60"
-                      title="Removed from your calendar feed. Kept here for your records."
+                      title="Archived after leaving your calendar feed. Kept here for your records."
                     >
                       <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 01-2 2M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M10 12h4" />
                       </svg>
-                      Removed from calendar
+                      Archived
                     </span>
                   </div>
                 </div>

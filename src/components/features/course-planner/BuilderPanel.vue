@@ -39,7 +39,7 @@ const showNoCombosMessage = computed(
 <template>
   <div class="mt-3 flex-1 min-h-0 overflow-y-auto pr-1 space-y-5 max-h-[70vh] lg:max-h-none">
     <!-- Candidates -->
-    <div class="rounded-2xl border border-paper-line dark:border-gray-700/60 bg-surface/40 dark:bg-gray-800/30 p-4">
+    <div class="rounded-2xl border border-primary-200/60 dark:border-primary-800/40 bg-primary-50/50 dark:bg-primary-900/15 p-4">
       <div class="flex items-center justify-between mb-2.5">
         <p class="eyebrow text-gray-400 dark:text-gray-500">
           Courses <span class="text-gray-300 dark:text-gray-600 tabular-nums">· {{ builder.candidates.length }}/8</span>
@@ -89,7 +89,7 @@ const showNoCombosMessage = computed(
     </div>
 
     <!-- Add courses from the loaded subject -->
-    <div class="rounded-2xl border border-paper-line dark:border-gray-700/60 bg-surface/40 dark:bg-gray-800/30 p-4">
+    <div class="rounded-2xl border border-primary-200/50 dark:border-primary-800/30 bg-surface/40 dark:bg-gray-800/30 p-4">
       <p class="eyebrow text-gray-400 dark:text-gray-500 mb-2.5">Add courses</p>
 
       <p v-if="planner.loading.sections" class="py-4 text-center font-mono text-[12px] text-gray-400 dark:text-gray-500">
@@ -139,7 +139,7 @@ const showNoCombosMessage = computed(
     </div>
 
     <!-- Filters -->
-    <div class="rounded-2xl border border-paper-line dark:border-gray-700/60 bg-surface/40 dark:bg-gray-800/30 p-4 space-y-4">
+    <div class="rounded-2xl border border-primary-200/50 dark:border-primary-800/30 bg-surface/40 dark:bg-gray-800/30 p-4 space-y-4">
       <p class="eyebrow text-gray-400 dark:text-gray-500">Filters</p>
 
       <div class="grid grid-cols-2 gap-3">

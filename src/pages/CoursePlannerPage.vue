@@ -469,7 +469,7 @@ function confirmApply() {
         </p>
       </div>
       <div class="shrink-0 text-left sm:text-right">
-        <p class="display text-4xl text-gray-900 dark:text-gray-50 leading-none tabular-nums">
+        <p class="display text-4xl text-primary-700 dark:text-primary-400 leading-none tabular-nums">
           {{ planner.savedSections.length }}
         </p>
         <p class="eyebrow text-gray-400 dark:text-gray-500 mt-1.5">in your plan</p>
@@ -666,12 +666,12 @@ function confirmApply() {
             <div
               v-for="section in filteredSections"
               :key="section.crn"
-              class="rounded-xl border border-paper-line dark:border-gray-700/60 bg-surface/50 dark:bg-gray-800/30 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-surface dark:hover:bg-gray-800/60 transition-colors p-3.5"
+              class="group rounded-xl border border-paper-line dark:border-gray-700/60 bg-surface/50 dark:bg-gray-800/30 hover:border-primary-300/70 dark:hover:border-primary-700/50 hover:bg-surface dark:hover:bg-gray-800/60 transition-colors p-3.5"
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1">
-                    <span class="font-semibold text-[14px] text-gray-900 dark:text-gray-100">
+                    <span class="font-semibold text-[14px] text-gray-900 dark:text-gray-100 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors">
                       {{ section.subjectCode }} {{ section.courseNumber }}
                     </span>
                     <span class="font-mono text-[11px] text-gray-400 dark:text-gray-500">{{ section.sectionNumber }}</span>
@@ -729,9 +729,9 @@ function confirmApply() {
         </div>
 
         <!-- RIGHT: weekly grid (the page hero) -->
-        <div class="min-w-0 rounded-2xl border border-paper-line dark:border-gray-700/60 bg-surface/40 dark:bg-gray-800/30 overflow-hidden">
+        <div class="min-w-0 rounded-2xl border border-primary-200/60 dark:border-primary-800/40 bg-surface/40 dark:bg-gray-800/30 overflow-hidden">
           <!-- Panel header -->
-          <div class="px-5 py-4 flex items-center justify-between gap-3 border-b border-paper-line dark:border-gray-700/60">
+          <div class="px-5 py-4 flex items-center justify-between gap-3 border-b border-primary-200/50 dark:border-primary-800/30 bg-primary-50/60 dark:bg-primary-900/20">
             <div class="min-w-0">
               <h2 class="display text-xl text-gray-900 dark:text-gray-100 leading-tight">Your week</h2>
               <p class="mt-0.5 font-mono text-[11px] text-gray-400 dark:text-gray-500">{{ weekSummary }}</p>

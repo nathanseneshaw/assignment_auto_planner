@@ -7,7 +7,7 @@ import { useCoursesStore } from '../stores/courses'
 import { useProfileStore } from '../stores/profile'
 import { useAuthStore } from '../stores/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { resolveAssignmentCourseName } from '../utils/assignmentDisplay.js'
+import { resolveAssignmentCourseName, courseDotColor } from '../utils/assignmentDisplay.js'
 
 const router = useRouter()
 const assignmentsStore = useAssignmentsStore()
@@ -64,6 +64,23 @@ const todayCompleted = computed(() => agenda.value.filter(t => t.completed).leng
 const overdueCount = computed(() => assignmentsStore.overdueAssignments.length)
 const nextDeadline = computed(() => assignmentsStore.upcomingAssignments[0] || null)
 const railDeadlines = computed(() => assignmentsStore.upcomingAssignments.slice(0, 4))
+
+// ── My courses (rail) ────────────────────────────────────────────────────
+// Enrolled courses with a live count of still-open (not completed, not
+// archived) assignments each. Busiest first so the course needing attention
+// sits at the top; taps through to that course's filtered assignments list.
+const myCourses = computed(() =>
+  coursesStore.coursesSorted
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      dot: courseDotColor(c.color),
+      openCount: assignmentsStore.assignments.filter(
+        (a) => a.courseId === c.id && a.status !== 'completed' && a.feedStatus !== 'archived'
+      ).length,
+    }))
+    .sort((a, b) => b.openCount - a.openCount || (a.name || '').localeCompare(b.name || ''))
+)
 
 // ── Week-ahead snapshot (rail) ───────────────────────────────────────────
 // This Mon–Sun week: how many tasks are scheduled, how many assignments are
@@ -458,6 +475,31 @@ function cellClass(day) {
             class="mt-3 eyebrow text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           >
             View all →
+          </button>
+        </div>
+
+        <!-- My courses -->
+        <div v-if="myCourses.length" class="mt-7">
+          <div class="flex items-baseline justify-between mb-0.5">
+            <p class="text-[13px] font-medium text-gray-500 dark:text-gray-400">My courses</p>
+            <span class="font-mono text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">{{ myCourses.length }}</span>
+          </div>
+
+          <button
+            v-for="c in myCourses.slice(0, 6)"
+            :key="c.id"
+            type="button"
+            @click="router.push({ path: '/assignments', query: { course: c.id } })"
+            class="group w-full flex items-center gap-2.5 py-2.5 border-b border-dotted border-paper-line dark:border-gray-700/60"
+          >
+            <span class="w-2 h-2 rounded-full shrink-0" :class="c.dot" />
+            <span class="flex-1 min-w-0 truncate text-left text-[13px] text-gray-800 dark:text-gray-200 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors">
+              {{ c.name }}
+            </span>
+            <span
+              class="shrink-0 font-mono text-[11px] tabular-nums"
+              :class="c.openCount ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'"
+            >{{ c.openCount ? `${c.openCount} left` : 'none' }}</span>
           </button>
         </div>
       </aside>

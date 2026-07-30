@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { COURSE_PLANNER } from '../../config/featureFlags.js'
 import { useTasksStore } from '../../stores/tasks'
 import { useAssignmentsStore } from '../../stores/assignments'
-import { useCoursesStore } from '../../stores/courses'
 import { useProfileStore } from '../../stores/profile'
 import { useAuthStore } from '../../stores/auth'
 import { isSupabaseConfigured } from '../../lib/supabase'
@@ -22,7 +21,6 @@ const route = useRoute()
 const router = useRouter()
 const tasksStore = useTasksStore()
 const assignmentsStore = useAssignmentsStore()
-const coursesStore = useCoursesStore()
 const profileStore = useProfileStore()
 const authStore = useAuthStore()
 
@@ -79,7 +77,7 @@ const sections = computed(() => [
       { name: 'Assignments', path: '/assignments', count: dueSoonCount.value },
       { name: 'Planner', path: '/planner', count: weekTaskCount.value },
       ...(COURSE_PLANNER
-        ? [{ name: 'Courses', path: '/course-planner', count: coursesStore.courses.length }]
+        ? [{ name: 'Courses', path: '/course-planner' }]
         : []),
     ],
   },
