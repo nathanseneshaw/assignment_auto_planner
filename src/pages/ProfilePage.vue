@@ -8,6 +8,7 @@ import { useAssignmentsStore } from '../stores/assignments'
 import { useCoursesStore } from '../stores/courses'
 import { isSupabaseConfigured } from '../lib/supabase'
 import IcsFeedsManager from '../components/features/IcsFeedsManager.vue'
+import IcsHelpGuide from '../components/features/IcsHelpGuide.vue'
 import SyllabusParser from '../components/features/SyllabusParser.vue'
 import UniversityPicker from '../components/features/UniversityPicker.vue'
 import ChangePasswordModal from '../components/features/ChangePasswordModal.vue'
@@ -688,10 +689,13 @@ async function confirmUnenroll() {
         <h2 class="display text-[15px] text-gray-900 dark:text-gray-100">Connected integrations</h2>
         <span class="eyebrow text-gray-400 dark:text-gray-500">Manage sources</span>
       </div>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-2.5 leading-relaxed">
         Pull assignments in automatically. Subscribe to one or more calendar feeds (Canvas,
         Brightspace, Blackboard) or import a syllabus. Re-open a connected source any time to re-sync.
       </p>
+      <div class="mb-1">
+        <IcsHelpGuide />
+      </div>
       <div>
         <IcsFeedsManager />
         <SyllabusParser />
