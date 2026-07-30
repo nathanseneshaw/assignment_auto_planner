@@ -115,6 +115,57 @@ function isAllowedNavigation(targetUrl) {
   }
 }
 
+// Right-click menu for editable fields. Chromium's native spellchecker runs
+// automatically on <input>/<textarea>/contenteditable (red squiggles), but the
+// actionable part — swapping in a suggestion — is surfaced through the
+// `context-menu` event's params, and Electron draws no default menu once
+// `Menu.setApplicationMenu(null)` has removed the app menu. So we build one:
+// spelling suggestions + "Add to dictionary" for misspellings, plus the
+// standard clipboard actions for any editable field or text selection.
+function installContextMenu(win) {
+  win.webContents.on('context-menu', (event, params) => {
+    const { misspelledWord, dictionarySuggestions, isEditable, editFlags, selectionText } = params
+    const template = []
+
+    if (misspelledWord) {
+      if (dictionarySuggestions.length > 0) {
+        for (const suggestion of dictionarySuggestions) {
+          template.push({
+            label: suggestion,
+            click: () => win.webContents.replaceMisspelling(suggestion),
+          })
+        }
+      } else {
+        template.push({ label: 'No suggestions', enabled: false })
+      }
+      template.push(
+        { type: 'separator' },
+        {
+          label: 'Add to dictionary',
+          click: () => session.defaultSession.addWordToSpellCheckerDictionary(misspelledWord),
+        },
+        { type: 'separator' },
+      )
+    }
+
+    // Clipboard actions when there's something to act on (an editable field, or
+    // a plain-text selection the user might want to copy).
+    if (isEditable || selectionText) {
+      template.push(
+        { role: 'cut', enabled: editFlags.canCut },
+        { role: 'copy', enabled: editFlags.canCopy },
+        { role: 'paste', enabled: editFlags.canPaste },
+      )
+      if (isEditable) {
+        template.push({ role: 'selectAll', enabled: editFlags.canSelectAll })
+      }
+    }
+
+    if (template.length === 0) return
+    Menu.buildFromTemplate(template).popup({ window: win })
+  })
+}
+
 function installNavigationGuards(win) {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (event, targetUrl) => {
@@ -164,10 +215,15 @@ function createWindow() {
       webSecurity: true,
       allowRunningInsecureContent: false,
       webviewTag: false,
+      // Chromium's native spellchecker (red squiggles on misspelled words in
+      // editable fields). On by default, but set explicitly so the intent is
+      // clear; the actionable suggestions come from installContextMenu below.
+      spellcheck: true,
     },
   })
 
   installNavigationGuards(win)
+  installContextMenu(win)
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
@@ -197,6 +253,18 @@ ipcMain.handle('window:setTitleBarOverlay', (event, opts) => {
 
 app.whenReady().then(() => {
   installResponseHooks()
+
+  // Spellchecker dictionary. On Windows/Linux this drives Hunspell (dictionary
+  // is fetched once from Google's CDN by the network process, so the renderer
+  // CSP doesn't apply); on macOS the OS spellchecker is used and this is a
+  // no-op. Guarded because setSpellCheckerLanguages doesn't exist on macOS.
+  if (typeof session.defaultSession.setSpellCheckerLanguages === 'function') {
+    try {
+      session.defaultSession.setSpellCheckerLanguages(['en-US'])
+    } catch (err) {
+      logger.warn('setSpellCheckerLanguages failed:', err)
+    }
+  }
 
   Menu.setApplicationMenu(null)
 
