@@ -54,7 +54,7 @@ jobs:
           set -euo pipefail
           xcodebuild build \
             -project App.xcodeproj \
-            -target App \
+            -scheme App \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
