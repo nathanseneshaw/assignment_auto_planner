@@ -38,7 +38,18 @@ useIcsAutoSync()
 
 function applyTheme(dark) {
   const isPublicPage = route.meta.authPage || route.meta.landingPage
-  document.documentElement.classList.toggle('dark', !!dark && !isPublicPage)
+  const effectiveDark = !!dark && !isPublicPage
+  document.documentElement.classList.toggle('dark', effectiveDark)
+  // Desktop: re-tint the native window-controls overlay (min/max/close) so it
+  // matches the title-bar background. Colors mirror --color-paper/--color-gray-900
+  // and their text counterparts in style.css.
+  if (isElectron) {
+    window.electronAPI?.window?.setTitleBarOverlay?.(
+      effectiveDark
+        ? { color: '#1c1917', symbolColor: '#e7e5e4' }
+        : { color: '#e9e6dd', symbolColor: '#1c1917' }
+    )
+  }
 }
 
 // Apply persisted theme immediately before first render
@@ -72,8 +83,8 @@ watch(
 </script>
 
 <template>
-  <!-- Electron only: custom title bar with our own min/max/close buttons. The
-       app layout below is offset by its height (--titlebar-h) in style.css. -->
+  <!-- Electron only: draggable title-bar strip under the native min/max/close
+       overlay. The app layout below is offset by its height (--titlebar-h). -->
   <TitleBar v-if="isElectron" />
 
   <template v-if="route.meta.authPage || route.meta.landingPage">

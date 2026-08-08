@@ -324,6 +324,44 @@ describe('persistence', () => {
   })
 })
 
+// ── applyCombo ────────────────────────────────────────────────────────────────
+
+describe('applyCombo', () => {
+  it('replaces the whole saved bucket for the combo school', () => {
+    useSchool('rice')
+    const store = useCoursePlannerStore()
+    store.addSection(sampleSection({ crn: 'OLD1' }))
+    store.addSection(sampleSection({ crn: 'OLD2' }))
+    store.applyCombo([sampleSection({ crn: 'NEW1' }), sampleSection({ crn: 'NEW2' }), sampleSection({ crn: 'NEW3' })])
+    expect(store.savedSections.map((s) => s.crn)).toEqual(['NEW1', 'NEW2', 'NEW3'])
+  })
+
+  it('leaves other school buckets untouched', () => {
+    const store = useCoursePlannerStore()
+    useSchool('ttu')
+    store.addSection(sampleSection({ school: 'ttu', crn: 'T1' }))
+    useSchool('rice')
+    store.applyCombo([sampleSection({ crn: 'R1' })])
+    useSchool('ttu')
+    expect(store.savedSections.map((s) => s.crn)).toEqual(['T1'])
+  })
+
+  it('ignores empty or non-array input', () => {
+    useSchool('rice')
+    const store = useCoursePlannerStore()
+    store.addSection(sampleSection({ crn: 'KEEP' }))
+    store.applyCombo([])
+    store.applyCombo(null)
+    expect(store.savedSections.map((s) => s.crn)).toEqual(['KEEP'])
+  })
+
+  it('persists the replacement', () => {
+    useSchool('rice')
+    useCoursePlannerStore().applyCombo([sampleSection({ crn: 'APPLIED' })])
+    expect(JSON.parse(localStorage.getItem('coursePlanner:saved')).rice.map((s) => s.crn)).toEqual(['APPLIED'])
+  })
+})
+
 // ── resetForSchoolChange ──────────────────────────────────────────────────────
 
 describe('resetForSchoolChange', () => {

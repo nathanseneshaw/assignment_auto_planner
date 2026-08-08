@@ -12,8 +12,6 @@ const router = useRouter()
 const tasksStore = useTasksStore()
 const assignmentsStore = useAssignmentsStore()
 
-const showSearch = ref(false)
-const searchQuery = ref('')
 const showNotifications = ref(false)
 const dismissedNotifications = ref(new Set())
 const notificationsEl = ref(null)
@@ -61,28 +59,6 @@ onBeforeUnmount(() => {
   if (clockTimer) clearInterval(clockTimer)
 })
 
-const searchResults = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return { assignments: [], tasks: [] }
-
-  const assignments = assignmentsStore.assignments
-    .filter(a =>
-      a.title?.toLowerCase().includes(q) ||
-      a.description?.toLowerCase().includes(q)
-    )
-    .slice(0, 4)
-
-  const tasks = tasksStore.tasks
-    .filter(t => t.title?.toLowerCase().includes(q))
-    .slice(0, 4)
-
-  return { assignments, tasks }
-})
-
-const hasResults = computed(() =>
-  searchResults.value.assignments.length > 0 || searchResults.value.tasks.length > 0
-)
-
 const todayStats = computed(() => ({
   overdue: tasksStore.overdueTasks.length,
 }))
@@ -126,27 +102,6 @@ function dismissNotification(id) {
   dismissedNotifications.value = new Set([...dismissedNotifications.value, id])
 }
 
-function handleSearch() {
-  if (searchResults.value.assignments.length > 0) {
-    router.push('/assignments')
-    showSearch.value = false
-  } else if (searchResults.value.tasks.length > 0) {
-    router.push('/tasks')
-    showSearch.value = false
-  }
-}
-
-function goToAssignment() {
-  router.push('/assignments')
-  showSearch.value = false
-  searchQuery.value = ''
-}
-
-function goToTask() {
-  router.push('/tasks')
-  showSearch.value = false
-  searchQuery.value = ''
-}
 </script>
 
 <template>
@@ -192,102 +147,6 @@ function goToTask() {
 
         <!-- Desktop auto-update (Electron only; hidden until an update exists) -->
         <UpdateButton />
-
-        <!-- Search -->
-        <div class="relative">
-          <button
-            @click="showSearch = !showSearch"
-            class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-paper-line dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-surface/60 dark:hover:bg-gray-800/60 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-            :class="{ 'bg-surface/70 dark:bg-gray-800/70 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100': showSearch }"
-            aria-label="Search"
-          >
-            <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
-
-          <!-- Search Dropdown -->
-          <Transition name="dropdown">
-            <div
-              v-if="showSearch"
-              class="absolute right-0 top-full mt-2 w-72 bg-surface dark:bg-gray-800 rounded-2xl shadow-lg shadow-gray-900/8 dark:shadow-gray-900/40 border border-gray-200/80 dark:border-gray-700 p-3"
-            >
-              <div class="relative">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  v-model="searchQuery"
-                  type="text"
-                  placeholder="Search assignments, tasks…"
-                  class="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-paper/60 dark:bg-gray-900/40 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-[border-color,box-shadow] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 focus-visible:border-primary-300/80 dark:focus-visible:border-primary-500/60 focus:bg-surface dark:focus:bg-gray-800"
-                  @keyup.enter="handleSearch"
-                  @keyup.esc="showSearch = false"
-                  autofocus
-                />
-              </div>
-              <!-- Search results -->
-              <div v-if="searchQuery.trim() && hasResults" class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/80 space-y-3">
-                <div v-if="searchResults.assignments.length > 0">
-                  <p class="eyebrow text-gray-400 dark:text-gray-500 mb-1.5 px-1">Assignments</p>
-                  <div class="space-y-0.5">
-                    <button
-                      v-for="a in searchResults.assignments"
-                      :key="a.id"
-                      type="button"
-                      @click="goToAssignment(a)"
-                      class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-                    >
-                      <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ a.title }}</p>
-                      <p v-if="a.dueDate" class="eyebrow text-gray-400 dark:text-gray-500 mt-0.5">Due {{ a.dueDate }}</p>
-                    </button>
-                  </div>
-                </div>
-                <div v-if="searchResults.tasks.length > 0">
-                  <p class="eyebrow text-gray-400 dark:text-gray-500 mb-1.5 px-1">Tasks</p>
-                  <div class="space-y-0.5">
-                    <button
-                      v-for="t in searchResults.tasks"
-                      :key="t.id"
-                      type="button"
-                      @click="goToTask(t)"
-                      class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      <p class="text-sm text-gray-800 dark:text-gray-200 truncate">{{ t.title }}</p>
-                      <p v-if="t.scheduledDate" class="eyebrow text-gray-400 dark:text-gray-500 mt-0.5">{{ t.scheduledDate }}</p>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- No results -->
-              <div v-else-if="searchQuery.trim() && !hasResults" class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/80">
-                <p class="text-sm text-center text-gray-400 dark:text-gray-500 py-2">No results for "{{ searchQuery }}"</p>
-              </div>
-
-              <!-- Quick links (shown when no query) -->
-              <div v-else class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/80">
-                <p class="eyebrow text-gray-400 dark:text-gray-500 mb-2">Quick Links</p>
-                <div class="space-y-1">
-                  <button
-                    type="button"
-                    @click="router.push('/planner'); showSearch = false"
-                    class="w-full text-left px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  >
-                    Weekly planner
-                  </button>
-                  <button
-                    type="button"
-                    @click="router.push('/assignments'); showSearch = false"
-                    class="w-full text-left px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  >
-                    Add assignment
-                  </button>
-                </div>
-              </div>
-            </div>
-          </Transition>
-        </div>
 
         <!-- Notifications -->
         <div ref="notificationsEl" class="relative">

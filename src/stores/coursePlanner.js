@@ -217,6 +217,16 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     persistSaved()
   }
 
+  /** Replace the whole saved bucket for a school with a generated combo. */
+  function applyCombo(sections) {
+    if (!Array.isArray(sections) || !sections.length) return
+    savedSectionsBySchool.value = {
+      ...savedSectionsBySchool.value,
+      [sections[0].school]: [...sections],
+    }
+    persistSaved()
+  }
+
   function removeSection(section) {
     const list = savedSectionsBySchool.value[section.school] || []
     savedSectionsBySchool.value = {
@@ -294,6 +304,7 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     resetForSchoolChange,
     isSaved,
     addSection,
+    applyCombo,
     removeSection,
     workShifts,
     setWorkShifts,

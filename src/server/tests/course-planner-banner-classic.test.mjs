@@ -297,3 +297,49 @@ describe('banner-classic Purdue variants', () => {
     assert.ok(!urls.some((u) => u.includes('p_disp_detail_sched')), 'no detail-page fetches expected')
   })
 })
+
+// ── trailingSlash variant (George Mason) ──────────────────────────────────────
+
+describe('banner-classic trailingSlash', () => {
+  it('appends a slash to every mod_plsql procedure URL (before any query)', async () => {
+    const urls = []
+    const detailHTML = `<html><body>
+      <table><tr><th><SPAN>Seats</SPAN></th><td>50</td><td>29</td><td>21</td></tr></table>
+    </body></html>`
+    const listing = buildListingHTML([{
+      title: 'Principles of Computing', crn: '79574', subj: 'CS', num: '100', sec: '001',
+      time: '9:00 am - 10:15 am', days: 'TR', room: 'MUSIC 1007', instructor: 'Abdelmoumin', credits: '3',
+    }])
+    const s = createBannerClassicScraper({
+      school: 'classic-slash', base: 'https://slash.edu', prefix: '/pls/prod', trailingSlash: true,
+    })
+    globalThis.fetch = async (url) => {
+      urls.push(url)
+      return mockRes(url.includes('p_disp_detail_sched') ? detailHTML : listing)
+    }
+    const [sec] = await s.getSections({ termCode: '202670', subjectCode: 'CS' })
+    // The section-search POST and the per-CRN detail GET must carry the slash.
+    assert.ok(
+      urls.some((u) => u.includes('bwckschd.p_get_crse_unsec/')),
+      'section search URL should end p_get_crse_unsec/'
+    )
+    assert.ok(
+      urls.some((u) => /p_disp_detail_sched\/\?/.test(u)),
+      'detail URL should be p_disp_detail_sched/?...'
+    )
+    // Seats still fill from the (slashed) detail page.
+    assert.equal(sec.enrollment.max, 50)
+    assert.equal(sec.enrollment.available, 21)
+    assert.equal(sec.status, 'open')
+  })
+
+  it('leaves URLs unslashed by default', async () => {
+    const urls = []
+    const s = createBannerClassicScraper({
+      school: 'classic-noslash', base: 'https://noslash.edu', prefix: '/prod', enrichSeats: false,
+    })
+    globalThis.fetch = async (url) => { urls.push(url); return mockRes('<html></html>') }
+    await s.getSections({ termCode: '202510', subjectCode: 'CS' })
+    assert.ok(urls.some((u) => u.endsWith('bwckschd.p_get_crse_unsec')), 'no trailing slash by default')
+  })
+})

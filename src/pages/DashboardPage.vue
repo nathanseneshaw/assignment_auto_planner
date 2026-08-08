@@ -7,7 +7,7 @@ import { useCoursesStore } from '../stores/courses'
 import { useProfileStore } from '../stores/profile'
 import { useAuthStore } from '../stores/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { resolveAssignmentCourseName } from '../utils/assignmentDisplay.js'
+import { resolveAssignmentCourseName, courseDotColor } from '../utils/assignmentDisplay.js'
 
 const router = useRouter()
 const assignmentsStore = useAssignmentsStore()
@@ -65,6 +65,54 @@ const overdueCount = computed(() => assignmentsStore.overdueAssignments.length)
 const nextDeadline = computed(() => assignmentsStore.upcomingAssignments[0] || null)
 const railDeadlines = computed(() => assignmentsStore.upcomingAssignments.slice(0, 4))
 
+// ── My courses (rail) ────────────────────────────────────────────────────
+// Enrolled courses with a live count of still-open (not completed, not
+// archived) assignments each. Busiest first so the course needing attention
+// sits at the top; taps through to that course's filtered assignments list.
+const myCourses = computed(() =>
+  coursesStore.coursesSorted
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      dot: courseDotColor(c.color),
+      openCount: assignmentsStore.assignments.filter(
+        (a) => a.courseId === c.id && a.status !== 'completed' && a.feedStatus !== 'archived'
+      ).length,
+    }))
+    .sort((a, b) => b.openCount - a.openCount || (a.name || '').localeCompare(b.name || ''))
+)
+
+// ── Week-ahead snapshot (rail) ───────────────────────────────────────────
+// This Mon–Sun week: how many tasks are scheduled, how many assignments are
+// due, and which days carry either — surfaced as a compact strip that taps
+// through to the planner.
+const DOW_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+
+const weekAhead = computed(() => {
+  const today = new Date(now.value)
+  today.setHours(0, 0, 0, 0)
+  const monday = new Date(today)
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7))
+  const todayKey = localDateKey(today)
+
+  const days = []
+  let taskCount = 0
+  let dueCount = 0
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    const key = localDateKey(d)
+    const tasksOn = tasksStore.tasks.filter(t => t.scheduledDate === key).length
+    const dueOn = assignmentsStore.assignments.filter(
+      a => a.dueDate === key && a.status !== 'completed' && a.feedStatus !== 'archived'
+    ).length
+    taskCount += tasksOn
+    dueCount += dueOn
+    days.push({ key, label: DOW_LABELS[i], active: tasksOn + dueOn > 0, isToday: key === todayKey })
+  }
+  return { days, taskCount, dueCount }
+})
+
 // The closing sentence of the hero subtitle adapts to today's workload.
 const slateLine = computed(() => {
   const n = agenda.value.length
@@ -88,8 +136,24 @@ function toggleTask(id) {
   tasksStore.toggleTaskComplete(id)
 }
 
-function courseName(assignment) {
-  return resolveAssignmentCourseName(assignment, coursesStore.getCourseById) || 'Calendar feed'
+function courseLabel(assignment) {
+  return resolveAssignmentCourseName(assignment, coursesStore.getCourseById) || ''
+}
+
+// Relative due label: near deadlines read as "Today / Tomorrow / N days" so the
+// urgency is legible at a glance; anything further out falls back to "Mon D".
+function daysUntil(dateString) {
+  const today = new Date(now.value)
+  today.setHours(0, 0, 0, 0)
+  return Math.round((parseDateLocal(dateString) - today) / 86_400_000)
+}
+
+function dueLabel(dateString) {
+  const diff = daysUntil(dateString)
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Tomorrow'
+  if (diff > 1 && diff <= 6) return `${diff} days`
+  return shortDate(dateString)
 }
 
 // ── Activity heatmap (last 14 weeks of completed assignments) ────────────
@@ -165,33 +229,42 @@ function cellClass(day) {
             {{ displayName }}<span class="text-primary-600">.</span>
           </h1>
           <p class="mt-4 max-w-2xl font-serif text-lg sm:text-xl leading-relaxed text-gray-600 dark:text-gray-300">
-            <template v-if="overdueCount">
-              <span class="italic text-rust-600 dark:text-rust-500">{{ overdueCount }} overdue assignment<template v-if="overdueCount !== 1">s</template></span><template v-if="agenda.length"> need attention. </template><template v-else> are waiting. </template>
-            </template>
-            <span>{{ slateLine }}</span>
+            {{ slateLine }}
           </p>
         </header>
 
-        <!-- Stat group -->
+        <!-- Stat group (each cell taps through to its detail view) -->
         <div class="grid grid-cols-3 rounded-2xl border border-paper-line dark:border-gray-700/60 overflow-hidden bg-surface/30 dark:bg-gray-800/20">
           <!-- Today's tasks -->
-          <div class="p-5 sm:p-6 border-r border-paper-line dark:border-gray-700/60">
+          <button
+            type="button"
+            @click="router.push('/tasks')"
+            class="text-left p-5 sm:p-6 border-r border-paper-line dark:border-gray-700/60 hover:bg-surface/70 dark:hover:bg-gray-800/40 transition-colors"
+          >
             <p class="display text-4xl sm:text-5xl text-gray-900 dark:text-gray-50 leading-none">
               {{ todayCompleted }}<span class="text-2xl sm:text-3xl text-gray-400 dark:text-gray-600">/{{ agenda.length }}</span>
             </p>
             <p class="mt-3.5 text-sm font-semibold text-gray-800 dark:text-gray-200">Today's Tasks</p>
             <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{{ todaysSub }}</p>
-          </div>
+          </button>
           <!-- Upcoming -->
-          <div class="p-5 sm:p-6 border-r border-paper-line dark:border-gray-700/60">
+          <button
+            type="button"
+            @click="router.push('/assignments')"
+            class="text-left p-5 sm:p-6 border-r border-paper-line dark:border-gray-700/60 hover:bg-surface/70 dark:hover:bg-gray-800/40 transition-colors"
+          >
             <p class="display text-4xl sm:text-5xl text-gray-900 dark:text-gray-50 leading-none">
               {{ assignmentsStore.upcomingAssignments.length }}
             </p>
             <p class="mt-3.5 text-sm font-semibold text-gray-800 dark:text-gray-200">Upcoming</p>
             <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{{ upcomingSub }}</p>
-          </div>
+          </button>
           <!-- Overdue -->
-          <div class="p-5 sm:p-6">
+          <button
+            type="button"
+            @click="router.push('/assignments')"
+            class="text-left p-5 sm:p-6 hover:bg-surface/70 dark:hover:bg-gray-800/40 transition-colors"
+          >
             <p
               class="display text-4xl sm:text-5xl leading-none"
               :class="overdueCount > 0 ? 'text-rust-600 dark:text-rust-500' : 'text-gray-900 dark:text-gray-50'"
@@ -200,7 +273,7 @@ function cellClass(day) {
             </p>
             <p class="mt-3.5 text-sm font-semibold text-gray-800 dark:text-gray-200">Overdue</p>
             <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{{ overdueSub }}</p>
-          </div>
+          </button>
         </div>
 
         <!-- Today's tasks -->
@@ -332,48 +405,43 @@ function cellClass(day) {
       <aside class="lg:border-l lg:border-paper-line dark:lg:border-gray-700/60 lg:pl-8 lg:sticky lg:top-16 self-start">
         <p class="eyebrow text-gray-400 dark:text-gray-500 mb-4">Plan</p>
 
-        <!-- Weekly planner -->
+        <!-- Week ahead → planner -->
         <button
           type="button"
           @click="router.push('/planner')"
-          class="group block w-full text-left rounded-2xl bg-gradient-to-br from-primary-800 to-primary-900 hover:from-primary-700 hover:to-primary-800 transition-colors p-4 shadow-sm shadow-primary-900/20"
+          class="group block w-full text-left rounded-2xl border border-paper-line dark:border-gray-700/60 bg-surface/40 dark:bg-gray-800/20 p-4 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-surface/70 dark:hover:bg-gray-800/40 transition-colors"
         >
-          <div class="flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <svg class="w-3.5 h-3.5 text-primary-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span class="text-[14px] font-semibold text-white tracking-tight">Weekly planner</span>
-              </div>
-              <p class="mt-1 text-[12.5px] text-primary-200/80">View + block the week ahead</p>
-            </div>
-            <svg class="w-4 h-4 text-primary-300 shrink-0 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <div class="flex items-center justify-between">
+            <span class="eyebrow text-gray-400 dark:text-gray-500">This week</span>
+            <svg
+              class="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-primary-600 dark:group-hover:text-primary-400 group-hover:translate-x-0.5 transition-all"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+            >
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </div>
-        </button>
-
-        <!-- Overdue alert -->
-        <div
-          v-if="overdueCount"
-          class="mt-4 rounded-2xl border border-dashed border-rust-500/35 bg-rust-50/70 dark:bg-rust-500/[0.06] p-4"
-        >
-          <div class="flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-rust-500" />
-            <span class="eyebrow text-rust-600">{{ overdueCount }} Overdue</span>
-          </div>
-          <p class="mt-2 font-serif text-[13.5px] leading-relaxed text-gray-600 dark:text-gray-300">
-            You have <span class="font-medium text-rust-600 dark:text-rust-500">{{ overdueCount }} assignment{{ overdueCount === 1 ? '' : 's' }}</span> past their due date.<template v-if="nextDeadline"> Let's clear them before {{ shortDate(nextDeadline.dueDate) }} hits.</template>
+          <p class="mt-2 text-[13.5px] text-gray-600 dark:text-gray-300">
+            <span class="font-semibold text-gray-900 dark:text-gray-100">{{ weekAhead.taskCount }}</span> task{{ weekAhead.taskCount === 1 ? '' : 's' }}
+            <span class="text-gray-300 dark:text-gray-600 mx-0.5">·</span>
+            <span class="font-semibold text-gray-900 dark:text-gray-100">{{ weekAhead.dueCount }}</span> due
           </p>
-          <button
-            type="button"
-            @click="router.push('/assignments')"
-            class="mt-2.5 inline-flex items-center text-[12.5px] font-medium text-rust-600 hover:text-rust-500 underline underline-offset-2 decoration-rust-500/40 transition-colors"
-          >
-            Review overdue →
-          </button>
-        </div>
+          <div class="mt-3.5 flex items-center justify-between">
+            <span v-for="day in weekAhead.days" :key="day.key" class="flex flex-col items-center gap-1.5">
+              <span
+                class="font-mono text-[10px] leading-none"
+                :class="day.isToday ? 'text-primary-600 dark:text-primary-400 font-semibold' : 'text-gray-400 dark:text-gray-500'"
+              >{{ day.label }}</span>
+              <span
+                class="w-1.5 h-1.5 rounded-full"
+                :class="day.active
+                  ? 'bg-primary-600'
+                  : day.isToday
+                    ? 'bg-primary-300 dark:bg-primary-700'
+                    : 'bg-paper-line dark:bg-gray-700'"
+              />
+            </span>
+          </div>
+        </button>
 
         <!-- Upcoming deadlines -->
         <div class="mt-7">
@@ -391,9 +459,12 @@ function cellClass(day) {
                 <p class="text-[13px] font-medium text-gray-900 dark:text-gray-100 leading-snug line-clamp-2 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors">
                   {{ a.title }}
                 </p>
-                <span class="shrink-0 mt-0.5 font-mono text-[11px] text-gray-400">{{ shortDate(a.dueDate) }}</span>
+                <span
+                  class="shrink-0 mt-0.5 font-mono text-[11px]"
+                  :class="daysUntil(a.dueDate) <= 2 ? 'text-rust-600 dark:text-rust-500' : 'text-gray-400'"
+                >{{ dueLabel(a.dueDate) }}</span>
               </div>
-              <p class="mt-1 font-mono text-[10.5px] text-gray-400 truncate">{{ courseName(a) }} · Calendar feed</p>
+              <p v-if="courseLabel(a)" class="mt-1 font-mono text-[10.5px] text-gray-400 truncate">{{ courseLabel(a) }}</p>
             </button>
           </div>
           <p v-else class="text-[13px] text-gray-400 dark:text-gray-500 py-3">Nothing on the horizon yet.</p>
@@ -404,6 +475,31 @@ function cellClass(day) {
             class="mt-3 eyebrow text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           >
             View all →
+          </button>
+        </div>
+
+        <!-- My courses -->
+        <div v-if="myCourses.length" class="mt-7">
+          <div class="flex items-baseline justify-between mb-0.5">
+            <p class="text-[13px] font-medium text-gray-500 dark:text-gray-400">My courses</p>
+            <span class="font-mono text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">{{ myCourses.length }}</span>
+          </div>
+
+          <button
+            v-for="c in myCourses.slice(0, 6)"
+            :key="c.id"
+            type="button"
+            @click="router.push({ path: '/assignments', query: { course: c.id } })"
+            class="group w-full flex items-center gap-2.5 py-2.5 border-b border-dotted border-paper-line dark:border-gray-700/60"
+          >
+            <span class="w-2 h-2 rounded-full shrink-0" :class="c.dot" />
+            <span class="flex-1 min-w-0 truncate text-left text-[13px] text-gray-800 dark:text-gray-200 group-hover:text-primary-700 dark:group-hover:text-primary-400 transition-colors">
+              {{ c.name }}
+            </span>
+            <span
+              class="shrink-0 font-mono text-[11px] tabular-nums"
+              :class="c.openCount ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'"
+            >{{ c.openCount ? `${c.openCount} left` : 'none' }}</span>
           </button>
         </div>
       </aside>

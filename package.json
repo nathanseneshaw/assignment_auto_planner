@@ -20,6 +20,7 @@
     "server:dev": "node --watch src/server/index.js",
     "server:test": "node --test ./src/server/tests/*.test.mjs",
     "test:client": "node --test ./src/services/__tests__/*.test.mjs",
+    "test:utils": "node --test ./src/utils/__tests__/*.test.mjs",
     "test:stores": "vitest run src/stores/__tests__",
     "render:build": "npm install",
     "electron:dev": "concurrently \"cross-env VITE_BUILD_TARGET=electron vite\" \"wait-on http://localhost:5173 && cross-env ELECTRON_DEV=true electron .\"",
@@ -28,10 +29,16 @@
     "electron:build": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && electron-builder --publish never",
     "preelectron:publish": "node electron/scripts/generate-icon.js",
     "electron:publish": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && dotenv -e .env.local -- electron-builder --publish always",
-    "electron:preview": "cross-env ELECTRON_DEV=false electron ."
+    "electron:publish:ci": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false VITE_BUILD_TARGET=electron VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && electron-builder --publish always",
+    "electron:preview": "cross-env ELECTRON_DEV=false electron .",
+    "ios:build": "cross-env VITE_BUILD_TARGET=capacitor VITE_API_BASE=https://assignment-auto-planner-server.onrender.com vite build && npx cap sync ios",
+    "ios:open": "npx cap open ios",
+    "ios:icons": "node scripts/gen-ios-icons.mjs && npx capacitor-assets generate --ios --iconBackgroundColor #0D4D3A --iconBackgroundColorDark #0B1410 --splashBackgroundColor #0D4D3A --splashBackgroundColorDark #0B1410"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@fontsource-variable/geist": "^5.2.9",
     "@fontsource-variable/geist-mono": "^5.2.8",
     "@fontsource-variable/newsreader": "^5.2.10",
@@ -56,6 +63,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.0",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/postcss": "^4.2.4",
     "@vitejs/plugin-vue": "^5.1.4",
@@ -101,7 +110,13 @@
       "target": "nsis"
     },
     "mac": {
-      "target": "dmg"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "universal"
+        }
+      ],
+      "icon": "electron/icon.png"
     },
     "linux": {
       "target": "AppImage"

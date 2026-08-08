@@ -6,25 +6,19 @@ const { contextBridge, ipcRenderer } = require('electron')
 // bridge for backend calls — only the desktop auto-updater below.
 contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
-  // Custom title bar: drive the frameless window's min/max/close from our own
-  // buttons (see TitleBar.vue), and let the renderer track maximize state so the
-  // maximize/restore icon stays correct.
+  // Min/max/close are native OS buttons (titleBarOverlay); the renderer only
+  // re-tints them when the app theme flips between light and dark (App.vue).
   window: {
-    minimize: () => ipcRenderer.invoke('window:minimize'),
-    toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
-    close: () => ipcRenderer.invoke('window:close'),
-    isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
-    onMaximizeChange: (callback) => {
-      const listener = (_event, isMaximized) => callback(isMaximized)
-      ipcRenderer.on('window:maximized-changed', listener)
-      return () => ipcRenderer.removeListener('window:maximized-changed', listener)
-    },
+    setTitleBarOverlay: (opts) => ipcRenderer.invoke('window:setTitleBarOverlay', opts),
   },
   // Auto-update controls, backed by electron-updater in the main process
   // (see electron/updater.js). All methods are no-ops returning {status:'dev'}
   // when the app isn't packaged.
   updates: {
     check: () => ipcRenderer.invoke('updates:check'),
+    // Awaitable manual check used by the profile-page "Software update" section.
+    checkNow: () => ipcRenderer.invoke('updates:checkNow'),
+    getVersion: () => ipcRenderer.invoke('updates:getVersion'),
     download: () => ipcRenderer.invoke('updates:download'),
     install: () => ipcRenderer.invoke('updates:install'),
     getState: () => ipcRenderer.invoke('updates:getState'),

@@ -1,0 +1,65 @@
+name: Release (Windows + Mac)
+
+# Manual only: bump the version in package.json, commit/push it, then trigger
+# this from the Actions tab. Each platform builds independently (electron-
+# builder can't cross-compile a mac target from Windows or vice versa) and
+# both upload to the SAME draft GitHub release, matched by the version in
+# package.json. Once both succeed, the last job flips that release live -
+# same effect as the old local `gh release edit --draft=false --latest` step.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run electron:publish:ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Unsigned build (no Apple Developer account configured) - Gatekeeper
+      # will require a right-click > Open on first launch, and electron-updater
+      # auto-updates on this platform aren't expected to work reliably without
+      # code signing + notarization.
+      - run: npm run electron:publish:ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: version
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the draft release
+        run: gh release edit "${{ steps.version.outputs.tag }}" --draft=false --latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

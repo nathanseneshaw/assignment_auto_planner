@@ -7,6 +7,7 @@ import {
   parseCredits,
   parseCsv,
   csvToObjects,
+  dedupeMeetings,
 } from '../course-planner/util.js'
 
 // ── normalizeTime ─────────────────────────────────────────────────────────────
@@ -92,6 +93,70 @@ describe('parseCredits', () => {
   it('returns null for whitespace-only', () => assert.equal(parseCredits('  '), null))
   it('returns null for non-numeric "TBA"', () => assert.equal(parseCredits('TBA'), null))
   it('returns null for "N/A"', () => assert.equal(parseCredits('N/A'), null))
+})
+
+// ── dedupeMeetings ────────────────────────────────────────────────────────────
+
+describe('dedupeMeetings', () => {
+  it('collapses identical rows to one (UTD biweekly-lab shape)', () => {
+    const meetings = Array.from({ length: 5 }, () => ({
+      days: ['F'],
+      startTime: '13:00',
+      endTime: '15:45',
+      location: 'ECSN 3.114',
+    }))
+    assert.deepEqual(dedupeMeetings(meetings), [
+      { days: ['F'], startTime: '13:00', endTime: '15:45', location: 'ECSN 3.114' },
+    ])
+  })
+  it('keeps meetings that differ by day', () => {
+    const meetings = [
+      { days: ['M'], startTime: '09:00', endTime: '09:50', location: 'A' },
+      { days: ['W'], startTime: '09:00', endTime: '09:50', location: 'A' },
+    ]
+    assert.equal(dedupeMeetings(meetings).length, 2)
+  })
+  it('keeps meetings that differ by time', () => {
+    const meetings = [
+      { days: ['M'], startTime: '09:00', endTime: '09:50', location: 'A' },
+      { days: ['M'], startTime: '10:00', endTime: '10:50', location: 'A' },
+    ]
+    assert.equal(dedupeMeetings(meetings).length, 2)
+  })
+  it('keeps meetings that differ only by location (same time)', () => {
+    const meetings = [
+      { days: ['M'], startTime: '09:00', endTime: '09:50', location: 'A 1.1' },
+      { days: ['M'], startTime: '09:00', endTime: '09:50', location: 'B 2.2' },
+    ]
+    assert.equal(dedupeMeetings(meetings).length, 2)
+  })
+  it('treats day order as equivalent (["M","W"] === ["W","M"])', () => {
+    const meetings = [
+      { days: ['M', 'W'], startTime: '09:00', endTime: '09:50', location: 'A' },
+      { days: ['W', 'M'], startTime: '09:00', endTime: '09:50', location: 'A' },
+    ]
+    assert.equal(dedupeMeetings(meetings).length, 1)
+  })
+  it('preserves the first occurrence unchanged (does not mutate day order)', () => {
+    const first = { days: ['W', 'M'], startTime: '09:00', endTime: '09:50', location: 'A' }
+    const out = dedupeMeetings([first, { ...first, days: ['M', 'W'] }])
+    assert.deepEqual(out, [first])
+  })
+  it('collapses multiple distinct TBA rows to one', () => {
+    const meetings = [
+      { days: [], startTime: null, endTime: null, location: '' },
+      { days: [], startTime: null, endTime: null, location: '' },
+    ]
+    assert.equal(dedupeMeetings(meetings).length, 1)
+  })
+  it('skips null entries', () => {
+    const meetings = [null, { days: ['M'], startTime: '09:00', endTime: '09:50', location: 'A' }]
+    assert.equal(dedupeMeetings(meetings).length, 1)
+  })
+  it('returns [] for non-array input', () => {
+    assert.deepEqual(dedupeMeetings(null), [])
+    assert.deepEqual(dedupeMeetings(undefined), [])
+  })
 })
 
 // ── parseCsv ──────────────────────────────────────────────────────────────────

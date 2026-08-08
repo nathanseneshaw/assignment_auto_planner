@@ -33,8 +33,9 @@ function apply(payload) {
       if (typeof payload.percent === 'number') percent.value = payload.percent
       break
     case 'downloaded':
-      // Don't auto-install here  the main process shows a native "Restart now?"
-      // dialog, and the button below offers the same. Avoids a double restart.
+      // Don't auto-install here. There's intentionally no native dialog (see
+      // electron/updater.js); the "Restart to update" button below is the only
+      // prompt. If the user ignores it, autoInstallOnAppQuit finishes on quit.
       status.value = 'downloaded'
       break
     case 'error':

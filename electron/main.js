@@ -115,6 +115,57 @@ function isAllowedNavigation(targetUrl) {
   }
 }
 
+// Right-click menu for editable fields. Chromium's native spellchecker runs
+// automatically on <input>/<textarea>/contenteditable (red squiggles), but the
+// actionable part — swapping in a suggestion — is surfaced through the
+// `context-menu` event's params, and Electron draws no default menu once
+// `Menu.setApplicationMenu(null)` has removed the app menu. So we build one:
+// spelling suggestions + "Add to dictionary" for misspellings, plus the
+// standard clipboard actions for any editable field or text selection.
+function installContextMenu(win) {
+  win.webContents.on('context-menu', (event, params) => {
+    const { misspelledWord, dictionarySuggestions, isEditable, editFlags, selectionText } = params
+    const template = []
+
+    if (misspelledWord) {
+      if (dictionarySuggestions.length > 0) {
+        for (const suggestion of dictionarySuggestions) {
+          template.push({
+            label: suggestion,
+            click: () => win.webContents.replaceMisspelling(suggestion),
+          })
+        }
+      } else {
+        template.push({ label: 'No suggestions', enabled: false })
+      }
+      template.push(
+        { type: 'separator' },
+        {
+          label: 'Add to dictionary',
+          click: () => session.defaultSession.addWordToSpellCheckerDictionary(misspelledWord),
+        },
+        { type: 'separator' },
+      )
+    }
+
+    // Clipboard actions when there's something to act on (an editable field, or
+    // a plain-text selection the user might want to copy).
+    if (isEditable || selectionText) {
+      template.push(
+        { role: 'cut', enabled: editFlags.canCut },
+        { role: 'copy', enabled: editFlags.canCopy },
+        { role: 'paste', enabled: editFlags.canPaste },
+      )
+      if (isEditable) {
+        template.push({ role: 'selectAll', enabled: editFlags.canSelectAll })
+      }
+    }
+
+    if (template.length === 0) return
+    Menu.buildFromTemplate(template).popup({ window: win })
+  })
+}
+
 function installNavigationGuards(win) {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (event, targetUrl) => {
@@ -138,12 +189,19 @@ function createWindow() {
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    // Custom title bar: hide the native caption bar (and its buttons) while
-    // keeping the standard window frame behaviors — resize, Aero Snap, drop
-    // shadow, Win11 rounded corners. We draw our own min/max/close buttons in
-    // the renderer (see TitleBar.vue), wired through the window:* IPC below.
+    // Native-look title bar: hide the caption bar but let the OS draw the real
+    // Windows min/max/close buttons as an overlay in the top-right (same setup
+    // as the Claude desktop app). The renderer paints the bar itself as a plain
+    // drag region (see TitleBar.vue) and re-tints the overlay on theme change
+    // via the window:setTitleBarOverlay IPC below. Keeps all standard frame
+    // behaviors — resize, Aero Snap, drop shadow, Win11 rounded corners.
     // `backgroundColor` matches light paper to avoid a white flash on load.
     titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#e9e6dd', // --color-paper; renderer re-tints for dark mode
+      symbolColor: '#1c1917', // --color-gray-900
+      height: 48, // keep in sync with --titlebar-h in src/style.css
+    },
     backgroundColor: '#f4f1e8',
     // Runtime taskbar/window icon. `build.icon` in package.json only sets the
     // packaged-app icon resource; during `electron:dev` the BrowserWindow
@@ -157,18 +215,15 @@ function createWindow() {
       webSecurity: true,
       allowRunningInsecureContent: false,
       webviewTag: false,
+      // Chromium's native spellchecker (red squiggles on misspelled words in
+      // editable fields). On by default, but set explicitly so the intent is
+      // clear; the actionable suggestions come from installContextMenu below.
+      spellcheck: true,
     },
   })
 
   installNavigationGuards(win)
-
-  // Keep the renderer's maximize/restore button icon in sync when the window is
-  // maximized by any means (our button, double-click on the bar, Aero Snap).
-  const sendMaxState = () => {
-    if (!win.isDestroyed()) win.webContents.send('window:maximized-changed', win.isMaximized())
-  }
-  win.on('maximize', sendMaxState)
-  win.on('unmaximize', sendMaxState)
+  installContextMenu(win)
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
@@ -177,28 +232,39 @@ function createWindow() {
   }
 }
 
-// Custom title-bar window controls, driven by the renderer's TitleBar.vue.
-// Each resolves the calling window from its WebContents so it stays correct
-// even if a second window is ever opened.
-ipcMain.handle('window:minimize', (event) => {
-  BrowserWindow.fromWebContents(event.sender)?.minimize()
-})
-ipcMain.handle('window:toggleMaximize', (event) => {
+// Re-tint the native window-controls overlay when the renderer's theme
+// changes (light/dark). Colors are validated to plain hex so a compromised
+// renderer can't feed setTitleBarOverlay something that throws.
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
+ipcMain.handle('window:setTitleBarOverlay', (event, opts) => {
   const win = BrowserWindow.fromWebContents(event.sender)
-  if (!win) return false
-  if (win.isMaximized()) win.unmaximize()
-  else win.maximize()
-  return win.isMaximized()
-})
-ipcMain.handle('window:close', (event) => {
-  BrowserWindow.fromWebContents(event.sender)?.close()
-})
-ipcMain.handle('window:isMaximized', (event) => {
-  return Boolean(BrowserWindow.fromWebContents(event.sender)?.isMaximized())
+  // setTitleBarOverlay only exists where the overlay does (Windows/Linux).
+  if (!win || typeof win.setTitleBarOverlay !== 'function') return
+  const color = typeof opts?.color === 'string' && HEX_COLOR.test(opts.color) ? opts.color : null
+  const symbolColor =
+    typeof opts?.symbolColor === 'string' && HEX_COLOR.test(opts.symbolColor) ? opts.symbolColor : null
+  if (!color || !symbolColor) return
+  try {
+    win.setTitleBarOverlay({ color, symbolColor })
+  } catch (err) {
+    logger.warn('setTitleBarOverlay failed:', err)
+  }
 })
 
 app.whenReady().then(() => {
   installResponseHooks()
+
+  // Spellchecker dictionary. On Windows/Linux this drives Hunspell (dictionary
+  // is fetched once from Google's CDN by the network process, so the renderer
+  // CSP doesn't apply); on macOS the OS spellchecker is used and this is a
+  // no-op. Guarded because setSpellCheckerLanguages doesn't exist on macOS.
+  if (typeof session.defaultSession.setSpellCheckerLanguages === 'function') {
+    try {
+      session.defaultSession.setSpellCheckerLanguages(['en-US'])
+    } catch (err) {
+      logger.warn('setSpellCheckerLanguages failed:', err)
+    }
+  }
 
   Menu.setApplicationMenu(null)
 

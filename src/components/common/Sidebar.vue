@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { COURSE_PLANNER } from '../../config/featureFlags.js'
 import { useTasksStore } from '../../stores/tasks'
 import { useAssignmentsStore } from '../../stores/assignments'
-import { useCoursesStore } from '../../stores/courses'
 import { useProfileStore } from '../../stores/profile'
 import { useAuthStore } from '../../stores/auth'
 import { isSupabaseConfigured } from '../../lib/supabase'
@@ -22,7 +21,6 @@ const route = useRoute()
 const router = useRouter()
 const tasksStore = useTasksStore()
 const assignmentsStore = useAssignmentsStore()
-const coursesStore = useCoursesStore()
 const profileStore = useProfileStore()
 const authStore = useAuthStore()
 
@@ -79,7 +77,7 @@ const sections = computed(() => [
       { name: 'Assignments', path: '/assignments', count: dueSoonCount.value },
       { name: 'Planner', path: '/planner', count: weekTaskCount.value },
       ...(COURSE_PLANNER
-        ? [{ name: 'Courses', path: '/course-planner', count: coursesStore.courses.length }]
+        ? [{ name: 'Courses', path: '/course-planner' }]
         : []),
     ],
   },
@@ -134,11 +132,12 @@ const isActive = (path) => {
 
   <!-- Sidebar -->
   <aside
-    class="app-sidebar fixed top-0 left-0 z-50 h-screen w-64 bg-paper dark:bg-gray-900/95 backdrop-blur-xl border-r border-paper-line dark:border-gray-700/80 flex flex-col transition-transform duration-300 ease-in-out"
+    class="app-sidebar fixed top-0 left-0 z-50 h-screen w-64 bg-paper dark:bg-gray-900/95 backdrop-blur-xl flex flex-col transition-transform duration-300 ease-in-out after:content-[''] after:pointer-events-none after:absolute after:right-0 after:top-16 after:bottom-0 after:w-px after:bg-paper-line dark:after:bg-gray-700/80"
     :class="mobileOpen ? 'w-72 translate-x-0' : '-translate-x-full lg:translate-x-0'"
   >
-    <!-- Logo -->
-    <div class="flex items-center justify-between h-16 px-5 flex-shrink-0">
+    <!-- Logo. In Electron the sidebar reaches the top of the window, so this row
+         doubles as part of the title bar (drag region + caption-bar height). -->
+    <div class="app-sidebar-header flex items-center justify-between h-16 px-5 flex-shrink-0">
       <div class="flex items-center gap-2.5">
         <img src="/plannr-icon-light.svg" alt="" class="w-7 h-7 block dark:hidden" />
         <img src="/plannr-icon-dark.svg" alt="" class="w-7 h-7 hidden dark:block" />

@@ -71,6 +71,34 @@ export function initAutoUpdater() {
     return { status: 'installing' }
   })
 
+  // The installed app's current version, for the profile-page "Software update"
+  // section to display.
+  ipcMain.handle('updates:getVersion', () => app.getVersion())
+
+  // Manual "Check for updates" (profile page). Unlike updates:check, this AWAITS
+  // the GitHub release lookup and resolves to a definitive result the button can
+  // act on: available / not-available / error (or dev when unpacked). The
+  // update-available/error events still fire, so the top-bar button and any
+  // download-progress UI stay in sync.
+  ipcMain.handle('updates:checkNow', async () => {
+    const currentVersion = app.getVersion()
+    if (!app.isPackaged) return { status: 'dev', currentVersion }
+    try {
+      const result = await autoUpdater.checkForUpdates()
+      const version = result?.updateInfo?.version
+      // Prefer electron-updater's own verdict; fall back to a version diff if an
+      // older build doesn't surface isUpdateAvailable.
+      const available =
+        typeof result?.isUpdateAvailable === 'boolean'
+          ? result.isUpdateAvailable
+          : Boolean(version && version !== currentVersion)
+      return { status: available ? 'available' : 'not-available', version, currentVersion }
+    } catch (e) {
+      logger.error('autoUpdater: manual check failed', e)
+      return { status: 'error', message: String(e?.message || e), currentVersion }
+    }
+  })
+
   // No installer to swap out when running from source / unpacked, so don't start
   // the checker. The IPC handlers above still answer (button just stays hidden).
   if (!app.isPackaged) {
