@@ -13,8 +13,10 @@ const loginToApp = { name: 'Login', query: { redirect: '/dashboard' } }
 const registerToApp = { name: 'Register', query: { redirect: '/dashboard' } }
 
 // Always serves the installer from the newest published GitHub Release.
-// Filename is version-less (see build.artifactName) so this link never changes.
+// Filenames are version-less (see build.artifactName) so these links never change.
 const installerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/releases/latest/download/Plannr-x64.exe'
+// Universal .dmg (build.mac arch: ['universal']) runs on both Apple Silicon and Intel.
+const macInstallerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/releases/latest/download/Plannr-universal.dmg'
 
 // ── Static hero product preview (a faithful, non-interactive snapshot of the
 //    Tasks page). Decorative only — marked aria-hidden in the template. ──
@@ -581,7 +583,7 @@ function scrollToHowItWorks() {
           <span class="hidden sm:inline text-gray-300">·</span>
           <span>Course catalogs from 55+ universities</span>
           <span class="hidden sm:inline text-gray-300">·</span>
-          <span>Web + Windows desktop app</span>
+          <span>Web + Windows &amp; Mac desktop app</span>
         </div>
       </section>
 
@@ -680,7 +682,7 @@ function scrollToHowItWorks() {
             </p>
           </div>
 
-          <div v-reveal="120" class="mt-10 max-w-md mx-auto">
+          <div v-reveal="120" class="mt-10 grid gap-4 sm:grid-cols-2 max-w-2xl mx-auto">
             <a
               :href="installerUrl"
               download
@@ -709,10 +711,39 @@ function scrollToHowItWorks() {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </a>
+
+            <a
+              :href="macInstallerUrl"
+              download
+              class="flex items-center gap-4 rounded-2xl border border-paper-line bg-surface p-5 shadow-sm shadow-gray-900/[0.03] hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+            >
+              <svg
+                class="w-10 h-10 shrink-0 text-primary-700"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z" />
+              </svg>
+              <div class="flex-1 text-left">
+                <p class="text-base font-semibold text-gray-900">Download for Mac</p>
+                <p class="mt-0.5 text-sm text-gray-500">.dmg installer · Apple Silicon &amp; Intel</p>
+              </div>
+              <svg
+                class="w-5 h-5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </a>
           </div>
 
           <p class="mt-6 text-center text-sm text-gray-500">
-            Mac and Linux builds aren’t available yet. In the meantime, use the
+            Available for Windows and Mac. Prefer to stay in the browser? Use the
             <RouterLink :to="loginToApp" class="text-primary-700 hover:underline">web app</RouterLink>.
           </p>
         </div>
