@@ -1,0 +1,8 @@
+{
+  "appId": "com.plannr.app",
+  "appName": "Plannr",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "automatic"
+  }
+}
