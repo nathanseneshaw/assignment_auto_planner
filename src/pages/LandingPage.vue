@@ -15,8 +15,9 @@ const registerToApp = { name: 'Register', query: { redirect: '/dashboard' } }
 // Always serves the installer from the newest published GitHub Release.
 // Filenames are version-less (see build.artifactName) so these links never change.
 const installerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/releases/latest/download/Plannr-x64.exe'
-// Universal .dmg (build.mac arch: ['universal']) runs on both Apple Silicon and Intel.
-const macInstallerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/releases/latest/download/Plannr-universal.dmg'
+// Mac download is temporarily disabled (see the "Coming soon" card below). When
+// re-enabling, restore the href on that card and uncomment this:
+// const macInstallerUrl = 'https://github.com/nathanseneshaw/assignment_auto_planner/releases/latest/download/Plannr-universal.dmg'
 
 // ── Static hero product preview (a faithful, non-interactive snapshot of the
 //    Tasks page). Decorative only — marked aria-hidden in the template. ──
@@ -712,13 +713,14 @@ function scrollToHowItWorks() {
               </svg>
             </a>
 
-            <a
-              :href="macInstallerUrl"
-              download
-              class="flex items-center gap-4 rounded-2xl border border-paper-line bg-surface p-5 shadow-sm shadow-gray-900/[0.03] hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+            <!-- Mac build is temporarily disabled: rendered as a non-interactive
+                 "coming soon" card (no href) so it can't be downloaded yet. -->
+            <div
+              aria-disabled="true"
+              class="flex items-center gap-4 rounded-2xl border border-paper-line bg-surface p-5 shadow-sm shadow-gray-900/[0.03] opacity-60 cursor-not-allowed select-none"
             >
               <svg
-                class="w-10 h-10 shrink-0 text-primary-700"
+                class="w-10 h-10 shrink-0 text-gray-400"
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 aria-hidden="true"
@@ -729,21 +731,16 @@ function scrollToHowItWorks() {
                 <p class="text-base font-semibold text-gray-900">Download for Mac</p>
                 <p class="mt-0.5 text-sm text-gray-500">.dmg installer · Apple Silicon &amp; Intel</p>
               </div>
-              <svg
-                class="w-5 h-5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
+              <span
+                class="shrink-0 rounded-full border border-paper-line px-2.5 py-1 text-[11px] font-medium text-gray-400"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </a>
+                Coming soon
+              </span>
+            </div>
           </div>
 
           <p class="mt-6 text-center text-sm text-gray-500">
-            Available for Windows and Mac. Prefer to stay in the browser? Use the
+            Available for Windows, with Mac coming soon. Prefer to stay in the browser? Use the
             <RouterLink :to="loginToApp" class="text-primary-700 hover:underline">web app</RouterLink>.
           </p>
         </div>
