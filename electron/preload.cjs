@@ -6,6 +6,10 @@ const { contextBridge, ipcRenderer } = require('electron')
 // bridge for backend calls — only the desktop auto-updater below.
 contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
+  // 'darwin' | 'win32' | 'linux'. The renderer lays the title bar out
+  // differently per OS: window controls are top-right on Windows but the
+  // traffic lights are top-LEFT on macOS (see .is-mac rules in src/style.css).
+  platform: process.platform,
   // Min/max/close are native OS buttons (titleBarOverlay); the renderer only
   // re-tints them when the app theme flips between light and dark (App.vue).
   window: {

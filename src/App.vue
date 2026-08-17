@@ -11,7 +11,7 @@ import { useSubtasksStore } from './stores/subtasks'
 import { useAuthStore } from './stores/auth'
 import { useProfileStore } from './stores/profile'
 import { isSupabaseConfigured } from './lib/supabase'
-import { isElectron } from './lib/platform'
+import { isElectron, isMacElectron } from './lib/platform'
 import { hydrateLmsStoresFromSupabase } from './services/lmsSupabaseHydration'
 import { useSupabaseStoreSync } from './composables/useSupabaseStoreSync'
 import { useSupabaseRealtimeSync } from './composables/useSupabaseRealtimeSync'
@@ -23,6 +23,9 @@ const route = useRoute()
 // (the web build never gets this class, so the browser app is untouched).
 if (isElectron && typeof document !== 'undefined') {
   document.documentElement.classList.add('is-electron')
+  // macOS draws the traffic lights top-LEFT, where the sidebar logo sits in
+  // the Windows layout - .is-mac shifts the logo row down below them.
+  if (isMacElectron) document.documentElement.classList.add('is-mac')
 }
 
 const coursesStore = useCoursesStore()

@@ -29,6 +29,12 @@ export const isElectron =
   IS_ELECTRON_BUILD ||
   (typeof window !== 'undefined' && Boolean(window.electronAPI?.isElectron))
 
+// Electron on macOS. The window-control buttons live on opposite sides per OS
+// (traffic lights top-left on mac, min/max/close top-right on Windows), so the
+// title-bar layout branches on this (App.vue adds .is-mac to <html>).
+export const isMacElectron =
+  isElectron && typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin'
+
 export const isCapacitor = IS_CAPACITOR_BUILD || Capacitor.isNativePlatform()
 
 export const isIOS = isCapacitor && Capacitor.getPlatform() === 'ios'

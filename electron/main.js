@@ -197,6 +197,10 @@ function createWindow() {
     // behaviors — resize, Aero Snap, drop shadow, Win11 rounded corners.
     // `backgroundColor` matches light paper to avoid a white flash on load.
     titleBarStyle: 'hidden',
+    // On macOS color/symbolColor are ignored (the OS draws native traffic
+    // lights top-left instead); `height` still applies and vertically centers
+    // the traffic lights in the strip. The renderer shifts the sidebar logo
+    // below them via the .is-mac rules in src/style.css.
     titleBarOverlay: {
       color: '#e9e6dd', // --color-paper; renderer re-tints for dark mode
       symbolColor: '#1c1917', // --color-gray-900
