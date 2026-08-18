@@ -32,8 +32,25 @@ export const isElectron =
 // Electron on macOS. The window-control buttons live on opposite sides per OS
 // (traffic lights top-left on mac, min/max/close top-right on Windows), so the
 // title-bar layout branches on this (App.vue adds .is-mac to <html>).
-export const isMacElectron =
-  isElectron && typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin'
+//
+// This value is frozen the moment this module is first imported, so the mac
+// check has to be correct at that instant. `window.electronAPI.platform` is the
+// authoritative source, but with sandbox:true that preload handle occasionally
+// isn't populated yet when platform.js evaluates — and because `isElectron` can
+// be true purely from IS_ELECTRON_BUILD, the const would then freeze to `false`
+// on macOS for the whole session (the traffic lights end up overlapping the
+// logo). Fall back to the user agent, which is always readable synchronously on
+// the renderer's window, so mac is detected regardless of preload timing.
+function detectMacElectron() {
+  if (!isElectron || typeof window !== 'object') return false
+  const platform = window.electronAPI?.platform
+  if (platform) return platform === 'darwin'
+  const nav = window.navigator || {}
+  const uaPlatform = nav.userAgentData?.platform || nav.platform || ''
+  return /mac/i.test(uaPlatform) || /Mac OS X|Macintosh/i.test(nav.userAgent || '')
+}
+
+export const isMacElectron = detectMacElectron()
 
 export const isCapacitor = IS_CAPACITOR_BUILD || Capacitor.isNativePlatform()
 
