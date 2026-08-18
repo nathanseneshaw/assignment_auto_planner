@@ -180,6 +180,17 @@ html.is-electron .app-sidebar-header {
   app-region: drag;
 }
 
+/* macOS: the OS draws the traffic lights in the top-LEFT of the caption area,
+   exactly where the logo row sits in the Windows layout above. Instead of
+   overlapping them, keep the caption strip as an empty drag region for the
+   traffic lights and start the logo row just below it (padding-top keeps the
+   whole header one continuous drag surface). */
+html.is-electron.is-mac .app-sidebar-header {
+  padding-top: var(--titlebar-h);
+  height: calc(var(--titlebar-h) + 3.5rem);
+  margin-bottom: 0;
+}
+
 html.is-electron .app-content {
   padding-top: var(--titlebar-h);
 }

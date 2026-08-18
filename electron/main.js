@@ -197,11 +197,20 @@ function createWindow() {
     // behaviors — resize, Aero Snap, drop shadow, Win11 rounded corners.
     // `backgroundColor` matches light paper to avoid a white flash on load.
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#e9e6dd', // --color-paper; renderer re-tints for dark mode
-      symbolColor: '#1c1917', // --color-gray-900
-      height: 48, // keep in sync with --titlebar-h in src/style.css
-    },
+    // macOS: pin the native traffic lights so they sit vertically centered in
+    // the 48px caption strip and align with the sidebar's 20px content inset;
+    // the renderer moves the logo row below them (.is-mac rules in
+    // src/style.css). Windows/Linux: the OS draws min/max/close as an overlay
+    // in the top-right instead.
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 20, y: 18 } }
+      : {
+          titleBarOverlay: {
+            color: '#e9e6dd', // --color-paper; renderer re-tints for dark mode
+            symbolColor: '#1c1917', // --color-gray-900
+            height: 48, // keep in sync with --titlebar-h in src/style.css
+          },
+        }),
     backgroundColor: '#f4f1e8',
     // Runtime taskbar/window icon. `build.icon` in package.json only sets the
     // packaged-app icon resource; during `electron:dev` the BrowserWindow
@@ -237,6 +246,8 @@ function createWindow() {
 // renderer can't feed setTitleBarOverlay something that throws.
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
 ipcMain.handle('window:setTitleBarOverlay', (event, opts) => {
+  // No overlay on macOS - the traffic lights are native and need no re-tint.
+  if (process.platform === 'darwin') return
   const win = BrowserWindow.fromWebContents(event.sender)
   // setTitleBarOverlay only exists where the overlay does (Windows/Linux).
   if (!win || typeof win.setTitleBarOverlay !== 'function') return
