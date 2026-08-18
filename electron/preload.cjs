@@ -1,5 +1,24 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
+// The title-bar layout differs per OS: macOS draws the traffic lights in the
+// top-LEFT (where the sidebar logo sits in the Windows layout), Windows draws
+// min/max/close as an overlay in the top-right. Tag <html> here - the preload
+// is guaranteed to run before any renderer script and `process.platform` is
+// authoritative - so the .is-mac/.is-electron CSS in src/style.css never
+// depends on bundle-eval timing. App.vue re-adds the same classes, which is a
+// harmless no-op backstop.
+function tagPlatformClasses() {
+  const root = document.documentElement
+  if (!root) return
+  root.classList.add('is-electron')
+  if (process.platform === 'darwin') root.classList.add('is-mac')
+}
+if (document.documentElement) {
+  tagPlatformClasses()
+} else {
+  window.addEventListener('DOMContentLoaded', tagPlatformClasses)
+}
+
 // `window.electronAPI` is the renderer's only handle to anything privileged.
 // `isElectron` is a capability-detection sentinel; the backend API itself lives
 // on Render (see VITE_API_BASE in the electron:build script), so there's no IPC
