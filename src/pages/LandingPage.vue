@@ -237,8 +237,11 @@ function toggleFaq(i) {
   openFaq.value = openFaq.value === i ? -1 : i
 }
 
-function scrollToHowItWorks() {
-  document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
+// Smooth-scroll to an in-page section WITHOUT writing a `#id` fragment to the
+// address bar. Anchors keep their href (for a11y / middle-click) but left-click
+// is intercepted here so the URL stays clean (e.g. plannr.sh, not plannr.sh/#download).
+function scrollToSection(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 }
 </script>
 
@@ -255,11 +258,11 @@ function scrollToHowItWorks() {
         </RouterLink>
 
         <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
-          <a href="#how-it-works" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">How it works</a>
-          <a href="#tour" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Tour</a>
-          <a href="#features" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Features</a>
-          <a href="#download" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Download</a>
-          <a href="#faq" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">FAQ</a>
+          <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">How it works</a>
+          <a href="#tour" @click.prevent="scrollToSection('tour')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Tour</a>
+          <a href="#features" @click.prevent="scrollToSection('features')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Features</a>
+          <a href="#download" @click.prevent="scrollToSection('download')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Download</a>
+          <a href="#faq" @click.prevent="scrollToSection('faq')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">FAQ</a>
         </nav>
 
         <nav class="flex items-center flex-wrap justify-end gap-2">
@@ -328,7 +331,7 @@ function scrollToHowItWorks() {
                 size="lg"
                 type="button"
                 class="w-full sm:w-auto min-w-[9rem]"
-                @click="scrollToHowItWorks"
+                @click="scrollToSection('how-it-works')"
               >
                 See how it works
               </Button>
@@ -855,11 +858,11 @@ function scrollToHowItWorks() {
         >
           <p>© {{ new Date().getFullYear() }} Plannr</p>
           <nav class="flex items-center gap-5">
-            <a href="#how-it-works" class="hover:text-gray-900 transition-colors">How it works</a>
-            <a href="#tour" class="hover:text-gray-900 transition-colors">Tour</a>
-            <a href="#features" class="hover:text-gray-900 transition-colors">Features</a>
-            <a href="#download" class="hover:text-gray-900 transition-colors">Download</a>
-            <a href="#faq" class="hover:text-gray-900 transition-colors">FAQ</a>
+            <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')" class="hover:text-gray-900 transition-colors">How it works</a>
+            <a href="#tour" @click.prevent="scrollToSection('tour')" class="hover:text-gray-900 transition-colors">Tour</a>
+            <a href="#features" @click.prevent="scrollToSection('features')" class="hover:text-gray-900 transition-colors">Features</a>
+            <a href="#download" @click.prevent="scrollToSection('download')" class="hover:text-gray-900 transition-colors">Download</a>
+            <a href="#faq" @click.prevent="scrollToSection('faq')" class="hover:text-gray-900 transition-colors">FAQ</a>
           </nav>
         </div>
       </footer>
