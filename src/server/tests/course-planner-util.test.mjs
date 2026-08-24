@@ -8,6 +8,7 @@ import {
   parseCsv,
   csvToObjects,
   dedupeMeetings,
+  stripLeadingCode,
 } from '../course-planner/util.js'
 
 // ── normalizeTime ─────────────────────────────────────────────────────────────
@@ -221,5 +222,30 @@ describe('csvToObjects', () => {
   it('handles numeric-string values unchanged', () => {
     const rows = [['SCORE'], ['42']]
     assert.deepEqual(csvToObjects(rows), [{ SCORE: '42' }])
+  })
+})
+
+describe('stripLeadingCode', () => {
+  it('drops the code and its separator from the description', () => {
+    assert.equal(stripLeadingCode('ACCT', 'ACCT-Accounting'), 'Accounting')
+    assert.equal(stripLeadingCode('ACNT', 'ACNT Accounting-WECM'), 'Accounting-WECM')
+    assert.equal(stripLeadingCode('ARTZ', 'ARTZ - Art - CE'), 'Art - CE')
+    assert.equal(stripLeadingCode('AERM', 'AERM -Aircraft MechaniTech-CE'), 'Aircraft MechaniTech-CE')
+  })
+  it('is case-insensitive about the repeated code', () => {
+    assert.equal(stripLeadingCode('BMGT', 'Bmgt - Business Mngmnt'), 'Business Mngmnt')
+  })
+  it('leaves a description that merely starts with the same letters', () => {
+    assert.equal(stripLeadingCode('BIO', 'BIOLOGY'), 'BIOLOGY')
+    assert.equal(stripLeadingCode('CS', 'Computer Science'), 'Computer Science')
+  })
+  it('keeps the original when stripping would empty it', () => {
+    assert.equal(stripLeadingCode('BIO', 'BIO'), 'BIO')
+    assert.equal(stripLeadingCode('BIO', 'BIO -'), 'BIO -')
+  })
+  it('handles a missing code or label', () => {
+    assert.equal(stripLeadingCode('', 'Accounting'), 'Accounting')
+    assert.equal(stripLeadingCode('ACCT', ''), '')
+    assert.equal(stripLeadingCode('ACCT', null), '')
   })
 })

@@ -256,11 +256,11 @@ describe('DashboardPage right rail', () => {
     expect(w.text()).toContain('Weekly planner')
   })
 
-  it('lists upcoming deadlines with title and short date', async () => {
+  it('lists this week’s deadlines with title and short date', async () => {
     seedFullDashboard()
     const w = mountDashboard()
     await flushPromises(); await nextTick()
-    expect(w.text()).toContain('Upcoming deadlines')
+    expect(w.text()).toContain('Due this week')
     expect(w.text()).toContain('Essay Draft')
     expect(w.text()).toContain('Jun 16')
     expect(w.text()).toContain('Problem Set 5')
@@ -301,9 +301,21 @@ describe('DashboardPage right rail', () => {
     expect(w.text()).toContain('1 Overdue')
   })
 
-  it('shows an empty-rail message when nothing is upcoming', async () => {
+  it('shows an empty-rail message when nothing is due this week', async () => {
     const w = mountDashboard()
     await flushPromises(); await nextTick()
-    expect(w.text()).toContain('Nothing on the horizon yet')
+    expect(w.text()).toContain('Nothing due this week')
+  })
+
+  it('keeps the rail to the 7-day window, not the whole road ahead', async () => {
+    useAssignmentsStore().assignments.push(
+      { id: 'soon', title: 'Due In Three Days', dueDate: '2026-06-18', status: 'pending', feedStatus: 'live' },
+      { id: 'far', title: 'Due Next Month', dueDate: '2026-07-20', status: 'pending', feedStatus: 'live' },
+    )
+    const w = mountDashboard()
+    await flushPromises(); await nextTick()
+    expect(w.text()).toContain('Due In Three Days')
+    // Still on the assignments page's Upcoming list, just not on this rail.
+    expect(w.text()).not.toContain('Due Next Month')
   })
 })

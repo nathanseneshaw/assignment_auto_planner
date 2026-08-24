@@ -343,3 +343,104 @@ describe('banner-classic trailingSlash', () => {
     assert.ok(urls.some((u) => u.endsWith('bwckschd.p_get_crse_unsec')), 'no trailing slash by default')
   })
 })
+
+// ── Per-school listing quirks (A&M-Texarkana, Texas Southern) ─────────────────
+
+describe('banner-classic listing quirks', () => {
+  it('skips an interleaved "View Book Information" header row (A&M-Texarkana)', async () => {
+    // Texarkana puts a second th.ddtitle row between the section header and its
+    // detail row; taking the literal next <tr> lost every meeting + instructor.
+    const html = `<html><body>
+      <table class="datadisplaytable">
+        <tr><th class="ddtitle"><a>Principles of Accounting I - 80207 - ACCT 2301 - 001</a></th></tr>
+        <tr><th class="ddtitle"><a href="https://tamut.bncollege.com/"><img src="/wtlgifs/twgginfo.gif"> View Book Information</a></th></tr>
+        <tr><td class="dddefault">
+          3.000 Credits
+          <table class="datadisplaytable">
+            <tr><th class="ddheader">Type</th><th>Time</th><th>Days</th><th>Where</th><th>Date</th><th>Sched</th><th>Instructors</th></tr>
+            <tr>
+              <td class="dddefault">Class</td>
+              <td class="dddefault">11:00 am - 12:15 pm</td>
+              <td class="dddefault">TR</td>
+              <td class="dddefault">University Center 217</td>
+              <td class="dddefault">Aug 24, 2026 - Dec 09, 2026</td>
+              <td class="dddefault">Lecture</td>
+              <td class="dddefault">Selena G.  Jefferies (<ABBR title="Primary">P</ABBR>)</td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>
+    </body></html>`
+    const s = makeScraper('bookrow')
+    globalThis.fetch = async () => mockRes(html)
+    const sections = await s.getSections({ termCode: '202680', subjectCode: 'ACCT' })
+    // The bookstore row is not a section of its own.
+    assert.equal(sections.length, 1)
+    assert.equal(sections[0].crn, '80207')
+    assert.equal(sections[0].credits, 3)
+    assert.equal(sections[0].meetings.length, 1)
+    assert.equal(sections[0].meetings[0].startTime, '11:00')
+    assert.deepEqual(sections[0].instructors, ['Selena G. Jefferies'])
+  })
+
+  it('leaves a section with no detail row empty rather than borrowing the next one', async () => {
+    const html = `<html><body>
+      <table class="datadisplaytable">
+        <tr><th class="ddtitle"><a>Ghost Course - 10001 - CS 1000 - 001</a></th></tr>
+        <tr><th class="ddtitle"><a>Real Course - 10002 - CS 1010 - 001</a></th></tr>
+        <tr><td class="dddefault">
+          3.000 Credits
+          <table class="datadisplaytable">
+            <tr><th class="ddheader">Type</th><th>Time</th><th>Days</th><th>Where</th><th>Date</th><th>Sched</th><th>Instructors</th></tr>
+            <tr>
+              <td class="dddefault">Class</td><td class="dddefault">9:00 am - 9:50 am</td>
+              <td class="dddefault">MWF</td><td class="dddefault">SCI 100</td>
+              <td class="dddefault">Aug 24 - Dec 09</td><td class="dddefault">Lecture</td>
+              <td class="dddefault">Ana Rivera</td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>
+    </body></html>`
+    const s = makeScraper('nodetail')
+    globalThis.fetch = async () => mockRes(html)
+    const sections = await s.getSections({ termCode: '202680', subjectCode: 'CS' })
+    assert.equal(sections.length, 2)
+    assert.equal(sections[0].meetings.length, 0)
+    assert.deepEqual(sections[0].instructors, [])
+    // The detail row belongs to the second section only.
+    assert.equal(sections[1].meetings.length, 1)
+    assert.deepEqual(sections[1].instructors, ['Ana Rivera'])
+  })
+
+  it('keeps an instructor name wrapped in a CV link (Texas Southern)', async () => {
+    // TSU links each name to its HB 2504 CV PDF and still ships the e-mail icon
+    // link; only the mailto link and the images should be dropped.
+    const html = `<html><body>
+      <table class="datadisplaytable">
+        <tr><th class="ddtitle"><a>Principles Of Accounting I - 13259 - ACCT 2301 - 01</a> <a href="https://example.org/acct-2301-01.pdf">view syllabus</a></th></tr>
+        <tr><td class="dddefault">
+          3.000 Credits
+          <table class="datadisplaytable">
+            <tr><th class="ddheader">Type</th><th>Time</th><th>Days</th><th>Where</th><th>Date</th><th>Sched</th><th>Instructors</th></tr>
+            <tr>
+              <td class="dddefault">Class</td>
+              <td class="dddefault">1:00 pm - 1:50 pm</td>
+              <td class="dddefault">MWF</td>
+              <td class="dddefault">0150 - JH Jones Business Bldg 105</td>
+              <td class="dddefault">Aug 17, 2026 - Dec 10, 2026</td>
+              <td class="dddefault">Lecture</td>
+              <td class="dddefault"><a href="https://example.org/cv/alexander-ronnie-cv.pdf">Ronnie R  Alexander</a> (<ABBR title="Primary">P</ABBR>)<a href="mailto:ronnie.alexander@TSU.EDU"><img src="/wtlgifs/web_email.gif" alt="E-mail"></a></td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>
+    </body></html>`
+    const s = makeScraper('cvlink')
+    globalThis.fetch = async () => mockRes(html)
+    const [sec] = await s.getSections({ termCode: '202710', subjectCode: 'ACCT' })
+    // The syllabus link after the title must not break title parsing.
+    assert.equal(sec.title, 'Principles Of Accounting I')
+    assert.deepEqual(sec.instructors, ['Ronnie R Alexander'])
+  })
+})

@@ -132,6 +132,86 @@ describe('colleague getSubjects', () => {
     assert.ok(!subjects.some((s) => s.code === 'HIDDEN'))
   })
 
+  // The advanced-search list is catalog-wide, so a term-scoped call must come
+  // from the section search's Subjects facet or the picker fills with subjects
+  // that yield "no sections" (Dallas College: 135 listed vs 77 real).
+  it('returns only subjects the given term actually offers', async () => {
+    const s = makeScraper('facet1')
+    globalThis.fetch = async (url) => {
+      // Check AdvancedSearch first: "GetCatalogAdvancedSearchAsync" also
+      // contains the substring "SearchAsync".
+      if (String(url).includes('AdvancedSearch')) {
+        return mockRes(advancedSearchData({
+          subjects: [
+            { Code: 'ACCT', Description: 'ACCOUNTING' },
+            { Code: 'BIOL', Description: 'BIOLOGY' },
+            { Code: 'DEAD', Description: 'RETIRED SUBJECT' },
+          ],
+        }))
+      }
+      if (String(url).includes('SearchAsync')) {
+        return mockRes({
+          Sections: [], TotalPages: 1,
+          Subjects: [
+            { Value: 'BIOL', Description: 'BIOLOGY', Count: 236 },
+            { Value: 'ACCT', Description: 'ACCOUNTING', Count: 29 },
+          ],
+        })
+      }
+      return mockRes(LANDING_HTML)
+    }
+    const subjects = await s.getSubjects('2026FA')
+    assert.deepEqual(subjects.map((x) => x.code), ['ACCT', 'BIOL'])
+    assert.equal(subjects[0].label, 'ACCOUNTING')
+  })
+
+  it('drops zero-count entries from the term facet', async () => {
+    const s = makeScraper('facet2')
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('SearchAsync')) {
+        return mockRes({
+          Sections: [], TotalPages: 1,
+          Subjects: [
+            { Value: 'ACCT', Description: 'ACCOUNTING', Count: 29 },
+            { Value: 'EMPTY', Description: 'NO SECTIONS', Count: 0 },
+          ],
+        })
+      }
+      return mockRes(LANDING_HTML)
+    }
+    assert.deepEqual((await s.getSubjects('2026FA')).map((x) => x.code), ['ACCT'])
+  })
+
+  it('falls back to the catalog-wide list when the term facet is empty', async () => {
+    const s = makeScraper('facet3')
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('AdvancedSearch')) {
+        return mockRes(advancedSearchData({ subjects: [{ Code: 'ACCT', Description: 'ACCOUNTING' }] }))
+      }
+      if (String(url).includes('SearchAsync')) {
+        return mockRes({ Sections: [], TotalPages: 1, Subjects: [] })
+      }
+      return mockRes(LANDING_HTML)
+    }
+    assert.deepEqual((await s.getSubjects('2026FA')).map((x) => x.code), ['ACCT'])
+  })
+
+  it('caches per term so two terms do not share a subject list', async () => {
+    const s = makeScraper('facet4')
+    globalThis.fetch = async (url, opts) => {
+      if (String(url).includes('SearchAsync')) {
+        const term = JSON.parse(JSON.parse(opts.body).searchParameters).terms[0]
+        return mockRes({
+          Sections: [], TotalPages: 1,
+          Subjects: [{ Value: term === '2026FA' ? 'FALLONLY' : 'SPRINGONLY', Description: 'X', Count: 1 }],
+        })
+      }
+      return mockRes(LANDING_HTML)
+    }
+    assert.deepEqual((await s.getSubjects('2026FA')).map((x) => x.code), ['FALLONLY'])
+    assert.deepEqual((await s.getSubjects('2026SP')).map((x) => x.code), ['SPRINGONLY'])
+  })
+
   it('sorts subjects alphabetically by code', async () => {
     const s = makeScraper('subj2')
     globalThis.fetch = async (url) => {
@@ -175,6 +255,50 @@ describe('colleague getSections', () => {
     assert.equal(sec.meetings[0].startTime, '09:00')
     assert.equal(sec.meetings[0].endTime, '09:50')
     assert.equal(sec.meetings[0].location, 'Business 101')
+  })
+
+  // The CourseName separator is a per-site Colleague setting: TWU prints
+  // "MKT*3113", Dallas College prints "ITSC-1001".
+  it('splits a hyphenated CourseName into subject + course number', async () => {
+    const s = makeScraper('hyphen')
+    globalThis.fetch = async (url) => {
+      if (url.includes('SearchAsync')) {
+        return mockRes(sectionSearchData({
+          sections: [makeSection({ CourseName: 'ITSC-1001', Number: '84109' })],
+        }))
+      }
+      return mockRes(LANDING_HTML)
+    }
+    const [sec] = await s.getSections({ termCode: '2026FA', subjectCode: 'ITSC' })
+    assert.equal(sec.subjectCode, 'ITSC')
+    assert.equal(sec.courseNumber, '1001')
+    assert.equal(sec.sectionNumber, '84109')
+  })
+
+  it('splits only on the first separator so a hyphenated number survives', async () => {
+    const s = makeScraper('hyphen2')
+    globalThis.fetch = async (url) => {
+      if (url.includes('SearchAsync')) {
+        return mockRes(sectionSearchData({ sections: [makeSection({ CourseName: 'NURS-1001-A' })] }))
+      }
+      return mockRes(LANDING_HTML)
+    }
+    const [sec] = await s.getSections({ termCode: '2026FA', subjectCode: 'NURS' })
+    assert.equal(sec.subjectCode, 'NURS')
+    assert.equal(sec.courseNumber, '1001-A')
+  })
+
+  it('leaves subject and course number blank when CourseName has no separator', async () => {
+    const s = makeScraper('nosep')
+    globalThis.fetch = async (url) => {
+      if (url.includes('SearchAsync')) {
+        return mockRes(sectionSearchData({ sections: [makeSection({ CourseName: 'ODDBALL' })] }))
+      }
+      return mockRes(LANDING_HTML)
+    }
+    const [sec] = await s.getSections({ termCode: '2026FA', subjectCode: 'X' })
+    assert.equal(sec.subjectCode, '')
+    assert.equal(sec.courseNumber, '')
   })
 
   it('maps AvailabilityStatusDisplay "Closed" to "closed"', async () => {
@@ -238,5 +362,67 @@ describe('colleague getSections', () => {
     }
     const [result] = await s.getSections({ termCode: '2025FA', subjectCode: 'ACCT' })
     assert.deepEqual(result.instructors, ['Dr. Real'])
+  })
+})
+
+// ── Older Self-Service release (legacyApi) ───────────────────────────────────
+
+describe('colleague legacyApi', () => {
+  it('calls the unsuffixed endpoints with a bare criteria body', async () => {
+    const s = createColleagueScraper({
+      school: 'colleague-legacy', base: 'https://legacy.edu', legacyApi: true,
+    })
+    const urls = []
+    let bodySeen = null
+    globalThis.fetch = async (url, opts = {}) => {
+      urls.push(url)
+      if (url.includes('/GetCatalogAdvancedSearch')) {
+        return mockRes(advancedSearchData({ terms: [{ Item1: '2026FL', Item2: '2026 Fall' }] }))
+      }
+      if (url.includes('/PostSearchCriteria')) {
+        bodySeen = JSON.parse(opts.body)
+        return mockRes(sectionSearchData({ sections: [makeSection()] }))
+      }
+      return mockRes(LANDING_HTML)
+    }
+    const sections = await s.getSections({ termCode: '2026FL', subjectCode: 'ACCT' })
+    assert.equal(sections.length, 1)
+    // Bare criteria, not { searchParameters: "<json>" } — the wrapped form is
+    // accepted by these hosts but silently ignores every filter.
+    assert.equal(bodySeen.searchParameters, undefined)
+    assert.deepEqual(bodySeen.subjects, ['ACCT'])
+    assert.deepEqual(bodySeen.terms, ['2026FL'])
+    assert.ok(!urls.some((u) => /SearchAsync|GetCatalogAdvancedSearchAsync/.test(u)))
+  })
+
+  it('leaves the modern endpoints and wrapped body in place by default', async () => {
+    const s = makeScraper('modern')
+    const urls = []
+    let bodySeen = null
+    globalThis.fetch = async (url, opts = {}) => {
+      urls.push(url)
+      if (url.includes('SearchAsync')) {
+        bodySeen = JSON.parse(opts.body)
+        return mockRes(sectionSearchData({ sections: [makeSection()] }))
+      }
+      return mockRes(LANDING_HTML)
+    }
+    await s.getSections({ termCode: '2025FA', subjectCode: 'ACCT' })
+    assert.equal(typeof bodySeen.searchParameters, 'string')
+    assert.ok(urls.some((u) => u.includes('/SearchAsync')))
+    assert.ok(!urls.some((u) => u.includes('/PostSearchCriteria')))
+  })
+
+  it('splits an underscore CourseName (McLennan prints "ACCT_2301")', async () => {
+    const s = makeScraper('underscore')
+    globalThis.fetch = async (url) => {
+      if (url.includes('SearchAsync')) {
+        return mockRes(sectionSearchData({ sections: [makeSection({ CourseName: 'ACCT_2301' })] }))
+      }
+      return mockRes(LANDING_HTML)
+    }
+    const [sec] = await s.getSections({ termCode: '2026/FA', subjectCode: 'ACCT' })
+    assert.equal(sec.subjectCode, 'ACCT')
+    assert.equal(sec.courseNumber, '2301')
   })
 })

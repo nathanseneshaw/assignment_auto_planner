@@ -250,6 +250,45 @@ describe('upcomingAssignments', () => {
   })
 })
 
+describe('dueSoonAssignments', () => {
+  /** Local `YYYY-MM-DD` `offset` days from today, matching the store's helper. */
+  const dayKey = (offset) => {
+    const d = new Date()
+    d.setDate(d.getDate() + offset)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  it('narrows upcoming to the next 7 days, inclusive', () => {
+    const store = useAssignmentsStore()
+    store.assignments.push(
+      { id: '1', title: 'Today', dueDate: dayKey(0), status: 'pending' },
+      { id: '2', title: 'Day 7', dueDate: dayKey(7), status: 'pending' },
+      { id: '3', title: 'Day 8', dueDate: dayKey(8), status: 'pending' },
+      { id: '4', title: 'Next month', dueDate: dayKey(30), status: 'pending' },
+    )
+    expect(store.dueSoonAssignments.map(a => a.title)).toEqual(['Today', 'Day 7'])
+  })
+
+  it('leaves upcomingAssignments uncapped, so no assignment falls between the two', () => {
+    const store = useAssignmentsStore()
+    store.assignments.push(
+      { id: '1', title: 'Day 3', dueDate: dayKey(3), status: 'pending' },
+      { id: '2', title: 'Day 40', dueDate: dayKey(40), status: 'pending' },
+    )
+    expect(store.upcomingAssignments.map(a => a.title)).toEqual(['Day 3', 'Day 40'])
+  })
+
+  it('excludes completed and feed-archived items', () => {
+    const store = useAssignmentsStore()
+    store.assignments.push(
+      { id: '1', title: 'Open', dueDate: dayKey(2), status: 'pending', feedStatus: 'live' },
+      { id: '2', title: 'Done', dueDate: dayKey(2), status: 'completed', feedStatus: 'live' },
+      { id: '3', title: 'Archived', dueDate: dayKey(2), status: 'pending', feedStatus: 'archived' },
+    )
+    expect(store.dueSoonAssignments.map(a => a.title)).toEqual(['Open'])
+  })
+})
+
 describe('overdueAssignments', () => {
   it('returns past-due incomplete assignments', () => {
     const store = useAssignmentsStore()

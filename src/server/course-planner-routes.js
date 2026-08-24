@@ -82,6 +82,22 @@ import * as cofc from './course-planner/cofc-scraper.js'
 import * as uncc from './course-planner/uncc-scraper.js'
 import * as udel from './course-planner/udel-scraper.js'
 import * as odu from './course-planner/odu-scraper.js'
+import * as dallascollege from './course-planner/dallascollege-scraper.js'
+import * as tamusa from './course-planner/tamusa-scraper.js'
+import * as tamut from './course-planner/tamut-scraper.js'
+import * as tsu from './course-planner/tsu-scraper.js'
+import * as tamiu from './course-planner/tamiu-scraper.js'
+import * as sulross from './course-planner/sulross-scraper.js'
+import * as tamucc from './course-planner/tamucc-scraper.js'
+import * as sanjac from './course-planner/sanjac-scraper.js'
+import * as stc from './course-planner/stc-scraper.js'
+import * as stedwards from './course-planner/stedwards-scraper.js'
+import * as tccd from './course-planner/tccd-scraper.js'
+import * as mclennan from './course-planner/mclennan-scraper.js'
+import * as southwestern from './course-planner/southwestern-scraper.js'
+import * as hsutx from './course-planner/hsutx-scraper.js'
+import * as austincc from './course-planner/austincc-scraper.js'
+import * as alamo from './course-planner/alamo-scraper.js'
 
 const router = Router()
 
@@ -566,6 +582,130 @@ const SCHOOLS = {
     // Course Search JSON carries live "current of max" enrollment per section.
     enrollmentDataAvailable: true,
     scraper: odu,
+  },
+  dallascollege: {
+    code: 'dallascollege',
+    // Heads-up for anyone reading section data back: the guest Colleague
+    // catalog behind this entry holds the Continuing Education / Workforce
+    // schedule only, so no academic-transfer course (MATH 1314, ENGL 1301,
+    // GOVT 2305) appears under it. The credit catalog lives in Workday behind a
+    // login, and its public mirror (schedule.dallascollege.edu) is rate-gated by
+    // an AWS WAF challenge allowing roughly one request per five minutes per IP
+    // — unusable from the server's single shared egress IP. See
+    // scraper-status.md for that path's form shape and measured limits.
+    name: 'Dallas College',
+    // Colleague Self-Service exposes capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: dallascollege,
+  },
+  tamusa: {
+    code: 'tamusa',
+    name: 'Texas A&M University–San Antonio',
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
+    scraper: tamusa,
+  },
+  tamut: {
+    code: 'tamut',
+    name: 'Texas A&M University–Texarkana',
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
+    scraper: tamut,
+  },
+  tsu: {
+    code: 'tsu',
+    name: 'Texas Southern University',
+    // Banner classic per-CRN detail pages fill capacity / enrolled / available.
+    enrollmentDataAvailable: true,
+    scraper: tsu,
+  },
+  tamiu: {
+    code: 'tamiu',
+    name: 'Texas A&M International University',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: tamiu,
+  },
+  sulross: {
+    code: 'sulross',
+    name: 'Sul Ross State University',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: sulross,
+  },
+  tamucc: {
+    code: 'tamucc',
+    name: 'Texas A&M University–Corpus Christi',
+    // The public schedule table prints Available / Capacity per section.
+    enrollmentDataAvailable: true,
+    scraper: tamucc,
+  },
+  sanjac: {
+    code: 'sanjac',
+    name: 'San Jacinto College',
+    // Banner classic listing only — San Jac's per-CRN detail pages omit the
+    // Registration Availability table, so no seat counts are public.
+    enrollmentDataAvailable: false,
+    scraper: sanjac,
+  },
+  stc: {
+    code: 'stc',
+    name: 'South Texas College',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: stc,
+  },
+  stedwards: {
+    code: 'stedwards',
+    name: "St. Edward's University",
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: stedwards,
+  },
+  tccd: {
+    code: 'tccd',
+    name: 'Tarrant County College',
+    // Colleague Self-Service exposes capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: tccd,
+  },
+  mclennan: {
+    code: 'mclennan',
+    name: 'McLennan Community College',
+    // Colleague Self-Service exposes capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: mclennan,
+  },
+  southwestern: {
+    code: 'southwestern',
+    name: 'Southwestern University',
+    // Colleague Self-Service exposes capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: southwestern,
+  },
+  hsutx: {
+    code: 'hsutx',
+    name: 'Hardin-Simmons University',
+    // Colleague Self-Service exposes capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: hsutx,
+  },
+  austincc: {
+    code: 'austincc',
+    name: 'Austin Community College',
+    // Every row of the public schedule prints [enrolled/capacity/waitlisted].
+    enrollmentDataAvailable: true,
+    scraper: austincc,
+  },
+  alamo: {
+    code: 'alamo',
+    // One Banner instance covers all five district colleges, so sections from
+    // San Antonio, Northeast Lakeview, Northwest Vista, Palo Alto and
+    // St. Philip's all appear together (the campus shows in the room).
+    name: 'Alamo Colleges District',
+    // Banner 9 SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: alamo,
   },
 }
 

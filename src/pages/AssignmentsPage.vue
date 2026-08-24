@@ -72,14 +72,23 @@ function isCompleted(a) {
 function isOverdue(a) {
   return !isArchived(a) && a.status !== 'completed' && a.dueDate < localDateKey()
 }
+/** One week out. Only the "heaviest batch" nudge uses this now; Upcoming
+ *  itself is deliberately uncapped (see isUpcoming). */
 function sevenDaysFromNow() {
   const d = new Date()
   d.setDate(d.getDate() + 7)
   return localDateKey(d)
 }
 
+/**
+ * Still open and not yet due, with **no upper bound**. Together with overdue,
+ * completed and archived this has to partition the list: anything matching none
+ * of the four lands in no section and renders nowhere, on every tab including
+ * "All". A 7-day ceiling here is what hid whole-semester ICS imports.
+ * The narrow "due this week" window lives in the store as `dueSoonAssignments`.
+ */
 function isUpcoming(a) {
-  return !isArchived(a) && a.status !== 'completed' && a.dueDate >= localDateKey() && a.dueDate <= sevenDaysFromNow()
+  return !isArchived(a) && a.status !== 'completed' && a.dueDate >= localDateKey()
 }
 
 function byDueDate(list) {
@@ -144,7 +153,7 @@ const emptyCopy = computed(() => {
     case 'overdue':
       return { title: 'Nothing overdue. Nicely done.', sub: 'You’re all caught up here.' }
     case 'upcoming':
-      return { title: 'Nothing due in the next 7 days.', sub: 'You\'re clear for now. Check back as deadlines approach.' }
+      return { title: 'Nothing upcoming.', sub: 'You\'re clear for now. Check back as deadlines approach.' }
     case 'completed':
       return { title: 'Nothing completed yet.', sub: 'Check items off and they’ll collect here.' }
     case 'archived':
@@ -191,7 +200,11 @@ const courseFilters = computed(() => {
 // Busiest upcoming day, for the overdue nudge ("…that's when your heaviest batch lands").
 const heaviestUpcoming = computed(() => {
   const tally = {}
+  // Scoped to the next week: "catch up before X" is only useful pointing at
+  // something imminent, and upcomingList now runs to the end of the semester.
+  const cutoff = sevenDaysFromNow()
   for (const a of upcomingList.value) {
+    if (a.dueDate > cutoff) continue
     const key = String(a.dueDate || '').slice(0, 10)
     if (!key) continue
     tally[key] = (tally[key] || 0) + 1

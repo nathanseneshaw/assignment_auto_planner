@@ -19,16 +19,34 @@
  * shape works against whatever schema is deployed.
  *
  * Dedupe identity (Pillar B): the primary key is the event UID
- * (`external_assignment_id`), so a moved due date with a *stable* UID updates in
- * place. Some LMS feeds rotate the UID when an assignment changes, which would
- * otherwise duplicate the row. To catch that, we additionally load this feed's
- * existing assignments and, for any incoming occurrence whose UID is unknown,
- * try to match an existing row by (course + normalized title) and re-key it onto
- * the new UID instead of inserting. This is intentionally conservative — applied
- * only to non-recurring occurrences and only when the title match is unambiguous
- * (exactly one unclaimed candidate) — so two distinct same-titled assignments are
- * never silently merged. Costs one extra feed-scoped select per non-empty sync.
+ * (`external_assignment_id`), so a moved due date or a renamed assignment with a
+ * *stable* UID updates in place. Two things break that, and both used to archive
+ * the original and insert a near-identical duplicate beside it:
+ *
+ *   1. Some LMS feeds rotate the UID whenever an assignment changes.
+ *   2. An RRULE occurrence's id is synthesised as `<series uid>@<instant>`, so
+ *      moving the series (even by an hour) rotates every member's id even though
+ *      the underlying event UID never changed.
+ *
+ * So for any incoming occurrence whose UID is unknown we load this feed's
+ * existing rows and try to re-key one onto the new UID instead of inserting:
+ *
+ *   - recurring: same (course + series UID), nearest due date within
+ *     MAX_SERIES_SHIFT_MS. The series UID is the stable professor-side identity;
+ *     the date only decides which member of the series moved where.
+ *   - one-off: same (course + source URL), else (course + normalized title),
+ *     else (course + exact due instant). Together these survive a rename, a date
+ *     move, or both at once when the feed supplies a per-event URL.
+ *
+ * Every candidate considered is a row the archive sweep below is about to mark
+ * archived anyway, so a match can only ever turn "archive + insert a duplicate"
+ * into "update in place". The conservative guards — unclaimed rows only, exactly
+ * one candidate for the one-off tiers, a bounded shift for the series tier —
+ * keep two genuinely distinct assignments from being merged.
+ * Costs one extra feed-scoped select per non-empty sync.
  */
+
+import { RECURRENCE_PAST_WINDOW_DAYS, parseOccurrenceUid } from './ics-parser.js'
 
 function nowIso() {
   return new Date().toISOString()
@@ -49,19 +67,109 @@ function contentKey(courseId, title) {
   return `${courseId}::${normalizeTitleKey(title)}`
 }
 
+/** Series key: all expanded occurrences of one recurring event, per course. */
+function seriesKeyOf(courseId, seriesUid) {
+  return `${courseId}::${seriesUid}`
+}
+
+/** Per-event permalink key. Only built for rows that actually carry a URL. */
+function sourceUrlKey(courseId, sourceUrl) {
+  return `${courseId}::${String(sourceUrl).trim()}`
+}
+
+/** Exact-due-instant key, so a renamed assignment still matches its old row. */
+function dueKey(courseId, dueAt) {
+  const t = Date.parse(dueAt)
+  return Number.isNaN(t) ? null : `${courseId}::${t}`
+}
+
 /**
- * Find an existing row to re-key onto a rotated UID, matched by (course + title).
- * Returns the row and marks it claimed, or null when the match is absent or
- * ambiguous (more than one unclaimed candidate) — we never merge two distinct
- * same-titled assignments. Mutates `claimed`.
+ * How far a recurring series may move and still be recognised as the same
+ * occurrences. Comfortably covers the realistic edits (a time-of-day change, a
+ * day-of-week change) while staying short enough that a genuinely new occurrence
+ * at the tail of a series cannot adopt a long-departed one.
  */
-function claimContentMatch(occ, courseId, contentIndex, claimed) {
-  const key = contentKey(courseId, occ.title)
-  const candidates = (contentIndex.get(key) || []).filter((r) => !claimed.has(r.id))
+const MAX_SERIES_SHIFT_MS = 14 * 24 * 60 * 60 * 1000
+
+/** The series identity behind an occurrence, whether or not the parser set it. */
+function seriesUidOf(occ) {
+  if (occ.seriesUid) return String(occ.seriesUid)
+  const parsed = parseOccurrenceUid(occ.uid)
+  return parsed ? parsed.seriesUid : null
+}
+
+/**
+ * Claim the single unclaimed row at `key`. Returns null when the key is absent
+ * or ambiguous (more than one candidate) — we never merge two distinct rows on a
+ * guess. Mutates `claimed`.
+ */
+function claimUnique(index, key, claimed) {
+  if (!key) return null
+  const candidates = (index.get(key) || []).filter((r) => !claimed.has(r.id))
   if (candidates.length !== 1) return null
-  const match = candidates[0]
-  claimed.add(match.id)
-  return match
+  claimed.add(candidates[0].id)
+  return candidates[0]
+}
+
+/**
+ * Claim the member of this occurrence's own series whose due date is nearest.
+ * Unlike the one-off tiers this tolerates several candidates, because the series
+ * UID has already established they are all the same professor-side event — the
+ * date only decides which member moved where. Bounded by MAX_SERIES_SHIFT_MS;
+ * the earliest row wins a tie so the pass stays deterministic.
+ */
+function claimSeriesMatch(occ, courseId, seriesIndex, claimed) {
+  const seriesUid = seriesUidOf(occ)
+  if (!seriesUid) return null
+  const target = Date.parse(occ.dueAt)
+  if (Number.isNaN(target)) return null
+
+  let best = null
+  let bestDist = Infinity
+  let bestAt = Infinity
+  for (const row of seriesIndex.get(seriesKeyOf(courseId, seriesUid)) || []) {
+    if (claimed.has(row.id)) continue
+    const at = Date.parse(row.due_at)
+    if (Number.isNaN(at)) continue
+    const dist = Math.abs(at - target)
+    if (dist < bestDist || (dist === bestDist && at < bestAt)) {
+      best = row
+      bestDist = dist
+      bestAt = at
+    }
+  }
+  if (!best || bestDist > MAX_SERIES_SHIFT_MS) return null
+  claimed.add(best.id)
+  return best
+}
+
+/**
+ * Find an existing row to re-key onto a rotated UID. Recurring occurrences match
+ * on their series UID; one-offs walk the permalink -> title -> due-instant tiers,
+ * strongest identity first. Mutates `claimed`.
+ */
+function claimRekeyTarget(occ, courseId, indexes, claimed) {
+  if (occ.isRecurring) return claimSeriesMatch(occ, courseId, indexes.series, claimed)
+  return (
+    (occ.sourceUrl
+      ? claimUnique(indexes.sourceUrl, sourceUrlKey(courseId, occ.sourceUrl), claimed)
+      : null) ||
+    claimUnique(indexes.content, contentKey(courseId, occ.title), claimed) ||
+    claimUnique(indexes.due, dueKey(courseId, occ.dueAt), claimed)
+  )
+}
+
+/**
+ * True when a row is an expanded recurrence that simply fell out of the back of
+ * the parser's expansion window. The feed stopped listing it because it is old,
+ * not because the professor removed it, so the archive sweep must leave it alone
+ * — otherwise a live weekly series bleeds a row into the Archived tab per week.
+ */
+function isAgedOutSeriesMember(row, cutoffMs) {
+  const parsed = parseOccurrenceUid(row.external_assignment_id)
+  if (!parsed) return false
+  const dueMs = Date.parse(row.due_at)
+  return (Number.isNaN(dueMs) ? parsed.instant : dueMs) < cutoffMs
 }
 
 // Feature flag for the Pillar A archive columns (feed_status / archived_at).
@@ -276,14 +384,26 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
   for (const row of existingRows || []) existingByExt.set(String(row.external_assignment_id), row)
 
   // Pillar B: load this feed's existing assignments so an incoming occurrence
-  // with an unknown UID can be matched to an existing row by content (course +
-  // title) and re-keyed, instead of duplicating, when a feed rotates its UIDs.
-  // Only rows whose UID is NOT in this sync are eligible for content matching (a
-  // still-present UID is handled by the direct match above). `feedRows` is also
-  // the basis for the Pillar A archive sweep below. Skipped when feedId is absent.
+  // with an unknown UID can be matched to an existing row and re-keyed, instead
+  // of duplicating, when a feed rotates its UIDs or a recurring series moves.
+  // Only rows whose UID is NOT in this sync are eligible (a still-present UID is
+  // handled by the direct match above). `feedRows` is also the basis for the
+  // Pillar A archive sweep below. Skipped when feedId is absent.
   const incomingUids = new Set(uniqueOccurrences.map((o) => String(o.uid)))
-  const contentIndex = new Map() // contentKey -> candidate rows (rotated/orphaned)
+  // Each index maps a candidate identity -> rotated/orphaned rows. See
+  // claimRekeyTarget for the order they are consulted in.
+  const indexes = {
+    series: new Map(),
+    sourceUrl: new Map(),
+    content: new Map(),
+    due: new Map(),
+  }
   const claimed = new Set() // existing row ids already matched this run
+  const addTo = (index, key, row) => {
+    if (!key) return
+    if (!index.has(key)) index.set(key, [])
+    index.get(key).push(row)
+  }
   let feedRows = []
   if (feedId) {
     const { data, error: feedSelErr } = await selectAssignments(
@@ -294,9 +414,20 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
     feedRows = data || []
     for (const row of feedRows) {
       if (incomingUids.has(String(row.external_assignment_id))) continue
-      const key = contentKey(row.course_id, row.assignment_name)
-      if (!contentIndex.has(key)) contentIndex.set(key, [])
-      contentIndex.get(key).push(row)
+      // A row is a candidate for one kind of match only: an expanded recurrence
+      // is matched through its series, everything else through its own content.
+      // Mixing them would let a one-off adopt a series member and punch a hole
+      // in the series (its title and URL are shared by every member anyway).
+      const parsed = parseOccurrenceUid(row.external_assignment_id)
+      if (parsed) {
+        addTo(indexes.series, seriesKeyOf(row.course_id, parsed.seriesUid), row)
+        continue
+      }
+      addTo(indexes.content, contentKey(row.course_id, row.assignment_name), row)
+      addTo(indexes.due, dueKey(row.course_id, row.due_at), row)
+      if (normText(row.source_url).trim()) {
+        addTo(indexes.sourceUrl, sourceUrlKey(row.course_id, row.source_url), row)
+      }
     }
   }
 
@@ -355,10 +486,10 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
       continue
     }
 
-    // UID unknown. Pillar B: before inserting, try to re-key an existing row
-    // matched by content (course + title) — handles feeds that change the UID
-    // when an assignment moves. Non-recurring + unambiguous match only.
-    const adopt = occ.isRecurring ? null : claimContentMatch(occ, courseId, contentIndex, claimed)
+    // UID unknown. Pillar B: before inserting, try to re-key an existing row —
+    // handles feeds that change the UID when an assignment is edited, and the
+    // synthetic per-occurrence ids of a recurring series that moved.
+    const adopt = claimRekeyTarget(occ, courseId, indexes, claimed)
     if (adopt) {
       const patch = {
         external_assignment_id: occ.uid,
@@ -435,14 +566,17 @@ export async function writeOccurrences({ supabase, userId, feedId, occurrences }
   //      path returns before calling this — so a broken/login-walled feed can't
   //      mass-archive real work.
   //    A row whose UID is still in the feed is never archived, even if an
-  //    upstream error left it unclaimed.
+  //    upstream error left it unclaimed, and neither is an expanded recurrence
+  //    that only dropped out of the back of the parser's expansion window.
   if (archiveColumnsPresent === true && feedId) {
+    const agedOutBefore = Date.now() - RECURRENCE_PAST_WINDOW_DAYS * 24 * 60 * 60 * 1000
     const toArchive = feedRows
       .filter(
         (r) =>
           !claimed.has(r.id) &&
           !incomingUids.has(String(r.external_assignment_id)) &&
-          normText(r.feed_status) !== 'archived'
+          normText(r.feed_status) !== 'archived' &&
+          !isAgedOutSeriesMember(r, agedOutBefore)
       )
       .map((r) => r.id)
     if (toArchive.length > 0) {

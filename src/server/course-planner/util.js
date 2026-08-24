@@ -118,6 +118,24 @@ export function dedupeMeetings(meetings) {
   return out
 }
 
+/**
+ * Drop a leading copy of the subject code from its own description.
+ *
+ * Several schools store the code inside the description with an inconsistent
+ * separator - Alamo Colleges prints "ACCT-Accounting", Dallas College
+ * "ACNT Accounting-WECM" / "ARTZ - Art - CE". The picker already renders the
+ * code beside the label, so left alone they read "ACCT - ACCT-Accounting".
+ * Keeps the original whenever stripping would leave nothing behind.
+ */
+export function stripLeadingCode(code, label) {
+  const text = String(label || '').trim()
+  if (!code) return text
+  // The lookahead keeps "BIOLOGY" intact when the code is "BIO"; everything
+  // non-alphanumeric after the code (space, hyphen, en/em dash, colon) goes.
+  const stripped = text.replace(new RegExp(`^${code}(?![A-Za-z0-9])[^A-Za-z0-9]*`, 'i'), '').trim()
+  return stripped || text
+}
+
 /** Coerces "12", "12.0", "1 TO 3" → 12 / 1 / null. Returns null for non-numeric. */
 export function parseCredits(raw) {
   if (raw === null || raw === undefined) return null

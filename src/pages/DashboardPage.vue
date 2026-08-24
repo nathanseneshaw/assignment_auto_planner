@@ -63,7 +63,7 @@ const agenda = computed(() => tasksStore.todaysTasks)
 const todayCompleted = computed(() => agenda.value.filter(t => t.completed).length)
 const overdueCount = computed(() => assignmentsStore.overdueAssignments.length)
 const nextDeadline = computed(() => assignmentsStore.upcomingAssignments[0] || null)
-const railDeadlines = computed(() => assignmentsStore.upcomingAssignments.slice(0, 4))
+const railDeadlines = computed(() => assignmentsStore.dueSoonAssignments.slice(0, 4))
 
 // ── My courses (rail) ────────────────────────────────────────────────────
 // Enrolled courses with a live count of still-open (not completed, not
@@ -254,9 +254,9 @@ function cellClass(day) {
             class="text-left p-5 sm:p-6 border-r border-paper-line dark:border-gray-700/60 hover:bg-surface/70 dark:hover:bg-gray-800/40 transition-colors"
           >
             <p class="display text-4xl sm:text-5xl text-gray-900 dark:text-gray-50 leading-none">
-              {{ assignmentsStore.upcomingAssignments.length }}
+              {{ assignmentsStore.dueSoonAssignments.length }}
             </p>
-            <p class="mt-3.5 text-sm font-semibold text-gray-800 dark:text-gray-200">Upcoming</p>
+            <p class="mt-3.5 text-sm font-semibold text-gray-800 dark:text-gray-200">Due this week</p>
             <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{{ upcomingSub }}</p>
           </button>
           <!-- Overdue -->
@@ -443,9 +443,9 @@ function cellClass(day) {
           </div>
         </button>
 
-        <!-- Upcoming deadlines -->
+        <!-- Due this week -->
         <div class="mt-7">
-          <p class="text-[13px] font-medium text-gray-500 dark:text-gray-400 mb-0.5">Upcoming deadlines</p>
+          <p class="text-[13px] font-medium text-gray-500 dark:text-gray-400 mb-0.5">Due this week</p>
 
           <div v-if="railDeadlines.length">
             <button
@@ -467,7 +467,7 @@ function cellClass(day) {
               <p v-if="courseLabel(a)" class="mt-1 font-mono text-[10.5px] text-gray-400 truncate">{{ courseLabel(a) }}</p>
             </button>
           </div>
-          <p v-else class="text-[13px] text-gray-400 dark:text-gray-500 py-3">Nothing on the horizon yet.</p>
+          <p v-else class="text-[13px] text-gray-400 dark:text-gray-500 py-3">Nothing due this week.</p>
 
           <button
             type="button"

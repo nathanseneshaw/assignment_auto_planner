@@ -12,10 +12,13 @@
  *   2. GET  {base}/Student/Courses/GetCatalogAdvancedSearchAsync    -> { Terms, Subjects, ... } all filter facets
  *   3. POST {base}/Student/Courses/SearchAsync                      -> { Sections, TotalPages, ... } the data
  *
- * The advanced-search facet endpoint (2) returns the full term + subject lists
- * in one shot — subjects are global, not per-term. The search endpoint (3) is
- * filtered by subject+term and paginated 30 sections per page (the server caps
- * the page size, so quantityPerPage is ignored and we walk TotalPages).
+ * The advanced-search facet endpoint (2) returns the full term list plus a
+ * catalog-wide subject list (every subject the school has ever offered, not
+ * just this term's). The search endpoint (3) is filtered by subject+term and
+ * paginated 30 sections per page (the server caps the page size, so
+ * quantityPerPage is ignored and we walk TotalPages); called WITHOUT a subject
+ * it also returns a per-term `Subjects` facet, which is how getSubjects trims
+ * the picker down to subjects that actually have sections in the chosen term.
  *
  * Both the advanced-search GET and the SearchAsync POST require the antiforgery
  * token echoed in a __RequestVerificationToken header (the cookie alone 400s).
@@ -46,8 +49,21 @@ function decodeEntities(s) {
     .trim()
 }
 
-export function createColleagueScraper({ school, base }) {
+/**
+ * `legacyApi: true` targets the older Self-Service release (Tarrant County
+ * College, McLennan, Southwestern, Hardin-Simmons all run it). Two differences,
+ * both purely transport — the JSON that comes back is field-for-field identical:
+ *   - the endpoints have no "Async" suffix (GetCatalogAdvancedSearch /
+ *     PostSearchCriteria; the Async names 404), and
+ *   - the search criteria are POSTed bare instead of wrapped in
+ *     { searchParameters: "<json string>" }. The wrapped form does NOT error on
+ *     these hosts — it silently ignores every filter and returns the whole
+ *     catalog as `Courses`, so getting this wrong looks like a working search.
+ */
+export function createColleagueScraper({ school, base, legacyApi = false }) {
   const coursesUrl = `${base}/Student/Courses`
+  const facetsPath = legacyApi ? 'GetCatalogAdvancedSearch' : 'GetCatalogAdvancedSearchAsync'
+  const searchPath = legacyApi ? 'PostSearchCriteria' : 'SearchAsync'
 
   /** GET the catalog landing page; return a cookie-bound fetch + antiforgery token. */
   async function session() {
@@ -62,7 +78,7 @@ export function createColleagueScraper({ school, base }) {
   /** The advanced-search facet payload: full Terms + Subjects + Locations lists. */
   async function advancedSearch() {
     const { cFetch, token } = await session()
-    const res = await cFetch(`${base}/Student/Courses/GetCatalogAdvancedSearchAsync`, {
+    const res = await cFetch(`${base}/Student/Courses/${facetsPath}`, {
       headers: {
         'User-Agent': UA,
         'X-Requested-With': 'XMLHttpRequest',
@@ -92,29 +108,60 @@ export function createColleagueScraper({ school, base }) {
     )
   }
 
-  // Colleague subjects are global, not term-scoped; termCode is accepted only to
-  // satisfy the shared scraper contract and is intentionally ignored.
-  async function getSubjects() {
+  /** The catalog-wide subject list: every subject the school has ever offered. */
+  async function allSubjects() {
+    const data = await advancedSearch()
+    return (Array.isArray(data.Subjects) ? data.Subjects : [])
+      .filter((s) => s.ShowInCourseSearch !== false && s.Code)
+      .map((s) => ({ code: s.Code, label: decodeEntities(s.Description) }))
+      .sort((a, b) => a.code.localeCompare(b.code))
+  }
+
+  /**
+   * Subjects that actually have sections in `termCode`.
+   *
+   * The advanced-search facet is catalog-wide, so using it directly fills the
+   * picker with subjects that yield "no sections" for the selected term —
+   * Dallas College lists 135 but only 77 have Fall 2026 sections; TWU lists 66
+   * against 56. One unfiltered search for the term returns a `Subjects` facet
+   * holding exactly that term's subjects with per-subject counts, for one extra
+   * request that the 1 h cache absorbs. Verified 2026-08-22 against a full
+   * 33-page walk of Dallas College's Fall 2026 term: identical 77 codes, none
+   * missing, none spurious, counts summing to TotalItems.
+   *
+   * Falls back to the catalog-wide list when no term is given or the facet
+   * comes back empty, so the picker can never end up blank.
+   */
+  async function getSubjects(termCode) {
     return cacheMemo(
-      `${school}:subjects`,
+      `${school}:subjects:${termCode || 'all'}`,
       async () => {
-        const data = await advancedSearch()
-        return (Array.isArray(data.Subjects) ? data.Subjects : [])
-          .filter((s) => s.ShowInCourseSearch !== false && s.Code)
-          .map((s) => ({ code: s.Code, label: decodeEntities(s.Description) }))
-          .sort((a, b) => a.code.localeCompare(b.code))
+        if (termCode) {
+          const { cFetch, token } = await session()
+          const json = await searchPage(cFetch, token, { termCode, page: 1 })
+          const inTerm = (Array.isArray(json.Subjects) ? json.Subjects : [])
+            .filter((s) => s.Value && Number(s.Count) > 0)
+            .map((s) => ({ code: s.Value, label: decodeEntities(s.Description) }))
+            .sort((a, b) => a.code.localeCompare(b.code))
+          if (inTerm.length) return inTerm
+        }
+        return allSubjects()
       },
       60 * 60 * 1000
     )
   }
 
-  /** One page of the section search for a (subject, term) pair. */
+  /**
+   * One page of the section search. Omit `subjectCode` to search the whole term
+   * — that form is what surfaces the per-term Subjects facet in the response.
+   */
   async function searchPage(cFetch, token, { subjectCode, termCode, page }) {
     const criteria = {
       keyword: null, terms: [termCode], requirement: null, subrequirement: null,
       courseIds: null, sectionIds: null, requirementText: null, subrequirementText: '',
       group: null, startTime: null, endTime: null, openSections: null,
-      subjects: [subjectCode], academicLevels: [], courseLevels: [], synonyms: [],
+      subjects: subjectCode ? [subjectCode] : [],
+      academicLevels: [], courseLevels: [], synonyms: [],
       courseTypes: [], topicCodes: [], days: [], locations: [], faculty: [],
       onlineCategories: null, keywordComponents: [], startDate: null, endDate: null,
       startsAtTime: null, endsAtTime: null, pageNumber: page, sortOn: 'None',
@@ -124,7 +171,7 @@ export function createColleagueScraper({ school, base }) {
       onlineCategoriesBadge: [], openAndWaitlistedSections: null,
       subRequirementText: null, quantityPerPage: 30, searchResultsView: 'SectionListing',
     }
-    const res = await cFetch(`${base}/Student/Courses/SearchAsync`, {
+    const res = await cFetch(`${base}/Student/Courses/${searchPath}`, {
       method: 'POST',
       headers: {
         'User-Agent': UA,
@@ -134,7 +181,9 @@ export function createColleagueScraper({ school, base }) {
         Referer: coursesUrl,
         __RequestVerificationToken: token,
       },
-      body: JSON.stringify({ searchParameters: JSON.stringify(criteria) }),
+      body: legacyApi
+        ? JSON.stringify(criteria)
+        : JSON.stringify({ searchParameters: JSON.stringify(criteria) }),
     })
     const json = await res.json()
     if (!json || typeof json !== 'object') throw new Error(`${school} search returned no data`)
@@ -164,6 +213,9 @@ export function createColleagueScraper({ school, base }) {
 
   return { getTerms, getSubjects, getSections }
 }
+
+/** "MKT*3113" / "ITSC-1001" / "ACCT_2301" -> ["", "MKT", "3113"]. */
+const SEP_RE = /^\s*([^*\-_\s]+)\s*[*\-_]\s*(.*)$/
 
 // JS-style day numbering used in FormattedMeetingTimes.Days: 0=Sun … 6=Sat.
 const DAY_NUM = ['U', 'M', 'T', 'W', 'R', 'F', 'S']
@@ -213,9 +265,13 @@ function deriveStatus(r) {
 }
 
 function normalize(r, school, termCode, termLabel, subjectLabel) {
-  // CourseName is "SUBJ*NUM" (e.g. "MKT*3113"); trust it over the searched
-  // subject so cross-listed courses keep their printed prefix.
-  const [subjFromName, numFromName] = String(r.CourseName || '').split('*')
+  // CourseName is "SUBJ<sep>NUM"; trust it over the searched subject so
+  // cross-listed courses keep their printed prefix. The separator is a Colleague
+  // site setting: TWU prints "MKT*3113", Dallas College "ITSC-1001", McLennan
+  // "ACCT_2301". Split on the FIRST separator only, so a course number that
+  // itself contains one survives.
+  const [, subjFromName = '', numFromName = ''] =
+    String(r.CourseName || '').match(SEP_RE) || []
   const max = numOrNull(r.Capacity)
   const current = numOrNull(r.Enrolled)
   const available = numOrNull(r.Available)

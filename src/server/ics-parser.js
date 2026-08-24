@@ -28,6 +28,43 @@ function isSubDailyFreq(rrule) {
 }
 
 /**
+ * How far back RRULE expansion reaches. Exported so the writer can tell
+ * "this occurrence aged out of the expansion window" apart from "the professor
+ * deleted it" - only the latter should archive a row.
+ */
+export const RECURRENCE_PAST_WINDOW_DAYS = RRULE_PAST_DAYS
+
+// A VEVENT with an RRULE becomes N assignment rows, so each occurrence needs its
+// own external id: `<series uid>@<occurrence start, ISO>`. The delimiter stays
+// '@' even though real ICS UIDs routinely contain one (`abc@instructure.com`) -
+// changing it would rotate every stored recurring id once, which is exactly the
+// churn this identity scheme exists to prevent. Parsing splits on the LAST '@'
+// and only accepts an ISO instant after it, so embedded '@'s stay unambiguous.
+const ISO_INSTANT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/
+
+/** Build the per-occurrence external id for one member of a recurring series. */
+export function occurrenceUid(seriesUid, occurrenceStart) {
+  return `${seriesUid}@${occurrenceStart.toISOString()}`
+}
+
+/**
+ * Inverse of occurrenceUid. Returns { seriesUid, instant } when `uid` looks like
+ * an expanded recurrence, else null (a plain one-off event UID). It also runs on
+ * ids already stored in the database, which is what lets the writer recover the
+ * stable series identity behind an occurrence id that moved.
+ */
+export function parseOccurrenceUid(uid) {
+  const s = String(uid == null ? '' : uid)
+  const at = s.lastIndexOf('@')
+  if (at <= 0) return null
+  const suffix = s.slice(at + 1)
+  if (!ISO_INSTANT_RE.test(suffix)) return null
+  const instant = Date.parse(suffix)
+  if (Number.isNaN(instant)) return null
+  return { seriesUid: s.slice(0, at), instant }
+}
+
+/**
  * Parse an ICS text body into { calendarName, events }.
  * Throws if the body does not look like an iCalendar feed (LMS often returns an HTML login page).
  */
@@ -236,11 +273,13 @@ function stringOf(v) {
 /**
  * Normalize a VEVENT/VTODO occurrence into the shape the writer expects.
  *
- * `isRecurring` marks occurrences expanded from an RRULE (their UID carries the
- * occurrence date, e.g. `uid@2026-09-01T...`). The writer uses this to *exclude*
- * them from the content-based dedupe fallback: a recurring series legitimately
- * has many same-titled occurrences in one course, so matching by title would be
- * ambiguous. Single (non-recurring) events are eligible for that fallback.
+ * `isRecurring` marks occurrences expanded from an RRULE. Their `uid` embeds the
+ * occurrence instant (`uid@2026-09-01T...`), so it is NOT stable across a date
+ * change - `seriesUid` is the stable half, and the writer matches on it to update
+ * a moved occurrence in place instead of archiving it and inserting a duplicate.
+ * Recurring occurrences stay out of the title-based dedupe fallback: a series
+ * legitimately has many same-titled members in one course, so a title match there
+ * is ambiguous. Single (non-recurring) events are eligible for that fallback.
  */
 function normalizeOccurrence(event, occurrenceStart, occurrenceEnd, course, sourceUrl, uidOverride, isRecurring = false) {
   const baseUid = stringOf(event.uid) || `${stringOf(event.summary)}@${occurrenceStart?.toISOString?.() || ''}`
@@ -260,6 +299,10 @@ function normalizeOccurrence(event, occurrenceStart, occurrenceEnd, course, sour
     description = description.slice(0, DESCRIPTION_MAX - 3) + '...'
   }
 
+  // Derived from the uid rather than passed in, so the two cannot drift and so it
+  // reads exactly the way the writer reads an id already in the database.
+  const recurrence = isRecurring ? parseOccurrenceUid(uid) : null
+
   return {
     uid,
     title,
@@ -269,6 +312,7 @@ function normalizeOccurrence(event, occurrenceStart, occurrenceEnd, course, sour
     courseExternalId: course.courseExternalId,
     courseName: course.courseName,
     isRecurring: !!isRecurring,
+    seriesUid: recurrence ? recurrence.seriesUid : null,
   }
 }
 
@@ -332,6 +376,7 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
       baseStart && effectiveEnd ? effectiveEnd.getTime() - baseStart.getTime() : 0
 
     const overrides = event.recurrences || {}
+    const seriesUid = stringOf(event.uid) || 'evt'
 
     for (const occStart of occurrences) {
       const isoKey = occStart.toISOString().slice(0, 10) // YYYY-MM-DD
@@ -343,7 +388,7 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
         const ovEnd = override.type === 'VTODO' ? null : toDate(override.end)
         const overrideEnd = ovDue || ovEnd || ovStart
         const overrideCourse = extractCourse(override, calendarName, bracketToCanvasId, opts)
-        const overrideUid = `${stringOf(event.uid) || 'evt'}@${occStart.toISOString()}`
+        const overrideUid = occurrenceUid(seriesUid, occStart)
         out.push(
           normalizeOccurrence(
             override,
@@ -359,7 +404,7 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
       }
 
       const occEnd = durationMs > 0 ? new Date(occStart.getTime() + durationMs) : occStart
-      const uid = `${stringOf(event.uid) || 'evt'}@${occStart.toISOString()}`
+      const uid = occurrenceUid(seriesUid, occStart)
       out.push(
         normalizeOccurrence(event, occStart, occEnd, course, stringOf(event.url), uid, true)
       )

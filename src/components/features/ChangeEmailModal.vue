@@ -110,6 +110,9 @@ async function onSave() {
         Open it and confirm to finish changing your email. The change applies once you
         click the link, so you can close this window.
       </p>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+        Don't see it? Check your spam folder.
+      </p>
     </div>
 
     <!-- Entry state. -->

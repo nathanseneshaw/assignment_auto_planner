@@ -115,7 +115,7 @@ async function onSubmit() {
     }
     if (data.user && !data.session) {
       successMessage.value =
-        'Check your email to confirm your account. This page signs you in automatically once you do.'
+        "Check your email to confirm your account. This page signs you in automatically once you do. Don't see it? Check your spam folder."
       waitForConfirmation()
       return
     }

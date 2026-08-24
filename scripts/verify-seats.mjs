@@ -1,4 +1,5 @@
 // Live verification: run each modified scraper end-to-end and report seat coverage.
+import { selectCurrentAndNextTerms } from '../src/server/course-planner/term-window.js'
 const TARGETS = [
   { school: 'utsa', mod: '../src/server/course-planner/utsa-scraper.js', prefer: ['CS', 'ACC'] },
   { school: 'utep', mod: '../src/server/course-planner/utep-scraper.js', prefer: ['CS', 'ACCT'] },
@@ -45,6 +46,31 @@ const TARGETS = [
   { school: 'uncc', mod: '../src/server/course-planner/uncc-scraper.js', prefer: ['ITCS', 'ECON'] },
   { school: 'udel', mod: '../src/server/course-planner/udel-scraper.js', prefer: ['CISC', 'ACCT'] },
   { school: 'odu', mod: '../src/server/course-planner/odu-scraper.js', prefer: ['CS', 'ECON'] },
+  { school: 'tamusa', mod: '../src/server/course-planner/tamusa-scraper.js', prefer: ['CSCI', 'ACCT'] },
+  { school: 'tamut', mod: '../src/server/course-planner/tamut-scraper.js', prefer: ['CSCI', 'ACCT'] },
+  { school: 'tsu', mod: '../src/server/course-planner/tsu-scraper.js', prefer: ['CS', 'ACCT'] },
+  { school: 'tamiu', mod: '../src/server/course-planner/tamiu-scraper.js', prefer: ['COMP', 'ACC'] },
+  { school: 'sulross', mod: '../src/server/course-planner/sulross-scraper.js', prefer: ['CS', 'ACCA'] },
+  { school: 'tamucc', mod: '../src/server/course-planner/tamucc-scraper.js', prefer: ['COSC', 'ACCT'] },
+  { school: 'stc', mod: '../src/server/course-planner/stc-scraper.js', prefer: ['COSC', 'ACCT'] },
+  { school: 'stedwards', mod: '../src/server/course-planner/stedwards-scraper.js', prefer: ['COSC', 'ACCT'] },
+  { school: 'tccd', mod: '../src/server/course-planner/tccd-scraper.js', prefer: ['COSC', 'ACCT'] },
+  { school: 'mclennan', mod: '../src/server/course-planner/mclennan-scraper.js', prefer: ['COSC', 'ACCT'] },
+  { school: 'southwestern', mod: '../src/server/course-planner/southwestern-scraper.js', prefer: ['CSC54', 'BUS30'] },
+  { school: 'hsutx', mod: '../src/server/course-planner/hsutx-scraper.js', prefer: ['CSCI', 'ACCT'] },
+  // ACC browses by discipline id, not course prefix (PCCOS = Software
+  // Development & Computer Science).
+  { school: 'austincc', mod: '../src/server/course-planner/austincc-scraper.js', prefer: ['PCCOS', 'PCACC'] },
+  // San Jacinto's per-CRN detail pages have no seats table, so withSeats=0 is
+  // the expected result here — the run still proves terms/subjects/sections.
+  { school: 'sanjac', mod: '../src/server/course-planner/sanjac-scraper.js', prefer: ['COSC', 'ACCT'] },
+  { school: 'alamo', mod: '../src/server/course-planner/alamo-scraper.js', prefer: ['COSC', 'ACCT'] },
+  // CE/Workforce catalog — its subject codes are WECM rubrics, not academic ones.
+  {
+    school: 'dallascollege',
+    mod: '../src/server/course-planner/dallascollege-scraper.js',
+    prefer: ['RNSG', 'ITSC'],
+  },
 ]
 
 const which = process.argv[2] // optional filter
@@ -53,8 +79,15 @@ for (const t of TARGETS) {
   const started = Date.now()
   try {
     const scraper = await import(t.mod)
-    const terms = (await scraper.getTerms()).filter((x) => !/view only/i.test(x.label))
-    const term = terms[0]
+    const allTerms = await scraper.getTerms()
+    // Skip "(View only)" shells — but Texas Southern marks even its live terms
+    // that way, so never let the filter empty the list.
+    const liveTerms = allTerms.filter((x) => !/view only/i.test(x.label))
+    const terms = liveTerms.length ? liveTerms : allTerms
+    // Verify the term the APP would actually bind (current one first), not
+    // whatever the school happens to list first — several schools lead with a
+    // Continuing-Ed or summer term that has nothing in the subject we probe.
+    const term = selectCurrentAndNextTerms(terms)[0] || terms[0]
     const subjects = await scraper.getSubjects(term.code)
     const subject =
       subjects.find((s) => t.prefer.includes(s.code)) || subjects[Math.min(4, subjects.length - 1)]

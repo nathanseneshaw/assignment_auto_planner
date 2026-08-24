@@ -264,22 +264,242 @@ describe('writeOccurrences (rotated-UID content dedupe)', () => {
     assert.equal(db.assignments.length, 3)
   })
 
-  it('does NOT content-match recurring occurrences (series members share a title)', async () => {
+  it('re-keys a renamed one-off by its source URL when the title also changed', async () => {
+    const courseId = 'course-1'
+    const seed = {
+      courses: [courseSeed(courseId)],
+      assignments: [{
+        id: 'seed-url', user_id: USER, course_id: courseId,
+        external_assignment_id: 'OLD-UID', assignment_name: 'Problem Set 3',
+        due_at: '2026-09-01T12:00:00.000Z', description: 'desc 1', feed_id: FEED, source_url: 'https://x/1',
+      }],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+
+    // Rotated UID + renamed + rescheduled. The per-event permalink is the only
+    // surviving anchor, and it is enough.
+    const occurrences = [occ(1, { uid: 'NEW-UID', title: 'Problem Set 3 (revised)', dueAt: '2026-09-15T12:00:00.000Z' })]
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 1)
+    assert.equal(res.assignmentsInserted, 0)
+    assert.equal(res.assignmentsArchived, 0)
+    assert.equal(db.assignments.length, 1)
+    assert.equal(db.assignments[0].id, 'seed-url')
+    assert.equal(db.assignments[0].assignment_name, 'Problem Set 3 (revised)')
+  })
+
+  it('re-keys a renamed one-off by its due instant when the feed carries no URL', async () => {
+    const courseId = 'course-1'
+    const seed = {
+      courses: [courseSeed(courseId)],
+      assignments: [{
+        id: 'seed-due', user_id: USER, course_id: courseId,
+        external_assignment_id: 'OLD-UID', assignment_name: 'Reading response',
+        due_at: '2026-09-02T12:00:00.000Z', description: 'desc 1', feed_id: FEED, source_url: null,
+      }],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+
+    const occurrences = [occ(1, { uid: 'NEW-UID', title: 'Reading response 2', sourceUrl: null })]
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 1)
+    assert.equal(res.assignmentsInserted, 0)
+    assert.equal(db.assignments.length, 1)
+    assert.equal(db.assignments[0].id, 'seed-due')
+    assert.equal(db.assignments[0].assignment_name, 'Reading response 2')
+  })
+
+  it('does NOT due-match when two rows share the same due instant (inserts instead)', async () => {
     const courseId = 'course-1'
     const seed = {
       courses: [courseSeed(courseId)],
       assignments: [
-        { id: 'seed-r', user_id: USER, course_id: courseId, external_assignment_id: 'base@2026-09-01', assignment_name: 'Lecture', due_at: '2026-09-01T12:00:00.000Z', feed_id: FEED },
+        { id: 'seed-a', user_id: USER, course_id: courseId, external_assignment_id: 'OLD-A', assignment_name: 'Quiz 4', due_at: '2026-09-02T12:00:00.000Z', feed_id: FEED, source_url: null },
+        { id: 'seed-b', user_id: USER, course_id: courseId, external_assignment_id: 'OLD-B', assignment_name: 'Discussion 4', due_at: '2026-09-02T12:00:00.000Z', feed_id: FEED, source_url: null },
       ],
     }
     const { client, db } = makeFakeSupabase(seed)
-    const occurrences = [occ(1, { uid: 'base@2026-09-08', title: 'Lecture', dueAt: '2026-09-08T12:00:00.000Z', isRecurring: true })]
+    const occurrences = [occ(1, { uid: 'NEW', title: 'Something else', sourceUrl: null })]
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 0)
+    assert.equal(res.assignmentsInserted, 1) // ambiguous → safe insert, never a wrong merge
+    assert.equal(db.assignments.length, 3)
+  })
+
+  it('does NOT match a recurring occurrence to a different series with the same title', async () => {
+    const courseId = 'course-1'
+    const seed = {
+      courses: [courseSeed(courseId)],
+      assignments: [
+        { id: 'seed-r', user_id: USER, course_id: courseId, external_assignment_id: 'base@2026-09-01T12:00:00.000Z', assignment_name: 'Lecture', due_at: '2026-09-01T12:00:00.000Z', feed_id: FEED },
+      ],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+    // Same title, same course, one week apart — but a different series UID, so
+    // the title must not be allowed to merge them.
+    const occurrences = [occ(1, { uid: 'other@2026-09-08T12:00:00.000Z', seriesUid: 'other', title: 'Lecture', dueAt: '2026-09-08T12:00:00.000Z', isRecurring: true })]
 
     const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
 
     assert.equal(res.assignmentsRekeyed, 0)
     assert.equal(res.assignmentsInserted, 1)
     assert.equal(db.assignments.length, 2)
+  })
+})
+
+// ── Pillar B: recurring series keep their identity when the series moves ──────
+
+/** An already-stored occurrence of series `base` in course-1. */
+const seriesRow = (isoStart, over = {}) => ({
+  id: `row-${isoStart}`, user_id: USER, course_id: 'course-1',
+  external_assignment_id: `base@${isoStart}`, assignment_name: 'Weekly Lab',
+  due_at: isoStart, description: 'lab', feed_id: FEED, source_url: 'https://x/lab',
+  feed_status: 'live', ...over,
+})
+
+/** The same occurrence as the feed now reports it, after the series moved. */
+const seriesOcc = (isoStart, over = {}) => ({
+  uid: `base@${isoStart}`,
+  seriesUid: 'base',
+  isRecurring: true,
+  courseExternalId: 'C1',
+  courseName: 'Course 1',
+  title: 'Weekly Lab',
+  dueAt: isoStart,
+  description: 'lab',
+  sourceUrl: 'https://x/lab',
+  ...over,
+})
+
+describe('writeOccurrences (recurring series identity)', () => {
+  it('updates a whole series in place when the professor shifts its time of day', async () => {
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [
+        seriesRow('2026-09-01T12:00:00.000Z'),
+        seriesRow('2026-09-08T12:00:00.000Z'),
+        seriesRow('2026-09-15T12:00:00.000Z'),
+      ],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+
+    // 12:00 → 17:00 rotates every synthetic occurrence id, but the series UID
+    // behind them is untouched, so every row must move rather than duplicate.
+    const occurrences = [
+      seriesOcc('2026-09-01T17:00:00.000Z'),
+      seriesOcc('2026-09-08T17:00:00.000Z'),
+      seriesOcc('2026-09-15T17:00:00.000Z'),
+    ]
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 3)
+    assert.equal(res.assignmentsInserted, 0)
+    assert.equal(res.assignmentsArchived, 0)
+    assert.equal(db.assignments.length, 3) // no duplicates, nothing archived
+
+    // Each physical row kept its identity and picked up its own new time.
+    assert.deepEqual(
+      db.assignments.map((r) => [r.id, r.external_assignment_id]).sort(),
+      [
+        ['row-2026-09-01T12:00:00.000Z', 'base@2026-09-01T17:00:00.000Z'],
+        ['row-2026-09-08T12:00:00.000Z', 'base@2026-09-08T17:00:00.000Z'],
+        ['row-2026-09-15T12:00:00.000Z', 'base@2026-09-15T17:00:00.000Z'],
+      ]
+    )
+    assert.ok(db.assignments.every((r) => r.feed_status !== 'archived'))
+  })
+
+  it('updates a series in place when both the day and the title change', async () => {
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [seriesRow('2026-09-01T12:00:00.000Z'), seriesRow('2026-09-08T12:00:00.000Z')],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+
+    const occurrences = [
+      seriesOcc('2026-09-03T12:00:00.000Z', { title: 'Weekly Lab (Thursdays)' }),
+      seriesOcc('2026-09-10T12:00:00.000Z', { title: 'Weekly Lab (Thursdays)' }),
+    ]
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 2)
+    assert.equal(res.assignmentsInserted, 0)
+    assert.equal(res.assignmentsArchived, 0)
+    assert.equal(db.assignments.length, 2)
+    assert.ok(db.assignments.every((r) => r.assignment_name === 'Weekly Lab (Thursdays)'))
+  })
+
+  it('recovers the series identity from a stored id even without seriesUid on the occurrence', async () => {
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [seriesRow('2026-09-01T12:00:00.000Z')],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+    const occurrences = [seriesOcc('2026-09-01T17:00:00.000Z', { seriesUid: undefined })]
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 1)
+    assert.equal(db.assignments.length, 1)
+  })
+
+  it('inserts rather than adopting a distant row when a series gains a new occurrence', async () => {
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [seriesRow('2026-09-01T12:00:00.000Z')],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+    // Three months away is far outside MAX_SERIES_SHIFT_MS: this is a new
+    // occurrence, not the old one moved.
+    const occurrences = [seriesOcc('2026-12-01T12:00:00.000Z')]
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences })
+
+    assert.equal(res.assignmentsRekeyed, 0)
+    assert.equal(res.assignmentsInserted, 1)
+    assert.equal(res.assignmentsArchived, 1) // the genuinely-gone occurrence
+    assert.equal(db.assignments.length, 2)
+  })
+
+  it('does not archive series occurrences that merely aged out of the expansion window', async () => {
+    const dayMs = 24 * 60 * 60 * 1000
+    const agedOut = new Date(Date.now() - 60 * dayMs).toISOString()
+    const stillInWindow = new Date(Date.now() + 7 * dayMs).toISOString()
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [seriesRow(agedOut), seriesRow(stillInWindow)],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+
+    // The feed only reports the occurrence still inside the window. The older one
+    // fell off the back of RRULE expansion — that is not a professor deleting it.
+    const res = await writeOccurrences({
+      supabase: client, userId: USER, feedId: FEED,
+      occurrences: [seriesOcc(stillInWindow)],
+    })
+
+    assert.equal(res.assignmentsArchived, 0)
+    assert.equal(db.assignments.find((r) => r.external_assignment_id === `base@${agedOut}`).feed_status, 'live')
+  })
+
+  it('still archives a one-off assignment the professor removed, however old', async () => {
+    const oldIso = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [
+        liveRow(),
+        { id: 'gone', user_id: USER, course_id: 'course-1', external_assignment_id: 'ONE-OFF', assignment_name: 'Deleted essay', due_at: oldIso, feed_id: FEED, source_url: 'https://x/essay', feed_status: 'live' },
+      ],
+    }
+    const { client, db } = makeFakeSupabase(seed)
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.assignmentsArchived, 1)
+    assert.equal(db.assignments.find((r) => r.id === 'gone').feed_status, 'archived')
   })
 })
 

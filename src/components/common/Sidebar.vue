@@ -33,20 +33,9 @@ function localDateKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function dateInDays(n) {
-  const d = new Date()
-  d.setDate(d.getDate() + n)
-  return localDateKey(d)
-}
-
-/** Assignments due within the next 7 days (not completed, not archived). */
-const dueSoonCount = computed(() => {
-  const today = localDateKey()
-  const cutoff = dateInDays(7)
-  return assignmentsStore.assignments.filter(
-    a => a.dueDate >= today && a.dueDate <= cutoff && a.status !== 'completed' && a.feedStatus !== 'archived'
-  ).length
-})
+/** Assignments due within the next 7 days. Reuses the store's window so this
+ *  badge and the dashboard tile can never disagree. */
+const dueSoonCount = computed(() => assignmentsStore.dueSoonAssignments.length)
 
 /** Count of tasks scheduled within the current Mon–Sun week. */
 const weekTaskCount = computed(() => {

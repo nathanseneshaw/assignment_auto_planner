@@ -213,6 +213,34 @@ export function createBannerClassicScraper({
  *  without hammering these older Banner hosts. */
 const DETAIL_CONCURRENCY = 8
 
+/**
+ * A real section header: "Principles of Accounting I - 13215 - ACC 2013 - 002".
+ * Also used to tell a section header apart from the decorative header rows some
+ * schools interleave (see findDetailRow).
+ */
+const SECTION_TITLE_RE = /^(.*) - (\d+) - (\S+)\s+(\S+) - (\S+)$/
+
+/**
+ * Walk from a section's header row to the row holding its details.
+ *
+ * Usually that's the very next <tr>, but A&M-Texarkana slots a second
+ * th.ddtitle row ("View Book Information", linking the campus bookstore)
+ * between the two, which would otherwise leave every section with no meeting
+ * times and no instructors. Skip header-only rows until the detail row shows
+ * up, and stop if the NEXT section starts first (a section with no detail row).
+ */
+function findDetailRow($, headerTr) {
+  let tr = headerTr.next('tr')
+  while (tr.length && !tr.find('td.dddefault').length) {
+    const header = tr.find('th.ddtitle, th.ddlabel').first()
+    if (!header.length) break
+    const text = decodeEntities(header.find('a').first().text() || header.text())
+    if (SECTION_TITLE_RE.test(text)) return $()
+    tr = tr.next('tr')
+  }
+  return tr
+}
+
 /** Parse a Banner "Class Schedule Listing" page into the unified Section shape. */
 function parseListing(html, { school, termCode, termLabel, subjectLabel }) {
   const $ = cheerio.load(html)
@@ -223,12 +251,11 @@ function parseListing(html, { school, termCode, termLabel, subjectLabel }) {
   // ddlabel row headers (e.g. nothing on the listing page matches it).
   $('th.ddtitle, th.ddlabel').each((_, th) => {
     const titleText = decodeEntities($(th).find('a').first().text() || $(th).text())
-    // "Principles of Accounting I - 13215 - ACC 2013 - 002"
-    const m = titleText.match(/^(.*) - (\d+) - (\S+)\s+(\S+) - (\S+)$/)
+    const m = titleText.match(SECTION_TITLE_RE)
     if (!m) return
     const [, title, crn, subjectCode, courseNumber, sectionNumber] = m
 
-    const detail = $(th).closest('tr').next('tr').find('td.dddefault').first()
+    const detail = findDetailRow($, $(th).closest('tr')).find('td.dddefault').first()
     const detailText = detail.text()
     const credits = parseCredits((detailText.match(/(\d+(?:\.\d+)?)\s+Credits/) || [])[1])
 
@@ -290,7 +317,11 @@ function parseInstructors($, detail) {
       const tds = $(tr).find('td.dddefault')
       if (tds.length < 7) return
       const clone = $(tds[6]).clone()
-      clone.find('a, img').remove()
+      // Drop the e-mail icon and its mailto link, but keep the text of other
+      // anchors: Texas Southern wraps each instructor's name in a link to
+      // their HB 2504 CV, so removing every <a> removed the names too.
+      clone.find('img').remove()
+      clone.find('a[href^="mailto:"]').remove()
       const text = decodeEntities(clone.text()).replace(/\s*\([^)]*\)/g, '')
       for (const name of text.split(',').map((s) => s.trim())) {
         if (!name || /^(tba|to be announced|staff)$/i.test(name)) continue

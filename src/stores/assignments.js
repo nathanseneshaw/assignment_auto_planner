@@ -42,13 +42,19 @@ export const useAssignmentsStore = defineStore('assignments', () => {
   })
 
   /**
-   * Today's date as `YYYY-MM-DD` in the **user's local timezone**. We never use
-   * `toISOString()` here because that would shift to UTC and put assignments
-   * due today into "yesterday" for anyone west of UTC.
+   * A date as `YYYY-MM-DD` in the **user's local timezone** (defaults to today).
+   * We never use `toISOString()` here because that would shift to UTC and put
+   * assignments due today into "yesterday" for anyone west of UTC.
    */
-  function localDateKey() {
-    const d = new Date()
+  function localDateKey(d = new Date()) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  /** The same local key, `n` days out from today. */
+  function dateInDays(n) {
+    const d = new Date()
+    d.setDate(d.getDate() + n)
+    return localDateKey(d)
   }
 
   /** Not-yet-due, still-open assignments sorted by due date. Archived (removed
@@ -58,6 +64,20 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     return assignmentsByDueDate.value.filter(
       a => a.dueDate >= today && a.status !== 'completed' && a.feedStatus !== 'archived'
     )
+  })
+
+  /** How far ahead "due soon" looks. The dashboard tile and the sidebar badge
+   *  use this narrow window; the assignments page shows the full
+   *  `upcomingAssignments` road ahead. */
+  const DUE_SOON_DAYS = 7
+
+  /** The slice of `upcomingAssignments` landing in the next `DUE_SOON_DAYS`
+   *  days. Derived from that getter rather than re-filtering `assignments`, so
+   *  the two windows can never drift apart the way they did when each page
+   *  hand-rolled its own definition of "upcoming". */
+  const dueSoonAssignments = computed(() => {
+    const cutoff = dateInDays(DUE_SOON_DAYS)
+    return upcomingAssignments.value.filter(a => a.dueDate <= cutoff)
   })
 
   /** Past-due and still incomplete — surfaced as warnings in the UI. Archived
@@ -240,6 +260,7 @@ export const useAssignmentsStore = defineStore('assignments', () => {
     error,
     assignmentsByDueDate,
     upcomingAssignments,
+    dueSoonAssignments,
     overdueAssignments,
     archivedAssignments,
     assignmentsByCourse,
