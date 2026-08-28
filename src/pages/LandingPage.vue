@@ -31,7 +31,9 @@ const previewTasks = [
 
 // ── Live demo loop: tasks in the preview check themselves off one by one,
 //    and the surrounding stats/progress animate in sync, then reset. ──
-const DEMO_TOTAL = 9
+// Total always equals the visible task rows so the stats genuinely add up and
+// the loop reaches a real 100% "all done" state before resetting.
+const DEMO_TOTAL = previewTasks.length
 const prefersReducedMotion =
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
@@ -103,6 +105,31 @@ const vReveal = {
 const previewEl = ref(null)
 const showStickyCta = ref(false)
 
+// ── Section nav: one source of truth for header, mobile menu & footer ──
+const navLinks = [
+  { href: '#how-it-works', label: 'How it works' },
+  { href: '#tour', label: 'Tour' },
+  { href: '#features', label: 'Features' },
+  { href: '#download', label: 'Download' },
+  { href: '#faq', label: 'FAQ' },
+]
+
+// Mobile menu (below md the inline nav is hidden; a hamburger reveals this)
+const mobileNavOpen = ref(false)
+
+function onMenuKeydown(e) {
+  if (e.key === 'Escape') mobileNavOpen.value = false
+}
+
+// Scroll-spy: highlights the nav link for the section currently in view.
+// The narrow rootMargin band means at most one section "wins" at a time.
+const activeSection = ref('')
+let sectionObserver = null
+
+// ── Download section: surface the card matching the visitor's OS first ──
+const isMacVisitor =
+  typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent)
+
 // ── Hero spotlight: a soft glow that trails the cursor (desktop pointers only) ──
 const heroEl = ref(null)
 const spotlightEl = ref(null)
@@ -134,6 +161,24 @@ function onScroll() {
 
 onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
+
+  if (typeof IntersectionObserver !== 'undefined') {
+    sectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) activeSection.value = entry.target.id
+        }
+      },
+      // Only the band around the upper-middle of the viewport counts, so
+      // exactly one section is "current" as the user scrolls.
+      { rootMargin: '-30% 0px -60% 0px' },
+    )
+    for (const link of navLinks) {
+      const el = document.getElementById(link.href.slice(1))
+      if (el) sectionObserver.observe(el)
+    }
+  }
+
   if (previewEl.value && typeof IntersectionObserver !== 'undefined') {
     const demoObserver = new IntersectionObserver(
       (entries) => {
@@ -154,6 +199,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScroll)
   clearTimeout(demoTimer)
   revealObserver?.disconnect()
+  sectionObserver?.disconnect()
 })
 
 const steps = [
@@ -247,8 +293,12 @@ function scrollToSection(id) {
 
 <template>
   <div class="min-h-screen scroll-smooth bg-paper text-gray-900">
+    <!-- Keyboard users jump past the header chrome straight to the content -->
+    <a href="#main-content" class="skip-link">Skip to content</a>
+
     <header
       class="sticky top-0 z-20 border-b border-paper-line bg-paper/90 backdrop-blur-xl"
+      @keydown="onMenuKeydown"
     >
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
         <RouterLink to="/" class="flex items-center gap-3 group min-w-0">
@@ -257,33 +307,81 @@ function scrollToSection(id) {
           <span class="text-[15px] font-semibold tracking-tight text-gray-900 truncate">Plannr</span>
         </RouterLink>
 
-        <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
-          <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">How it works</a>
-          <a href="#tour" @click.prevent="scrollToSection('tour')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Tour</a>
-          <a href="#features" @click.prevent="scrollToSection('features')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Features</a>
-          <a href="#download" @click.prevent="scrollToSection('download')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">Download</a>
-          <a href="#faq" @click.prevent="scrollToSection('faq')" class="px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors">FAQ</a>
+        <nav class="hidden md:flex items-center gap-1 text-sm font-medium" aria-label="Page sections">
+          <a
+            v-for="link in navLinks"
+            :key="link.href"
+            :href="link.href"
+            class="px-3 py-2 rounded-lg transition-colors"
+            :class="
+              activeSection === link.href.slice(1)
+                ? 'text-primary-800 bg-primary-100/60'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/80'
+            "
+            :aria-current="activeSection === link.href.slice(1) ? 'true' : undefined"
+            @click.prevent="scrollToSection(link.href.slice(1))"
+          >{{ link.label }}</a>
         </nav>
 
         <nav class="flex items-center flex-wrap justify-end gap-2">
           <template v-if="isSupabaseConfigured && authStore.isAuthenticated">
-            <RouterLink to="/dashboard" custom v-slot="{ navigate }">
-              <Button size="sm" type="button" @click="navigate">Go to app</Button>
+            <RouterLink to="/dashboard" custom v-slot="{ href, navigate }">
+              <Button size="sm" :href="href" @click="navigate">Go to app</Button>
             </RouterLink>
           </template>
           <template v-else-if="isSupabaseConfigured">
-            <RouterLink :to="loginToApp" custom v-slot="{ navigate }">
-              <Button variant="secondary" size="sm" type="button" @click="navigate">Sign in</Button>
+            <RouterLink :to="loginToApp" custom v-slot="{ href, navigate }">
+              <Button variant="secondary" size="sm" :href="href" @click="navigate">Sign in</Button>
             </RouterLink>
-            <RouterLink :to="registerToApp" custom v-slot="{ navigate }">
-              <Button size="sm" type="button" @click="navigate">Get started free</Button>
+            <RouterLink :to="registerToApp" custom v-slot="{ href, navigate }">
+              <Button size="sm" :href="href" @click="navigate">Get started free</Button>
             </RouterLink>
           </template>
+
+          <!-- Mobile: the section nav lives behind a hamburger below md -->
+          <button
+            type="button"
+            class="md:hidden flex w-9 h-9 items-center justify-center rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100/80 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
+            :aria-expanded="mobileNavOpen"
+            aria-controls="mobile-nav"
+            :aria-label="mobileNavOpen ? 'Close menu' : 'Open menu'"
+            @click="mobileNavOpen = !mobileNavOpen"
+          >
+            <svg v-if="!mobileNavOpen" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            <svg v-else class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Mobile section menu: same links as the desktop nav, closes on pick/Escape -->
+      <div
+        v-if="mobileNavOpen"
+        id="mobile-nav"
+        class="md:hidden border-t border-paper-line bg-paper/95 backdrop-blur-xl"
+      >
+        <nav class="max-w-6xl mx-auto px-4 py-2 flex flex-col text-sm font-medium" aria-label="Page sections">
+          <a
+            v-for="link in navLinks"
+            :key="link.href"
+            :href="link.href"
+            class="px-3 py-2.5 rounded-lg transition-colors"
+            :class="
+              activeSection === link.href.slice(1)
+                ? 'text-primary-800 bg-primary-100/60'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/80'
+            "
+            :aria-current="activeSection === link.href.slice(1) ? 'true' : undefined"
+            @click.prevent="mobileNavOpen = false; scrollToSection(link.href.slice(1))"
+          >{{ link.label }}</a>
         </nav>
       </div>
     </header>
 
-    <main class="overflow-x-clip">
+    <main id="main-content" class="overflow-x-clip">
       <section
         ref="heroEl"
         class="relative max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-16 sm:pb-24"
@@ -321,8 +419,8 @@ function scrollToSection(id) {
 
           <div class="hero-enter hero-enter-4 mt-10 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
             <template v-if="isSupabaseConfigured">
-              <RouterLink :to="registerToApp" custom v-slot="{ navigate }">
-                <Button size="lg" type="button" class="w-full sm:w-auto min-w-[9rem]" @click="navigate">
+              <RouterLink :to="registerToApp" custom v-slot="{ href, navigate }">
+                <Button size="lg" :href="href" class="w-full sm:w-auto min-w-[9rem]" @click="navigate">
                   Get started free
                 </Button>
               </RouterLink>
@@ -337,24 +435,24 @@ function scrollToSection(id) {
               </Button>
             </template>
             <template v-else>
-              <RouterLink to="/dashboard" custom v-slot="{ navigate }">
-                <Button size="lg" type="button" class="w-full sm:w-auto min-w-[9rem]" @click="navigate">
+              <RouterLink to="/dashboard" custom v-slot="{ href, navigate }">
+                <Button size="lg" :href="href" class="w-full sm:w-auto min-w-[9rem]" @click="navigate">
                   Open the app
                 </Button>
               </RouterLink>
-              <RouterLink :to="loginToApp" custom v-slot="{ navigate }">
-                <Button variant="secondary" size="lg" type="button" class="w-full sm:w-auto min-w-[9rem]" @click="navigate">
+              <RouterLink :to="loginToApp" custom v-slot="{ href, navigate }">
+                <Button variant="secondary" size="lg" :href="href" class="w-full sm:w-auto min-w-[9rem]" @click="navigate">
                   Sign in
                 </Button>
               </RouterLink>
             </template>
           </div>
 
-          <p v-if="showSkipSignIn" class="mt-6 text-sm text-gray-500">
+          <p v-if="showSkipSignIn" class="mt-6 text-sm text-gray-600">
             Auth isn’t configured yet. Use <strong class="font-medium text-gray-700">Open the app</strong> to try the
             planner locally.
           </p>
-          <p v-else class="hero-enter hero-enter-5 mt-5 text-sm text-gray-500">
+          <p v-else class="hero-enter hero-enter-5 mt-5 text-sm text-gray-600">
             Free during beta · No credit card
           </p>
         </div>
@@ -505,7 +603,7 @@ function scrollToSection(id) {
                 <div class="mt-6">
                   <div class="flex items-center gap-3">
                     <p class="eyebrow text-gray-400">This Week</p>
-                    <span class="font-mono text-[11px] text-gray-400 tabular-nums">{{ demoChecked }}/9</span>
+                    <span class="font-mono text-[11px] text-gray-400 tabular-nums">{{ demoChecked }}/{{ DEMO_TOTAL }}</span>
                     <div class="flex-1 h-px bg-paper-line"></div>
                   </div>
                   <div class="mt-1">
@@ -560,7 +658,7 @@ function scrollToSection(id) {
                 </div>
                 <p class="mt-3 text-[12px] text-gray-500">
                   <span class="font-medium text-gray-900">{{ demoChecked }}</span> of
-                  <span class="font-medium text-gray-900">9</span> tasks complete
+                  <span class="font-medium text-gray-900">{{ DEMO_TOTAL }}</span> tasks complete
                 </p>
 
                 <p class="eyebrow text-gray-400 mt-7 mb-2">Breakdown</p>
@@ -580,7 +678,7 @@ function scrollToSection(id) {
         </div>
 
         <!-- Trust strip: honest, concrete signals under the product preview -->
-        <div v-reveal class="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm text-gray-500">
+        <div v-reveal class="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm text-gray-600">
           <span>Works with Canvas, Blackboard &amp; Google Calendar</span>
           <span class="hidden sm:inline text-gray-300">·</span>
           <span>Course catalogs from 55+ universities</span>
@@ -614,12 +712,12 @@ function scrollToSection(id) {
           </ol>
 
           <div v-if="isSupabaseConfigured" class="mt-10 flex flex-col sm:flex-row items-center gap-4">
-            <RouterLink :to="registerToApp" custom v-slot="{ navigate }">
-              <Button size="lg" type="button" class="w-full sm:w-auto" @click="navigate">
+            <RouterLink :to="registerToApp" custom v-slot="{ href, navigate }">
+              <Button size="lg" :href="href" class="w-full sm:w-auto" @click="navigate">
                 Create your free account
               </Button>
             </RouterLink>
-            <p class="text-sm text-gray-500">Free during beta. No credit card.</p>
+            <p class="text-sm text-gray-600">Free during beta. No credit card.</p>
           </div>
         </div>
       </section>
@@ -689,6 +787,7 @@ function scrollToSection(id) {
               :href="installerUrl"
               download
               class="flex items-center gap-4 rounded-2xl border border-paper-line bg-surface p-5 shadow-sm shadow-gray-900/[0.03] hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              :class="isMacVisitor ? 'order-2' : 'order-1'"
             >
               <svg
                 class="w-10 h-10 shrink-0 text-primary-700"
@@ -699,8 +798,11 @@ function scrollToSection(id) {
                 <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.351" />
               </svg>
               <div class="flex-1 text-left">
-                <p class="text-base font-semibold text-gray-900">Download for Windows</p>
-                <p class="mt-0.5 text-sm text-gray-500">.exe installer · 64-bit</p>
+                <p class="flex flex-wrap items-center gap-2 text-base font-semibold text-gray-900">
+                  Download for Windows
+                  <span v-if="!isMacVisitor" class="badge-primary">For your device</span>
+                </p>
+                <p class="mt-0.5 text-sm text-gray-600">.exe installer · 64-bit</p>
               </div>
               <svg
                 class="w-5 h-5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all"
@@ -718,6 +820,7 @@ function scrollToSection(id) {
               :href="macInstallerUrl"
               download
               class="flex items-center gap-4 rounded-2xl border border-paper-line bg-surface p-5 shadow-sm shadow-gray-900/[0.03] hover:border-primary-300 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              :class="isMacVisitor ? 'order-1' : 'order-2'"
             >
               <svg
                 class="w-10 h-10 shrink-0 text-primary-700"
@@ -728,8 +831,11 @@ function scrollToSection(id) {
                 <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z" />
               </svg>
               <div class="flex-1 text-left">
-                <p class="text-base font-semibold text-gray-900">Download for Mac</p>
-                <p class="mt-0.5 text-sm text-gray-500">.dmg installer · Apple Silicon &amp; Intel</p>
+                <p class="flex flex-wrap items-center gap-2 text-base font-semibold text-gray-900">
+                  Download for Mac
+                  <span v-if="isMacVisitor" class="badge-primary">For your device</span>
+                </p>
+                <p class="mt-0.5 text-sm text-gray-600">.dmg installer · Apple Silicon &amp; Intel</p>
               </div>
               <svg
                 class="w-5 h-5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all"
@@ -744,7 +850,7 @@ function scrollToSection(id) {
             </a>
           </div>
 
-          <p class="mt-6 text-center text-sm text-gray-500">
+          <p class="mt-6 text-center text-sm text-gray-600">
             Available for Windows and Mac. Prefer to stay in the browser? Use the
             <RouterLink :to="loginToApp" class="text-primary-700 hover:underline">web app</RouterLink>.
           </p>
@@ -767,7 +873,9 @@ function scrollToSection(id) {
               <button
                 type="button"
                 class="flex w-full items-center justify-between gap-4 px-5 py-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 rounded-2xl"
+                :id="`faq-question-${i}`"
                 :aria-expanded="openFaq === i"
+                :aria-controls="`faq-panel-${i}`"
                 @click="toggleFaq(i)"
               >
                 <span class="text-base font-semibold text-gray-900">{{ item.q }}</span>
@@ -784,6 +892,10 @@ function scrollToSection(id) {
                 </svg>
               </button>
               <div
+                :id="`faq-panel-${i}`"
+                role="region"
+                :aria-labelledby="`faq-question-${i}`"
+                :aria-hidden="openFaq !== i"
                 class="grid transition-[grid-template-rows] duration-200 ease-out"
                 :class="openFaq === i ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
               >
@@ -808,22 +920,22 @@ function scrollToSection(id) {
             </p>
             <div class="mt-8 flex flex-col sm:flex-row justify-center gap-3">
               <template v-if="isSupabaseConfigured">
-                <RouterLink :to="registerToApp" custom v-slot="{ navigate }">
+                <RouterLink :to="registerToApp" custom v-slot="{ href, navigate }">
                   <Button
                     variant="secondary"
                     size="lg"
-                    type="button"
+                    :href="href"
                     class="!bg-surface !text-primary-900 hover:!bg-gray-100"
                     @click="navigate"
                   >
                     Get started free
                   </Button>
                 </RouterLink>
-                <RouterLink :to="loginToApp" custom v-slot="{ navigate }">
+                <RouterLink :to="loginToApp" custom v-slot="{ href, navigate }">
                   <Button
                     variant="outline"
                     size="lg"
-                    type="button"
+                    :href="href"
                     class="!border-white/40 !text-white hover:!bg-surface/10"
                     @click="navigate"
                   >
@@ -832,11 +944,11 @@ function scrollToSection(id) {
                 </RouterLink>
               </template>
               <template v-else>
-                <RouterLink to="/dashboard" custom v-slot="{ navigate }">
+                <RouterLink to="/dashboard" custom v-slot="{ href, navigate }">
                   <Button
                     variant="secondary"
                     size="lg"
-                    type="button"
+                    :href="href"
                     class="!bg-surface !text-primary-900 hover:!bg-gray-100"
                     @click="navigate"
                   >
@@ -854,15 +966,17 @@ function scrollToSection(id) {
 
       <footer class="border-t border-paper-line py-10">
         <div
-          class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500"
+          class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-600"
         >
           <p>© {{ new Date().getFullYear() }} Plannr</p>
-          <nav class="flex items-center gap-5">
-            <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')" class="hover:text-gray-900 transition-colors">How it works</a>
-            <a href="#tour" @click.prevent="scrollToSection('tour')" class="hover:text-gray-900 transition-colors">Tour</a>
-            <a href="#features" @click.prevent="scrollToSection('features')" class="hover:text-gray-900 transition-colors">Features</a>
-            <a href="#download" @click.prevent="scrollToSection('download')" class="hover:text-gray-900 transition-colors">Download</a>
-            <a href="#faq" @click.prevent="scrollToSection('faq')" class="hover:text-gray-900 transition-colors">FAQ</a>
+          <nav class="flex items-center gap-5" aria-label="Footer">
+            <a
+              v-for="link in navLinks"
+              :key="link.href"
+              :href="link.href"
+              class="hover:text-gray-900 transition-colors"
+              @click.prevent="scrollToSection(link.href.slice(1))"
+            >{{ link.label }}</a>
           </nav>
         </div>
       </footer>
@@ -874,8 +988,8 @@ function scrollToSection(id) {
         v-if="isSupabaseConfigured && showStickyCta"
         class="fixed inset-x-0 bottom-0 z-30 md:hidden border-t border-paper-line bg-paper/95 backdrop-blur-xl px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
       >
-        <RouterLink :to="registerToApp" custom v-slot="{ navigate }">
-          <Button block type="button" @click="navigate">Get started free</Button>
+        <RouterLink :to="registerToApp" custom v-slot="{ href, navigate }">
+          <Button block :href="href" @click="navigate">Get started free</Button>
         </RouterLink>
       </div>
     </Transition>
@@ -883,6 +997,27 @@ function scrollToSection(id) {
 </template>
 
 <style scoped>
+/* ── Skip link: parked off-screen (still focusable) until keyboard focus ── */
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 50;
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--color-surface);
+  color: var(--color-gray-900);
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 10px 25px rgba(28, 25, 23, 0.15);
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
 /* ── Hero entrance: staggered fade-up on load ── */
 .hero-enter {
   opacity: 0;

@@ -81,13 +81,19 @@ function select(i) {
   active.value = (i + STEPS.length) % STEPS.length
 }
 
+// Roving tabindex: only the active tab is tabbable; arrow keys move both the
+// selection and keyboard focus, per the ARIA tabs pattern.
+const tabEls = []
+
 function onKeydown(e) {
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
     e.preventDefault()
     select(active.value + 1)
+    tabEls[active.value]?.focus()
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
     e.preventDefault()
     select(active.value - 1)
+    tabEls[active.value]?.focus()
   }
 }
 
@@ -109,16 +115,20 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootEl" @keydown="onKeydown">
+  <div ref="rootEl">
     <div class="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center">
       <!-- Step list -->
-      <div role="tablist" aria-label="Plannr walkthrough steps" class="order-2 lg:order-1 space-y-2.5">
+      <div role="tablist" aria-label="Plannr walkthrough steps" class="order-2 lg:order-1 space-y-2.5" @keydown="onKeydown">
         <button
           v-for="(step, i) in STEPS"
           :key="step.key"
+          :ref="(el) => (tabEls[i] = el)"
           type="button"
           role="tab"
+          :id="`walkthrough-tab-${i}`"
+          aria-controls="walkthrough-panel"
           :aria-selected="active === i"
+          :tabindex="active === i ? 0 : -1"
           class="group relative w-full rounded-2xl border p-4 sm:p-5 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30"
           :class="
             active === i
@@ -158,7 +168,12 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Screenshot in a browser frame -->
-      <div class="order-1 lg:order-2 min-w-0">
+      <div
+        id="walkthrough-panel"
+        role="tabpanel"
+        :aria-labelledby="`walkthrough-tab-${active}`"
+        class="order-1 lg:order-2 min-w-0"
+      >
         <div
           class="relative rounded-2xl border border-paper-line bg-surface shadow-2xl shadow-gray-900/15 overflow-hidden"
         >
@@ -172,7 +187,7 @@ onBeforeUnmount(() => {
               <div
                 class="flex items-center gap-1.5 rounded-md border border-paper-line bg-surface px-3 py-1 text-[11px] font-mono text-gray-400"
               >
-                <span class="text-gray-500">app.plannr.co</span>
+                <span class="text-gray-500">plannr.sh</span>
                 <span class="text-gray-300">/</span>
                 <span class="truncate">{{ activeStep.route }}</span>
               </div>
