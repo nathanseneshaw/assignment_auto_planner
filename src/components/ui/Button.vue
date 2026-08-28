@@ -27,6 +27,13 @@ const props = defineProps({
   block: {
     type: Boolean,
     default: false
+  },
+  // When set, the button renders as a real <a href> (keeping button styling),
+  // so link-like actions get native behaviors: open in new tab, copy address,
+  // middle-click. Pair with RouterLink's custom slot: :href="href" @click="navigate".
+  href: {
+    type: String,
+    default: null
   }
 })
 
@@ -72,9 +79,11 @@ function handleClick(e) {
 </script>
 
 <template>
-  <button 
+  <component
+    :is="href ? 'a' : 'button'"
     :class="classes"
-    :disabled="disabled || loading"
+    :href="href || undefined"
+    :disabled="href ? undefined : (disabled || loading)"
     @click="handleClick"
   >
     <!-- Loading Spinner -->
@@ -89,5 +98,5 @@ function handleClick(e) {
     </span>
     
     <slot />
-  </button>
+  </component>
 </template>
