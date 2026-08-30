@@ -82,6 +82,19 @@ import * as cofc from './course-planner/cofc-scraper.js'
 import * as uncc from './course-planner/uncc-scraper.js'
 import * as udel from './course-planner/udel-scraper.js'
 import * as odu from './course-planner/odu-scraper.js'
+import * as uwyo from './course-planner/uwyo-scraper.js'
+import * as umontana from './course-planner/umontana-scraper.js'
+import * as uaf from './course-planner/uaf-scraper.js'
+import * as uaa from './course-planner/uaa-scraper.js'
+import * as sdstate from './course-planner/sdstate-scraper.js'
+import * as usd from './course-planner/usd-scraper.js'
+import * as hawaii from './course-planner/hawaii-scraper.js'
+import * as uvm from './course-planner/uvm-scraper.js'
+import * as washu from './course-planner/washu-scraper.js'
+import * as lsu from './course-planner/lsu-scraper.js'
+import * as uark from './course-planner/uark-scraper.js'
+import * as louisville from './course-planner/louisville-scraper.js'
+import * as unr from './course-planner/unr-scraper.js'
 
 const router = Router()
 
@@ -566,6 +579,97 @@ const SCHOOLS = {
     // Course Search JSON carries live "current of max" enrollment per section.
     enrollmentDataAvailable: true,
     scraper: odu,
+  },
+  uwyo: {
+    code: 'uwyo',
+    name: 'University of Wyoming',
+    // Banner SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: uwyo,
+  },
+  umontana: {
+    code: 'umontana',
+    name: 'University of Montana',
+    // Banner SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: umontana,
+  },
+  uaf: {
+    code: 'uaf',
+    name: 'University of Alaska Fairbanks',
+    // Banner SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: uaf,
+  },
+  uaa: {
+    code: 'uaa',
+    name: 'University of Alaska Anchorage',
+    // Banner SSB exposes max / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: uaa,
+  },
+  sdstate: {
+    code: 'sdstate',
+    name: 'South Dakota State University',
+    // Shared SDBOR Banner SSB, campus-scoped; full seat counts.
+    enrollmentDataAvailable: true,
+    scraper: sdstate,
+  },
+  usd: {
+    code: 'usd',
+    name: 'University of South Dakota',
+    // Shared SDBOR Banner SSB, campus-scoped; full seat counts.
+    enrollmentDataAvailable: true,
+    scraper: usd,
+  },
+  hawaii: {
+    code: 'hawaii',
+    name: 'University of Hawaii at Manoa',
+    // Shared UH-system Banner SSB, campus-scoped; full seat counts.
+    enrollmentDataAvailable: true,
+    scraper: hawaii,
+  },
+  uvm: {
+    code: 'uvm',
+    name: 'University of Vermont',
+    // FOSE details call carries max enrollment + seats available.
+    enrollmentDataAvailable: true,
+    scraper: uvm,
+  },
+  washu: {
+    code: 'washu',
+    name: 'Washington University in St. Louis',
+    // Registrar listing prints "Seats Taken" as taken/capacity per section.
+    enrollmentDataAvailable: true,
+    scraper: washu,
+  },
+  lsu: {
+    code: 'lsu',
+    name: 'Louisiana State University',
+    // Course Offerings prints "Enrollment: 39/40" per section.
+    enrollmentDataAvailable: true,
+    scraper: lsu,
+  },
+  uark: {
+    code: 'uark',
+    name: 'University of Arkansas',
+    // Schedule-of-Classes API carries Enrollment_Count / Section_Capacity.
+    enrollmentDataAvailable: true,
+    scraper: uark,
+  },
+  louisville: {
+    code: 'louisville',
+    name: 'University of Louisville',
+    // PeopleSoft class-detail walk fills capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: louisville,
+  },
+  unr: {
+    code: 'unr',
+    name: 'University of Nevada, Reno',
+    // PeopleSoft class-detail walk fills capacity / enrolled / available seats.
+    enrollmentDataAvailable: true,
+    scraper: unr,
   },
 }
 

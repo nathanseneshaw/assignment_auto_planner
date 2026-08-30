@@ -23,6 +23,7 @@
 import { CookieJar } from 'tough-cookie'
 import makeFetchCookie from 'fetch-cookie'
 import * as cheerio from 'cheerio'
+import { cacheMemo } from './cache.js'
 import { parseDays, normalizeTime } from './util.js'
 
 export const PS_UA =
@@ -38,14 +39,34 @@ export async function loadSearchForm(componentUrl) {
   return { cFetch, $, icsid }
 }
 
-/** Snapshot every field currently in the #win0 form into a POST body. */
+/**
+ * The class-search form. Most instances render it as `<form id="win0">`, but
+ * some name it instead and give the id to the component (Nebraska, Louisville
+ * and Mizzou all serve `<form id="CLASS_SEARCH" name="win0">`), which silently
+ * produced an EMPTY form snapshot - and therefore a search with no criteria -
+ * until this fell back to the name.
+ */
+function formSelector($) {
+  return $('#win0').length ? '#win0' : 'form[name="win0"]'
+}
+
+/** Snapshot every field currently in the class-search form into a POST body. */
 export function buildFormBody($) {
   const body = new URLSearchParams()
-  $('#win0 input, #win0 select, #win0 textarea').each((_, el) => {
+  const f = formSelector($)
+  $(`${f} input, ${f} select, ${f} textarea`).each((_, el) => {
     const name = $(el).attr('name')
     if (!name) return
     const tag = el.tagName.toLowerCase()
     const type = ($(el).attr('type') || tag).toLowerCase()
+    // Never post the on-page buttons. PeopleSoft signals the action through
+    // ICAction, and some instances render Search/Clear as <input type="button">
+    // INSIDE the form, whose visible label overflows the underlying field:
+    // Nebraska rejected every search with "The value for the field 'Clear'
+    // (CLASS_SRCH_WRK2.SSR_PB_CLEAR) was over by 4 characters".
+    if (type === 'button' || type === 'submit' || type === 'reset' || type === 'image') {
+      return
+    }
     if (type === 'checkbox' || type === 'radio') {
       if ($(el).attr('checked') !== undefined) body.set(name, $(el).attr('value') || 'Y')
       return
@@ -83,18 +104,26 @@ export async function postForm(cFetch, componentUrl, body) {
 }
 
 /**
- * Whether a search response is the "Select at least N search criteria" bounce
- * rather than a results page. On a cold guest session PeopleSoft intermittently
- * fails to register the criteria and re-renders the entry page — re-running the
- * whole search on a fresh session clears it. A genuine no-results search returns
- * a results page (or a "no results" message) and is NOT treated as a bounce.
+ * Whether a search response is a criteria bounce rather than a results page. On
+ * a cold guest session PeopleSoft intermittently fails to register the criteria
+ * and re-renders the entry page — re-running the whole search on a fresh session
+ * clears it. A genuine no-results search returns a results page (or a "no
+ * results" message) and is NOT treated as a bounce.
+ *
+ * Instances word the bounce differently: UH and UT Arlington say "Select at
+ * least 2 search criteria", Mizzou says "Specify additional selection criteria
+ * to narrow your search". Mizzou's phrasing was not matched here originally, so
+ * its searches never got the retry and roughly half of them came back empty even
+ * with valid criteria — the flake looked like a broken parser.
  */
 function isCriteriaBounce(rawText) {
   const isResults =
     /PAGE id='SSR_CLSRCH_RSLT'/.test(rawText) ||
     extractCdataHtml(rawText).includes('SSR_CLSRSLT_WRK_GROUPBOX')
   if (isResults) return false
-  return /at least \d+ search|select at least/i.test(extractCdataHtml(rawText))
+  return /at least \d+ search|select at least|additional selection criteria/i.test(
+    extractCdataHtml(rawText)
+  )
 }
 
 /**
@@ -399,4 +428,196 @@ function mapStatus(alt) {
   if (a.includes('open')) return 'open'
   if (a.includes('closed') || a.includes('wait')) return 'closed'
   return 'unknown'
+}
+
+/**
+ * Factory for the plainest flavour of the classic component: a public
+ * COMMUNITY_ACCESS class search whose SUBJECT field is a <select>.
+ *
+ * That is the shape Nebraska-Lincoln, Louisville and Mizzou serve, and it needs
+ * far less work than UT Arlington's (uta-scraper.js), where the subject is free
+ * text and the list has to be walked one alphabet tab at a time. Here the terms
+ * and subjects are simply the two dropdowns on the search page.
+ *
+ * Options:
+ *  - `institution` pins the campus on multi-campus instances; single-campus
+ *    nodes still send it because the component expects the field.
+ *  - `subjectLookup: true` for instances whose SUBJECT is a free-text input
+ *    rather than a <select> (Nevada-Reno). The list then comes from the field's
+ *    lookup button, walked one alphabet tab at a time - the same trick
+ *    uta-scraper.js uses, except the row ids here are stock PeopleSoft
+ *    (SSR_CLSRCH_SUBJ_SUBJECT$N) rather than UT Arlington's UTA_-prefixed ones.
+ *  - `byCareer: true` for instances that reject a subject-only search. Both
+ *    Mizzou and Nevada-Reno bounce back to the criteria page unless a second
+ *    field is set, and academic career is the one field that can be enumerated
+ *    and swept exhaustively: the search runs once per career (UGRD / GRAD /
+ *    LAW / ...) and the results are merged on CRN. The obvious alternative -
+ *    the catalog-number row with "greater than or equal to 0", which is what UT
+ *    Arlington uses - is rejected outright by both hosts, and falling back to
+ *    "contains" would silently drop every course number without that digit.
+ *  - `extraCriteria(form$, body)` sets anything else a school needs.
+ *
+ * Seat counts come from the shared class-detail walk afterwards, exactly as they
+ * do for UH and UTA.
+ */
+export function createPeopleSoftScraper({
+  school,
+  url,
+  institution,
+  subjectLookup = false,
+  byCareer = false,
+  extraCriteria,
+}) {
+  const SEL = {
+    institution: 'select[name^="CLASS_SRCH_WRK2_INSTITUTION"]',
+    term: 'select[name^="CLASS_SRCH_WRK2_STRM"]',
+    // Matches the <select> and the free-text <input> spelling alike.
+    subject: '[name^="SSR_CLSRCH_WRK_SUBJECT"]',
+    career: 'select[name*="ACAD_CAREER"]',
+    openOnly: 'input[name^="SSR_CLSRCH_WRK_SSR_OPEN_ONLY"]',
+  }
+
+  /** Non-empty <option>s of a select as { code, label }. */
+  function options($, selector) {
+    const out = []
+    $(`${selector} option`).each((_, o) => {
+      const code = ($(o).attr('value') || '').trim()
+      if (!code) return
+      out.push({ code, label: $(o).text().replace(/\s+/g, ' ').trim() || code })
+    })
+    return out
+  }
+
+  async function getTerms() {
+    return cacheMemo(
+      `${school}:terms`,
+      async () => {
+        const { $ } = await loadSearchForm(url)
+        return options($, SEL.term)
+      },
+      60 * 60 * 1000
+    )
+  }
+
+  /**
+   * Free-text-subject instances: click the field's lookup button, then each
+   * alphabet tab, collecting the code/description pairs from every panel. ICSID
+   * rotates on each ICAJAX response, so it is carried forward between posts.
+   */
+  async function lookupSubjects() {
+    const { cFetch, $, icsid: initialIcsid } = await loadSearchForm(url)
+    let currentIcsid = initialIcsid
+    let stateNum = 1
+
+    async function postAction(action) {
+      const body = buildFormBody($)
+      const name = $(SEL.institution).attr('name')
+      if (name) body.set(name, institution)
+      setIcAction(body, { icsid: currentIcsid, action, stateNum: stateNum++ })
+      const html = extractCdataHtml(await postForm(cFetch, url, body))
+      const next = cheerio.load(html)('input[name="ICSID"]').attr('value')
+      if (next) currentIcsid = next
+      return html
+    }
+
+    const out = []
+    const seen = new Set()
+    function collect(html) {
+      const $$ = cheerio.load(html)
+      $$('[id^="SSR_CLSRCH_SUBJ_SUBJECT$"]').each((_, el) => {
+        const n = (($$(el).attr('id') || '').match(/\$(\d+)$/) || [])[1]
+        if (n == null) return
+        const code = $$(el).text().trim()
+        if (!code || seen.has(code)) return
+        seen.add(code)
+        const label = $$(`[id="SUBJECT_TBL_DESCRFORMAL$${n}"]`).text().trim() || code
+        out.push({ code, label })
+      })
+    }
+
+    collect(await postAction('CLASS_SRCH_WRK2_SSR_PB_SUBJ_SRCH$0'))
+    for (const letter of 'BCDEFGHIJKLMNOPQRSTUVWXYZ') {
+      collect(await postAction(`SSR_CLSRCH_WRK2_SSR_ALPHANUM_${letter}`))
+    }
+    return out.sort((a, b) => a.code.localeCompare(b.code))
+  }
+
+  async function getSubjects(termCode) {
+    return cacheMemo(
+      `${school}:subjects:${termCode}`,
+      async () => {
+        const subjects = subjectLookup
+          ? await lookupSubjects()
+          : options((await loadSearchForm(url)).$, SEL.subject)
+        if (!subjects.length) throw new Error(`${school} subject list came back empty`)
+        return subjects
+      },
+      60 * 60 * 1000
+    )
+  }
+
+  /** The careers this instance offers, e.g. ['UGRD', 'GRAD', 'LAW']. */
+  async function getCareers() {
+    return cacheMemo(
+      `${school}:careers`,
+      async () => {
+        const { $ } = await loadSearchForm(url)
+        return options($, SEL.career).map((c) => c.code)
+      },
+      6 * 60 * 60 * 1000
+    )
+  }
+
+  function applyCriteria($, body, { termCode, subjectCode, career }) {
+    const set = (selector, value) => {
+      const name = $(selector).attr('name')
+      if (name) body.set(name, value)
+    }
+    set(SEL.institution, institution)
+    set(SEL.term, termCode)
+    set(SEL.subject, subjectCode)
+    if (career) set(SEL.career, career)
+    // "Show Open Classes Only" is checked by default on several instances and
+    // would silently hide full sections, which is exactly what a planner needs
+    // to see. Drop the checkbox so the search returns everything.
+    $(SEL.openOnly).each((_, el) => body.delete($(el).attr('name')))
+    extraCriteria?.($, body)
+  }
+
+  async function searchOnce({ termCode, subjectCode, termLabel, subjectLabel, career }) {
+    const criteria = ($, body) => applyCriteria($, body, { termCode, subjectCode, career })
+    const sections = await runClassSearch({
+      url,
+      school,
+      termCode,
+      termLabel,
+      subjectLabel,
+      applyCriteria: criteria,
+    })
+    await enrichSectionsWithSeats({ url, applyCriteria: criteria, sections })
+    return sections
+  }
+
+  async function getSections({ termCode, subjectCode, termLabel, subjectLabel }) {
+    return cacheMemo(`${school}:sections:${termCode}:${subjectCode}`, async () => {
+      if (!byCareer) {
+        return searchOnce({ termCode, subjectCode, termLabel, subjectLabel })
+      }
+      // One pass per career, merged on CRN. Most subjects sit in a single
+      // career, so all but one pass usually comes back empty.
+      const careers = await getCareers()
+      const results = await Promise.all(
+        careers.map((career) =>
+          searchOnce({ termCode, subjectCode, termLabel, subjectLabel, career }).catch(() => [])
+        )
+      )
+      const byCrn = new Map()
+      for (const section of results.flat()) {
+        if (!byCrn.has(section.crn)) byCrn.set(section.crn, section)
+      }
+      return [...byCrn.values()]
+    })
+  }
+
+  return { getTerms, getSubjects, getSections }
 }

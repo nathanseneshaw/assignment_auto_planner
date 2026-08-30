@@ -42,13 +42,58 @@ function decodeEntities(s) {
  * without it Node's shared keep-alive pool sprays requests across nodes, so
  * the node-local JSESSIONID term binding is silently lost (search "succeeds"
  * with totalCount 0). Fresh connections make the cookie arrive every time.
+ *
+ * Three systems in the roster put SEVERAL universities on one shared Banner
+ * instance, and neither the host nor `mepCode` separates them:
+ *
+ *   - South Dakota Board of Regents (registration.sdbor.edu) - all six public
+ *     campuses. mepCodes SDSU / USD / BOR return byte-identical subject and
+ *     section lists (verified live).
+ *   - University of Hawaii (www.sis.hawaii.edu:9234) - all ten campuses.
+ *   - University of Alaska (reg-prod.ec.alaska.edu) - UAF / UAA / UAS.
+ *     mepCode=UAF and mepCode=UAA return the same 34 ECON sections.
+ *
+ * Two options scope those, because the instances disagree about how:
+ *
+ *   `campus: 'S'`     -> server-side `txt_campus` filter. Works on SDBOR and
+ *                        Hawaii (SDSU 39 vs USD 31 CSC sections).
+ *   `campusRe: /^UAF/` -> client-side filter on each row's `campusDescription`.
+ *                        Needed for Alaska, where `txt_campus` is silently
+ *                        ignored - every value, including nonsense ones, returns
+ *                        the same rows - but `campusDescription` is reliable
+ *                        ("UAF - Fairbanks Campus", "UAA - Anchorage Campus").
+ *
+ * Either option also changes how the subject list is built. `get_subject` is
+ * catalog-wide and ignores `txt_campus` (223 subjects across all of South
+ * Dakota, 275 across Hawaii, 223 across Alaska), so a campus-scoped school would
+ * fill its picker with subjects that return "no sections" - the same trap the
+ * Dallas College term-scoping fix closed. When either is set, getSubjects
+ * derives the list from this campus's own sections instead. That is a full
+ * catalog walk, but these are small (SDSU 2,999 / USD 2,520 / Manoa 3,849 /
+ * all-Alaska 4,644 sections for Fall 2026 = 6-10 pages) and the result is cached
+ * for an hour like every other subject list.
  */
-export function createBannerScraper({ school, base, mepCode = '', closeConnections = false }) {
+export function createBannerScraper({
+  school,
+  base,
+  mepCode = '',
+  closeConnections = false,
+  campus = '',
+  campusRe = null,
+}) {
   const mepQ = mepCode ? `?mepCode=${mepCode}` : ''
   const mepAmp = mepCode ? `&mepCode=${mepCode}` : ''
+  const campusAmp = campus ? `&txt_campus=${encodeURIComponent(campus)}` : ''
+  const campusScoped = Boolean(campus || campusRe)
   const baseHeaders = closeConnections
     ? { 'User-Agent': UA, Connection: 'close' }
     : { 'User-Agent': UA }
+
+  /** Keep only rows belonging to this school's campus (no-op unless campusRe). */
+  function onCampus(rows) {
+    if (!campusRe) return rows
+    return rows.filter((r) => campusRe.test(decodeEntities(r.campusDescription)))
+  }
 
   /** A per-term Banner session: visit registration, then bind the term. */
   async function bannerSessionForTerm(termCode) {
@@ -102,6 +147,20 @@ export function createBannerScraper({ school, base, mepCode = '', closeConnectio
       `${school}:subjects:${termCode}`,
       async () => {
         const cFetch = await bannerSessionForTerm(termCode)
+        // Shared multi-campus instance: the catalog facet covers every campus,
+        // so derive this campus's subjects from its own sections instead.
+        if (campusScoped) {
+          const rows = onCampus(await fetchAllPages(cFetch, termCode, ''))
+          const byCode = new Map()
+          for (const r of rows) {
+            const code = String(r.subject || '').trim()
+            if (!code || byCode.has(code)) continue
+            byCode.set(code, decodeEntities(r.subjectDescription) || code)
+          }
+          return [...byCode]
+            .map(([code, label]) => ({ code, label }))
+            .sort((a, b) => a.code.localeCompare(b.code))
+        }
         const res = await cFetch(
           `${base}/StudentRegistrationSsb/ssb/classSearch/get_subject?searchTerm=&term=${termCode}&offset=1&max=500${mepAmp}`,
           { headers: baseHeaders }
@@ -116,18 +175,22 @@ export function createBannerScraper({ school, base, mepCode = '', closeConnectio
     )
   }
 
-  /** One searchResults page (Banner caps pageMaxSize at 500). */
+  /**
+   * One searchResults page (Banner caps pageMaxSize at 500). `subjectCode` is
+   * optional: omitting it searches every subject, which is how the campus-wide
+   * subject derivation below enumerates a shared instance.
+   */
   async function fetchResultsPage(cFetch, termCode, subjectCode, pageOffset) {
     const params = new URLSearchParams({
-      txt_subject: subjectCode,
       txt_term: termCode,
       pageOffset: String(pageOffset),
       pageMaxSize: '500',
       sortColumn: 'subjectDescription',
       sortDirection: 'asc',
     })
+    if (subjectCode) params.set('txt_subject', subjectCode)
     const res = await cFetch(
-      `${base}/StudentRegistrationSsb/ssb/searchResults/searchResults?${params}${mepAmp}`,
+      `${base}/StudentRegistrationSsb/ssb/searchResults/searchResults?${params}${campusAmp}${mepAmp}`,
       { headers: baseHeaders }
     )
     const json = await res.json()
@@ -137,27 +200,33 @@ export function createBannerScraper({ school, base, mepCode = '', closeConnectio
     return json
   }
 
+  /** Walk every page of a search, keeping one session. Returns the raw rows. */
+  async function fetchAllPages(cFetch, termCode, subjectCode) {
+    const first = await fetchResultsPage(cFetch, termCode, subjectCode, 0)
+    const rows = Array.isArray(first.data) ? [...first.data] : []
+    const total = Number(first.totalCount) || rows.length
+    while (rows.length < total) {
+      const page = await fetchResultsPage(cFetch, termCode, subjectCode, rows.length)
+      if (!page.data?.length) break // defensive: never loop on a bad page
+      rows.push(...page.data)
+    }
+    return rows
+  }
+
   async function getSections({ termCode, subjectCode, termLabel, subjectLabel }) {
     return cacheMemo(`${school}:sections:${termCode}:${subjectCode}`, async () => {
       let cFetch = await bannerSessionForTerm(termCode)
-      let first = await fetchResultsPage(cFetch, termCode, subjectCode, 0)
+      // Big subjects (e.g. Georgia Tech CS at ~1,700 sections) span multiple
+      // 500-row pages; fetchAllPages keeps one session and walks the offsets.
+      let rows = onCampus(await fetchAllPages(cFetch, termCode, subjectCode))
       // A fresh Banner session occasionally reports zero rows for a subject
       // that has plenty (term binding didn't take, seen on Georgia Tech), and
       // it reports totalCount 0 too - indistinguishable from a real empty
       // subject. Subjects come from the same term so a truly empty one is
       // rare; one retry on a brand-new session is cheap and shakes it loose.
-      if (!first.data?.length) {
+      if (!rows.length) {
         cFetch = await bannerSessionForTerm(termCode)
-        first = await fetchResultsPage(cFetch, termCode, subjectCode, 0)
-      }
-      const rows = Array.isArray(first.data) ? [...first.data] : []
-      // Big subjects (e.g. Georgia Tech CS at ~1,700 sections) span multiple
-      // 500-row pages; keep the same session and walk the offsets.
-      const total = Number(first.totalCount) || rows.length
-      while (rows.length < total) {
-        const page = await fetchResultsPage(cFetch, termCode, subjectCode, rows.length)
-        if (!page.data?.length) break // defensive: never loop on a bad page
-        rows.push(...page.data)
+        rows = onCampus(await fetchAllPages(cFetch, termCode, subjectCode))
       }
       return rows.map((r) => normalize(r, school, termCode, termLabel, subjectLabel))
     })

@@ -1,19 +1,15 @@
-name: Release (Windows + Mac)
+name: Build smoke test (Windows + iOS Simulator)
 
-# Manual only: bump the version in package.json, commit/push it, then trigger
-# this from the Actions tab. Each platform builds independently (electron-
-# builder can't cross-compile a mac target from Windows or vice versa) and
-# both upload to the SAME draft GitHub release, matched by the version in
-# package.json. Once both succeed, the last job flips that release live -
-# same effect as the old local `gh release edit --draft=false --latest` step.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-windows:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,11 +21,17 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run electron:publish:ci
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Same script used for local releases, minus publishing - unsigned build
+      # is fine here, this job only proves the Windows installer still builds.
+      - run: npm run electron:build
 
-  build-mac:
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: release/*.exe
+          retention-days: 7
+
+  ios-simulator:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,25 +43,47 @@ jobs:
 
       - run: npm ci
 
-      # Unsigned build (no Apple Developer account configured) - Gatekeeper
-      # will require a right-click > Open on first launch, and electron-updater
-      # auto-updates on this platform aren't expected to work reliably without
-      # code signing + notarization.
-      - run: npm run electron:publish:ci
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Builds dist/ and syncs it into the Xcode project (same as npm run
+      # ios:build), then compiles for the simulator SDK with signing off -
+      # no Apple Developer account needed for this.
+      - run: npm run ios:build
 
-  publish-release:
-    needs: [build-windows, build-mac]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Compile for iOS Simulator (unsigned)
+        working-directory: ios/App
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project App.xcodeproj \
+            -target App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
 
-      - name: Read version from package.json
-        id: version
-        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Boot Simulator, install & launch the app
+        run: |
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.name | test("iPhone"))][0].udid')
+          echo "Booting simulator $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
 
-      - name: Publish the draft release
-        run: gh release edit "${{ steps.version.outputs.tag }}" --draft=false --latest
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_PATH=$(find "$RUNNER_TEMP/build" -maxdepth 6 -name "App.app" -print -quit)
+          echo "Installing $APP_PATH"
+          xcrun simctl install "$UDID" "$APP_PATH"
+
+          xcrun simctl launch "$UDID" com.plannr.app
+          sleep 8
+
+          # If the app crashed on launch it drops out of the running-process
+          # list within a few seconds - this is a best-effort check, not a
+          # full UI test.
+          if xcrun simctl spawn "$UDID" launchctl list | grep -q com.plannr.app; then
+            echo "App launched and is still running."
+          else
+            echo "App is not present in the running process list - it may have crashed on launch."
+            exit 1
+          fi
