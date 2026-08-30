@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { COURSE_PLANNER } from '../../config/featureFlags.js'
 import { useTasksStore } from '../../stores/tasks'
@@ -8,7 +8,7 @@ import { useProfileStore } from '../../stores/profile'
 import { useAuthStore } from '../../stores/auth'
 import { isSupabaseConfigured } from '../../lib/supabase'
 
-defineProps({
+const props = defineProps({
   mobileOpen: {
     type: Boolean,
     default: false
@@ -26,6 +26,18 @@ const authStore = useAuthStore()
 
 watch(() => route.path, () => {
   emit('closeMobile')
+})
+
+// Electron: the caption strip and this sidebar’s logo row are OS window-drag
+// regions, and a drag region swallows clicks, so the mobile close button that
+// sits inside both never fired. Flag <html> while the panel is open so those
+// drag regions move out of its way (see .sidebar-mobile-open in style.css).
+watch(() => props.mobileOpen, (open) => {
+  document.documentElement.classList.toggle('sidebar-mobile-open', open)
+}, { immediate: true })
+
+onUnmounted(() => {
+  document.documentElement.classList.remove('sidebar-mobile-open')
 })
 
 /** Local `YYYY-MM-DD` key (timezone-safe  never toISOString). */
@@ -146,6 +158,8 @@ const isActive = (path) => {
 
       <!-- Mobile Close Button -->
       <button
+        type="button"
+        aria-label="Close menu"
         @click="emit('closeMobile')"
         class="lg:hidden p-2 -mr-2 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg transition-colors"
       >

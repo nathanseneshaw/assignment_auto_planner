@@ -27,7 +27,8 @@ const iconColors = {
 
 <template>
   <Teleport to="body">
-    <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+    <!-- z-[120]: above dialogs, so a toast fired from inside a modal is seen. -->
+    <div class="fixed bottom-4 right-4 z-[120] flex flex-col gap-2">
       <TransitionGroup name="toast-list">
         <div 
           v-for="toast in toasts"

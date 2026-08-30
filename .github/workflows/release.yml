@@ -1,15 +1,24 @@
-name: Build smoke test (Windows + iOS Simulator)
+name: Release
 
+# Every push to main: smoke-test a Windows build and an iOS Simulator launch.
+# If that push ALSO bumped the "version" field in package.json (checked by
+# looking for a GitHub release matching v<version> - if it doesn't exist yet,
+# this is a new version), the pipeline continues on to build signed-off
+# Windows + Mac installers and publish them to GitHub Releases. Push commits
+# without a version bump just smoke-test and stop - no release noise.
+#
+# workflow_dispatch lets you force a re-run (e.g. retry a failed release
+# build) without needing a new commit.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  windows:
+  smoke-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +40,7 @@ jobs:
           path: release/*.exe
           retention-days: 7
 
-  ios-simulator:
+  smoke-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,3 +96,82 @@ jobs:
             echo "App is not present in the running process list - it may have crashed on launch."
             exit 1
           fi
+
+  check-release:
+    needs: [smoke-windows, smoke-ios]
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run - forcing a release build for $TAG."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          elif gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Release $TAG already exists - this push didn't bump the version. Skipping release build."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release for $TAG yet - version was bumped. Building the release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-windows:
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run electron:publish:ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-mac:
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Unsigned build (no Apple Developer account configured) - Gatekeeper
+      # will require a right-click > Open on first launch, and electron-updater
+      # auto-updates on this platform aren't expected to work reliably without
+      # code signing + notarization.
+      - run: npm run electron:publish:ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  finalize-release:
+    needs: [check-release, release-windows, release-mac]
+    if: needs.check-release.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark the release published and latest
+        run: gh release edit "${{ needs.check-release.outputs.tag }}" --draft=false --latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -307,8 +307,8 @@ function handleModalClose() {
           Rows without a due date won't be saved. Fill one in or remove the row.
         </p>
 
-        <!-- Column headers -->
-        <div v-if="draft.assignments.length > 0" class="grid grid-cols-[1fr_148px_32px] gap-x-2 px-1 mb-1">
+        <!-- Column headers (hidden once rows stack on narrow screens) -->
+        <div v-if="draft.assignments.length > 0" class="hidden sm:grid grid-cols-[minmax(0,1fr)_168px_32px] gap-x-2 px-1 mb-1">
           <span class="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Name</span>
           <span class="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Due date</span>
           <span></span>
@@ -318,23 +318,30 @@ function handleModalClose() {
           No assignments detected. Click "Add row" to enter them manually.
         </div>
 
-        <ul v-else class="space-y-1.5">
+        <!--
+          Rows are name / due date / remove side by side once there's room, and
+          stack to name-on-top with the date and remove button beneath below
+          `sm`. The name track is minmax(0,1fr) rather than 1fr because a bare
+          `1fr` can't shrink under a text input's intrinsic width, which pushed
+          the whole row wider than the dialog on narrow windows.
+        -->
+        <ul v-else class="space-y-3 sm:space-y-1.5">
           <li
             v-for="(a, idx) in draft.assignments"
             :key="idx"
-            class="grid grid-cols-[1fr_148px_32px] gap-x-2 items-center"
+            class="grid grid-cols-[minmax(0,1fr)_32px] sm:grid-cols-[minmax(0,1fr)_168px_32px] gap-x-2 gap-y-1.5 items-center"
           >
             <!-- Name -->
             <input
               v-model="a.name"
               type="text"
               placeholder="Assignment name"
-              class="w-full px-3 py-2 rounded-lg border bg-surface dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 border-gray-200 dark:border-gray-700 transition-colors"
+              class="col-span-2 sm:col-span-1 w-full min-w-0 px-3 py-2 rounded-lg border bg-surface dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 border-gray-200 dark:border-gray-700 transition-colors"
             />
             <!-- Due date -->
             <DatePicker
               :model-value="isoToDateInput(a.dueAt)"
-              placeholder="Pick a due date"
+              placeholder="Pick a date"
               size="sm"
               @update:model-value="(v) => { a.dueAt = dateInputToIso(v) }"
             />

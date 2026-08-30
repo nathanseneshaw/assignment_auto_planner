@@ -65,9 +65,14 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div 
+      <!-- z-[100] = the dialog layer, above every piece of app chrome
+           (see the layer scale in src/style.css). In Electron the sidebar sits
+           at z-index 70 and the title-bar strip at 60, so anything lower gets
+           painted over whenever the window is narrow enough for the two to
+           overlap. -->
+      <div
         v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
       >
         <!-- Backdrop -->
         <div 
@@ -75,14 +80,17 @@ onUnmounted(() => {
           @click="close"
         ></div>
         
-        <!-- Modal Content -->
-        <div 
-          class="relative bg-surface dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(28,25,23,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full overflow-hidden"
+        <!-- Modal Content
+             Capped at the viewport height (minus the wrapper's p-4) and laid
+             out as a column so a tall body shrinks and scrolls instead of
+             pushing the header/footer off-screen on short windows. -->
+        <div
+          class="relative bg-surface dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(28,25,23,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden"
           :class="sizeClasses[size]"
           @click.stop
         >
           <!-- Header -->
-          <div v-if="title || $slots.header" class="flex items-center justify-between px-6 py-4 border-b border-paper-line/70 dark:border-gray-700/80">
+          <div v-if="title || $slots.header" class="shrink-0 flex items-center justify-between px-6 py-4 border-b border-paper-line/70 dark:border-gray-700/80">
             <slot name="header">
               <h3 class="text-[17px] font-semibold text-gray-900 dark:text-gray-100 tracking-tight">{{ title }}</h3>
             </slot>
@@ -98,13 +106,14 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <!-- Body -->
-          <div class="px-6 py-4 max-h-[70vh] overflow-y-auto">
+          <!-- Body: min-h-0 lets it shrink below its content inside the
+               column so the scroll happens here, not on the whole dialog. -->
+          <div class="px-6 py-4 max-h-[70vh] min-h-0 overflow-y-auto">
             <slot />
           </div>
 
           <!-- Footer -->
-          <div v-if="$slots.footer" class="px-6 py-4 border-t border-paper-line/70 dark:border-gray-700/80 bg-paper/40 dark:bg-gray-800/50">
+          <div v-if="$slots.footer" class="shrink-0 px-6 py-4 border-t border-paper-line/70 dark:border-gray-700/80 bg-paper/40 dark:bg-gray-800/50">
             <slot name="footer" />
           </div>
         </div>

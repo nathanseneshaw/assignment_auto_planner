@@ -89,6 +89,9 @@ const monthCells = computed(() => {
 // ── positioning (teleported, fixed, flips up when cramped) ──────────────────
 const PANEL_W = 304
 const PANEL_H = 376
+// Never shrink the calendar below this, even in a very short window - it would
+// stop being usable long before it stopped fitting.
+const PANEL_MIN_H = 220
 const panelStyle = ref({})
 
 function reposition() {
@@ -98,10 +101,30 @@ function reposition() {
   const margin = 8
   let left = Math.min(r.left, window.innerWidth - PANEL_W - margin)
   left = Math.max(margin, left)
-  const spaceBelow = window.innerHeight - r.bottom
-  const openUp = spaceBelow < PANEL_H + margin && r.top > spaceBelow
-  const top = openUp ? Math.max(margin, r.top - PANEL_H - margin) : r.bottom + margin
-  panelStyle.value = { position: 'fixed', top: `${top}px`, left: `${left}px`, width: `${PANEL_W}px` }
+
+  const spaceBelow = window.innerHeight - r.bottom - margin
+  const spaceAbove = r.top - margin
+  const openUp = spaceBelow < PANEL_H && spaceAbove > spaceBelow
+
+  // Size to the room actually available on the chosen side, then pin the panel
+  // inside the viewport. Without this a picker low on the page (or in a short
+  // window) opens downward and runs off the bottom of the screen, hiding the
+  // last week of the month plus the Clear/Today row.
+  const room = Math.max(openUp ? spaceAbove : spaceBelow, PANEL_MIN_H)
+  const height = Math.min(PANEL_H, room)
+  let top = openUp ? r.top - margin - height : r.bottom + margin
+  top = Math.max(margin, Math.min(top, window.innerHeight - height - margin))
+
+  panelStyle.value = {
+    position: 'fixed',
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${PANEL_W}px`,
+    // Only bites when the panel had to be shortened; at full height the
+    // calendar is smaller than PANEL_H so no scrollbar appears.
+    maxHeight: `${height}px`,
+    overflowY: 'auto',
+  }
 }
 
 function openPicker() {
@@ -228,7 +251,12 @@ function dayClasses(cell) {
       aria-haspopup="dialog"
       @click="toggle"
     >
-      <span :class="displayValue ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'">
+      <!-- truncate (not wrap): in a narrow column a two-line label would grow
+           the trigger and knock every sibling in a row layout out of line. -->
+      <span
+        class="truncate"
+        :class="displayValue ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'"
+      >
         {{ displayValue || placeholder }}
       </span>
       <svg
@@ -259,7 +287,7 @@ function dayClasses(cell) {
           :style="panelStyle"
           role="dialog"
           aria-label="Choose date"
-          class="z-[60] rounded-2xl border border-gray-200/80 dark:border-gray-700 bg-surface dark:bg-gray-800 p-3.5 shadow-[0_12px_36px_rgba(28,25,23,0.16),0_2px_8px_rgba(28,25,23,0.08)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.45)]"
+          class="z-[110] rounded-2xl border border-gray-200/80 dark:border-gray-700 bg-surface dark:bg-gray-800 p-3.5 shadow-[0_12px_36px_rgba(28,25,23,0.16),0_2px_8px_rgba(28,25,23,0.08)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.45)]"
         >
           <!-- Header -->
           <div class="flex items-center justify-between gap-2 mb-3">

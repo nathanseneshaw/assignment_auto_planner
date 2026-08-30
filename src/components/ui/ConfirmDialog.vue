@@ -70,9 +70,10 @@ function confirm() {
 <template>
   <Teleport to="body">
     <Transition name="confirm">
-      <div 
+      <!-- z-[100]: the dialog layer, above all app chrome (see src/style.css). -->
+      <div
         v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
       >
         <!-- Backdrop -->
         <div
@@ -81,7 +82,9 @@ function confirm() {
         ></div>
 
         <!-- Dialog -->
-        <div class="relative bg-surface dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(28,25,23,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full max-w-md overflow-hidden transform">
+        <!-- Capped at the viewport height (minus the wrapper's p-4) so a long
+             message can never push the action buttons off-screen. -->
+        <div class="relative bg-surface dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 shadow-[0_24px_48px_-12px_rgba(28,25,23,0.18)] dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto transform">
           <div class="p-6">
             <!-- Icon -->
             <div

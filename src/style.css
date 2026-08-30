@@ -90,10 +90,18 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Always reserve the scrollbar gutter. Every Modal locks page scroll via
+       body{overflow:hidden}; without a stable gutter the scrollbar vanishes,
+       the viewport widens by its width, and the whole layout (including the
+       fixed sidebar/top bar/title bar) jumps sideways as the dialog opens. */
+    scrollbar-gutter: stable;
   }
 
   body {
     @apply bg-paper text-gray-900 antialiased font-sans;
+    /* The viewport's scrollbar settings can propagate from <body>, so it needs
+       the same gutter for the rule above to hold. */
+    scrollbar-gutter: stable;
   }
 
   /* Editorial headings: tight tracking on display sizes */
@@ -129,6 +137,28 @@
 @media (prefers-reduced-motion: reduce) {
   .main-layout-bg { animation: none; }
 }
+
+/* ── Stacking layers ──
+   One scale for everything that overlaps, so a new overlay doesn't end up
+   underneath the app shell. Anything added here must respect these bands:
+
+     10-30    in-page overlays (sticky headers, page-local popovers)
+     40       floating page furniture (feedback button, mobile nav & scrim)
+     50       sidebar (browser build)
+     60       .app-titlebar        - Electron only
+     70       .app-sidebar         - Electron only, sits above the title bar
+     100      dialogs              - Modal, ConfirmDialog
+     110      teleported popovers  - DatePicker, TimePicker, Dropdown
+     120      toasts
+
+   The 100+ band exists because of the two Electron rows: the sidebar is lifted
+   to 70 so its logo row can occupy the caption strip, which means a dialog at
+   50 was painted over by the sidebar whenever the window was narrow enough for
+   the centred dialog to reach under it (fine maximised, clipped when restored).
+   Dialogs therefore sit above all chrome. One consequence on desktop: while a
+   dialog is open the title-bar strip is covered, so the window can't be dragged
+   by it until the dialog closes. The OS-drawn min/max/close overlay is native
+   and stays clickable. */
 
 /* ── Electron title bar ──
    The native caption bar is hidden (titleBarStyle:'hidden'); the OS draws the
@@ -178,6 +208,25 @@ html.is-electron .app-sidebar-header {
   margin-bottom: 10px; /* air between the caption-height logo row and the nav */
   -webkit-app-region: drag;
   app-region: drag;
+}
+
+/* Below lg the sidebar slides in over the content and its logo row carries a
+   close button. That button sits inside two OS drag regions (the full-width
+   caption strip and the logo row itself), and a drag region swallows clicks,
+   so the button did nothing. The global no-drag rule above cannot rescue it:
+   Chromium records the sidebar’s drag regions from its untransformed
+   position, and the mobile sidebar is placed with a translate, so the
+   button’s no-drag carve-out never lands where the button actually is. While
+   the panel is open, stop the caption strip short of it and drop the drag from
+   the logo row, leaving the close button on plain, clickable pixels. The rest
+   of the caption strip stays draggable. */
+html.is-electron.sidebar-mobile-open .app-titlebar {
+  left: 18rem; /* matches w-72, the open mobile sidebar width */
+}
+
+html.is-electron.sidebar-mobile-open .app-sidebar-header {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 /* macOS: the OS draws the traffic lights in the top-LEFT of the caption area,

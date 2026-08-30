@@ -412,7 +412,7 @@ const wrapperClasses = computed(() => [
           v-if="open"
           ref="panelRef"
           :style="panelStyle"
-          class="tp-panel z-[60] flex rounded-xl border border-gray-200/80 dark:border-gray-700 bg-surface dark:bg-gray-800 overflow-hidden shadow-[0_4px_20px_rgba(28,25,23,0.10),0_1px_4px_rgba(28,25,23,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
+          class="tp-panel z-[110] flex rounded-xl border border-gray-200/80 dark:border-gray-700 bg-surface dark:bg-gray-800 overflow-hidden shadow-[0_4px_20px_rgba(28,25,23,0.10),0_1px_4px_rgba(28,25,23,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
         >
           <!-- Numbers -->
           <div
