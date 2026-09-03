@@ -7,7 +7,7 @@ import { writeOccurrences } from '../ics-supabase-writer.js'
  * that writeOccurrences uses. Records per-table call counts so we can assert
  * the reads/writes are actually bulked (no N+1).
  */
-function makeFakeSupabase(seed = {}) {
+function makeFakeSupabase(seed = {}, opts = {}) {
   let idSeq = 1
   const db = {
     courses: (seed.courses || []).map((r) => ({ ...r })),
@@ -15,6 +15,9 @@ function makeFakeSupabase(seed = {}) {
   }
   const counts = { select: {}, insert: {}, update: {} }
   const bump = (op, table) => { counts[op][table] = (counts[op][table] || 0) + 1 }
+  // Optional error injection: `fail({ table, op, cols, payload, eqs, in })` may
+  // return a PostgREST-shaped error object to make that one call fail.
+  const fail = opts.fail || (() => null)
 
   function applyFilters(rows, eqs, inFilter) {
     let out = rows
@@ -27,9 +30,14 @@ function makeFakeSupabase(seed = {}) {
   }
 
   function builder(table) {
-    const state = { op: null, payload: null, eqs: [], in: null, single: false }
+    const state = { op: null, cols: null, payload: null, eqs: [], in: null, single: false }
     const exec = () => {
       const t = db[table] || (db[table] = [])
+      const injected = fail({ table, ...state })
+      if (injected) {
+        if (state.op) bump(state.op, table)
+        return { data: null, error: injected }
+      }
       if (state.op === 'select') {
         bump('select', table)
         const rows = applyFilters(t, state.eqs, state.in).map((r) => ({ ...r }))
@@ -54,7 +62,7 @@ function makeFakeSupabase(seed = {}) {
       return { data: null, error: null }
     }
     const api = {
-      select() { if (!state.op) state.op = 'select'; return api },
+      select(cols) { if (!state.op) state.op = 'select'; state.cols = cols ?? state.cols; return api },
       insert(payload) { state.op = 'insert'; state.payload = payload; return api },
       update(payload) { state.op = 'update'; state.payload = payload; return api },
       eq(col, val) { state.eqs.push([col, val]); return api },
@@ -356,5 +364,275 @@ describe('writeOccurrences (archive lifecycle)', () => {
 
     assert.equal(res.assignmentsArchived, 0)
     assert.equal(db.assignments.find((r) => r.external_assignment_id === 'B1').feed_status, 'live') // untouched
+  })
+})
+
+// ── bulk-insert resilience (per-row fallback) ────────────────────────────────
+// bulkInsert deliberately retries row-by-row when the batch insert fails, so a
+// single malformed row can't sink a whole feed. Nothing exercised that path.
+
+const isBatch = (ctx) => Array.isArray(ctx.payload)
+
+describe('writeOccurrences (bulk-insert per-row fallback)', () => {
+  it('falls back to per-row inserts when the batch fails, landing every good row', async () => {
+    const { client, counts, db } = makeFakeSupabase({}, {
+      fail: (ctx) => (ctx.op === 'insert' && ctx.table === 'assignments' && isBatch(ctx)
+        ? { message: 'batch rejected' }
+        : null),
+    })
+
+    const res = await writeOccurrences({
+      supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1), occ(2), occ(3)],
+    })
+
+    assert.equal(res.assignmentsInserted, 3)
+    assert.deepEqual(res.errors, [])
+    assert.equal(db.assignments.length, 3)
+    assert.equal(counts.insert.assignments, 4)   // 1 failed batch + 3 single-row retries
+  })
+
+  it('collects a per-row error for the one bad row and still saves the rest', async () => {
+    const { client, db } = makeFakeSupabase({}, {
+      fail: (ctx) => {
+        if (ctx.op !== 'insert' || ctx.table !== 'assignments') return null
+        const rows = isBatch(ctx) ? ctx.payload : [ctx.payload]
+        return rows.some((r) => r.external_assignment_id === 'A2')
+          ? { message: 'value too long for column assignment_name' }
+          : null
+      },
+    })
+
+    const res = await writeOccurrences({
+      supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1), occ(2), occ(3)],
+    })
+
+    assert.equal(res.assignmentsInserted, 2)
+    assert.equal(res.errors.length, 1)
+    assert.equal(res.errors[0].uid, 'A2')
+    assert.match(res.errors[0].error, /^assignments insert: /)
+    assert.deepEqual(db.assignments.map((r) => r.external_assignment_id).sort(), ['A1', 'A3'])
+  })
+
+  it('applies the same fallback to the courses insert', async () => {
+    const { client, counts, db } = makeFakeSupabase({}, {
+      fail: (ctx) => (ctx.op === 'insert' && ctx.table === 'courses' && isBatch(ctx)
+        ? { message: 'batch rejected' }
+        : null),
+    })
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.coursesInserted, 1)
+    assert.deepEqual(res.errors, [])
+    assert.equal(counts.insert.courses, 2)      // failed batch + one retry
+    assert.equal(db.courses.length, 1)
+  })
+
+  it('skips assignments whose parent course could not be created', async () => {
+    const { client, db } = makeFakeSupabase({}, {
+      fail: (ctx) => (ctx.op === 'insert' && ctx.table === 'courses' ? { message: 'courses are on fire' } : null),
+    })
+
+    const res = await writeOccurrences({
+      supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1), occ(2)],
+    })
+
+    assert.equal(res.assignmentsInserted, 0)
+    assert.equal(db.assignments.length, 0)
+    assert.ok(res.errors.some((e) => e.error === 'parent course unresolved'))
+    assert.deepEqual(res.errors.filter((e) => e.error === 'parent course unresolved').map((e) => e.uid), ['A1', 'A2'])
+  })
+})
+
+// ── unrecoverable read errors ────────────────────────────────────────────────
+
+describe('writeOccurrences (read failures throw, they do not silently no-op)', () => {
+  it('throws when the courses select fails', async () => {
+    const { client } = makeFakeSupabase({}, {
+      fail: (ctx) => (ctx.op === 'select' && ctx.table === 'courses' ? { message: 'boom' } : null),
+    })
+    await assert.rejects(
+      () => writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] }),
+      /courses select: boom/
+    )
+  })
+
+  it('throws when the UID-keyed assignments select fails', async () => {
+    const { client } = makeFakeSupabase({}, {
+      fail: (ctx) => (ctx.op === 'select' && ctx.table === 'assignments' &&
+        !ctx.eqs.some(([c]) => c === 'feed_id') ? { message: 'boom' } : null),
+    })
+    await assert.rejects(
+      () => writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] }),
+      /assignments select: boom/
+    )
+  })
+
+  it('throws when the feed-scoped assignments select fails', async () => {
+    const { client } = makeFakeSupabase({}, {
+      fail: (ctx) => (ctx.op === 'select' && ctx.table === 'assignments' &&
+        ctx.eqs.some(([c]) => c === 'feed_id') ? { message: 'boom' } : null),
+    })
+    await assert.rejects(
+      () => writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] }),
+      /assignments feed select: boom/
+    )
+  })
+
+  it('collects (does not throw on) a per-row assignment update failure', async () => {
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [{
+        id: 'seed-A1', user_id: USER, course_id: 'course-1', external_assignment_id: 'A1',
+        assignment_name: 'Old name', due_at: '2026-09-02T12:00:00.000Z', description: 'desc 1',
+        feed_id: FEED, source_url: 'https://x/1',
+      }],
+    }
+    const { client } = makeFakeSupabase(seed, {
+      fail: (ctx) => (ctx.op === 'update' && ctx.table === 'assignments' &&
+        ctx.eqs.some(([c]) => c === 'id') ? { message: 'update denied' } : null),
+    })
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.assignmentsUpdated, 0)
+    assert.equal(res.errors.length, 1)
+    assert.equal(res.errors[0].uid, 'A1')
+    assert.match(res.errors[0].error, /^assignments update: /)
+  })
+})
+
+// ── course row maintenance ───────────────────────────────────────────────────
+
+describe('writeOccurrences (course row maintenance)', () => {
+  it('renames an existing course when the feed\'s course name changed', async () => {
+    const { client, db } = makeFakeSupabase({
+      courses: [{ id: 'course-1', user_id: USER, source: 'ics', external_course_id: 'C1', course_name: 'Old title', feed_id: FEED }],
+    })
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.coursesUpdated, 1)
+    assert.equal(res.coursesInserted, 0)
+    assert.equal(db.courses.length, 1)
+    assert.equal(db.courses[0].course_name, 'Course 1')
+  })
+
+  it('backfills feed_id on a course row that predates feed tracking', async () => {
+    const { client, db } = makeFakeSupabase({
+      courses: [{ id: 'course-1', user_id: USER, source: 'ics', external_course_id: 'C1', course_name: 'Course 1', feed_id: null }],
+    })
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.coursesUpdated, 1)
+    assert.equal(db.courses[0].feed_id, FEED)
+    assert.equal(db.courses[0].course_name, 'Course 1')
+  })
+
+  it('leaves an already-correct course row completely untouched', async () => {
+    const { client, counts } = makeFakeSupabase({ courses: [courseSeed('course-1')] })
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+    assert.equal(res.coursesUpdated, 0)
+    assert.equal(res.coursesInserted, 0)
+    assert.equal(counts.update.courses || 0, 0)
+  })
+
+  it('collects a course update failure instead of throwing', async () => {
+    const { client } = makeFakeSupabase({
+      courses: [{ id: 'course-1', user_id: USER, source: 'ics', external_course_id: 'C1', course_name: 'Old title', feed_id: FEED }],
+    }, {
+      fail: (ctx) => (ctx.op === 'update' && ctx.table === 'courses' ? { message: 'denied' } : null),
+    })
+
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.coursesUpdated, 0)
+    assert.ok(res.errors.some((e) => e.uid === 'course:C1' && /courses update: denied/.test(e.error)))
+  })
+})
+
+// ── timestamp comparison tolerance ───────────────────────────────────────────
+// due_at comes back from PostgREST as '+00:00' while occurrences carry '.000Z'.
+// Comparing the strings would rewrite every row on every sync.
+
+describe('writeOccurrences (due_at is compared by instant, not by string)', () => {
+  const withDueAt = (dueAt) => ({
+    courses: [courseSeed('course-1')],
+    assignments: [{
+      id: 'seed-A1', user_id: USER, course_id: 'course-1', external_assignment_id: 'A1',
+      assignment_name: 'Assignment 1', due_at: dueAt, description: 'desc 1',
+      feed_id: FEED, source_url: 'https://x/1',
+    }],
+  })
+
+  it('treats a Postgres "+00:00" offset as identical to the ".000Z" form', async () => {
+    const { client, counts } = makeFakeSupabase(withDueAt('2026-09-02T12:00:00+00:00'))
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.assignmentsUnchanged, 1)
+    assert.equal(res.assignmentsUpdated, 0)
+    assert.ok((counts.update.assignments || 0) <= 1) // at most the bulk last_seen_at touch
+  })
+
+  it('treats an equivalent non-UTC offset as identical too', async () => {
+    const { client } = makeFakeSupabase(withDueAt('2026-09-02T07:00:00-05:00'))
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+    assert.equal(res.assignmentsUnchanged, 1)
+  })
+
+  it('still updates when the instant genuinely moved', async () => {
+    const { client, db } = makeFakeSupabase(withDueAt('2026-09-02T12:00:01+00:00'))
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+    assert.equal(res.assignmentsUpdated, 1)
+    assert.equal(db.assignments[0].due_at, '2026-09-02T12:00:00.000Z')
+  })
+})
+
+// ── pre-migration schema (archive columns absent) ────────────────────────────
+// Mirrors the content_hash degradation in ics-routes.js: the live schema can lag
+// the migrations, and the archive sweep must switch itself off rather than break
+// sync. Uses a FRESH module instance because `archiveColumnsPresent` is
+// process-level state that the tests above have already latched to `true`.
+
+describe('writeOccurrences (schema without feed_status/archived_at)', () => {
+  it('skips the archive sweep and syncs normally when the columns are missing', async () => {
+    const { writeOccurrences: writeFresh } = await import('../ics-supabase-writer.js?noArchiveColumns=1')
+
+    const seed = {
+      courses: [courseSeed('course-1')],
+      assignments: [{
+        id: 'vanished', user_id: USER, course_id: 'course-1', external_assignment_id: 'GONE',
+        assignment_name: 'Removed by the professor', due_at: '2026-08-01T12:00:00.000Z',
+        feed_id: FEED, source_url: 'https://x/old',
+      }],
+    }
+    const { client, db } = makeFakeSupabase(seed, {
+      fail: (ctx) => (ctx.op === 'select' && /feed_status/.test(String(ctx.cols || ''))
+        ? { code: '42703', message: 'column assignments.feed_status does not exist' }
+        : null),
+    })
+
+    const res = await writeFresh({ supabase: client, userId: USER, feedId: FEED, occurrences: [occ(1)] })
+
+    assert.equal(res.assignmentsInserted, 1, 'sync still works on a pre-migration schema')
+    assert.equal(res.assignmentsArchived, 0, 'the sweep must be skipped, not attempted')
+    assert.deepEqual(res.errors, [])
+
+    const gone = db.assignments.find((r) => r.external_assignment_id === 'GONE')
+    assert.ok(gone, 'the vanished row is left exactly as it was')
+    assert.equal(gone.feed_status, undefined)
+    assert.equal(gone.archived_at, undefined)
+  })
+
+  it('does not archive anything when the feed produced zero occurrences', async () => {
+    const { client, db } = makeFakeSupabase({
+      courses: [courseSeed('course-1')],
+      assignments: [liveRow()],
+    })
+    const res = await writeOccurrences({ supabase: client, userId: USER, feedId: FEED, occurrences: [] })
+
+    assert.equal(res.assignmentsArchived, 0)
+    assert.equal(db.assignments[0].feed_status, 'live', 'an empty feed must never mass-archive')
   })
 })

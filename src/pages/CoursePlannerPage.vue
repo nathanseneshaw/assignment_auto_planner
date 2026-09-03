@@ -3,12 +3,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useCoursePlannerStore } from '../stores/coursePlanner'
 import { useScheduleBuilderStore } from '../stores/scheduleBuilder'
 import { useProfileStore } from '../stores/profile'
-import { Button, ConfirmDialog, Dropdown, Modal, TimePicker } from '../components/ui'
+import { Button, Checkbox, ConfirmDialog, Dropdown, Modal, TimePicker } from '../components/ui'
 import BuilderPanel from '../components/features/course-planner/BuilderPanel.vue'
 import ComboNavigator from '../components/features/course-planner/ComboNavigator.vue'
 import { listSchools } from '../services/coursePlannerApi.js'
 import { schoolLogo } from '../lib/schoolLogos'
 import { DAYS, toMinutes, formatClock, formatHour, meetingSummary } from '../utils/scheduleTime.js'
+import { sectionUnavailable } from '../utils/sectionAvailability.js'
 
 const planner = useCoursePlannerStore()
 const builder = useScheduleBuilderStore()
@@ -64,19 +65,38 @@ const subjectDisabled = computed(
 )
 
 // --- Section list filtering ---
+// Two independent filters stack: the availability preference (store-owned,
+// persisted, shared with the Builder rail) and this page's text search.
 const filterQuery = ref('')
-const filteredSections = computed(() => {
+
+function matchesQuery(section, q) {
+  return (
+    section.title.toLowerCase().includes(q) ||
+    section.courseNumber.toLowerCase().includes(q) ||
+    section.sectionNumber.toLowerCase().includes(q) ||
+    section.instructors.join(' ').toLowerCase().includes(q)
+  )
+}
+
+function searchIn(list) {
   const q = filterQuery.value.trim().toLowerCase()
-  if (!q) return planner.sections
-  return planner.sections.filter((s) => {
-    return (
-      s.title.toLowerCase().includes(q) ||
-      s.courseNumber.toLowerCase().includes(q) ||
-      s.sectionNumber.toLowerCase().includes(q) ||
-      s.instructors.join(' ').toLowerCase().includes(q)
-    )
-  })
-})
+  if (!q) return list
+  return list.filter((s) => matchesQuery(s, q))
+}
+
+const filteredSections = computed(() => searchIn(planner.visibleSections))
+
+// Full/closed sections the preference is holding back from THIS search. Drives
+// the "N hidden" hint so nothing ever disappears silently.
+const hiddenBySearch = computed(() =>
+  planner.hideUnavailable ? searchIn(planner.sections).length - filteredSections.value.length : 0
+)
+
+// The search matched only full/closed sections — the list would read as an
+// empty catalogue without saying why.
+const allMatchesUnavailable = computed(
+  () => filteredSections.value.length === 0 && hiddenBySearch.value > 0
+)
 
 // --- Browse | Builder mode ---
 // Builder mode swaps the left rail for the Schedule Builder and, once combos
@@ -310,13 +330,7 @@ function statusPill(section) {
 }
 
 /** Returns 'closed', 'full', or null. */
-function unavailableReason(section) {
-  if (section.status === 'closed') return 'closed'
-  const enr = section.enrollment || {}
-  if (enr.available != null && enr.available <= 0) return 'full'
-  if (enr.max != null && enr.current != null && enr.current >= enr.max) return 'full'
-  return null
-}
+const unavailableReason = sectionUnavailable
 
 function isSectionUnavailable(section) {
   return unavailableReason(section) !== null
@@ -567,6 +581,23 @@ function confirmApply() {
             </div>
           </div>
         </div>
+        <!-- Availability preference. Applies to the Browse list AND the Builder's
+             "Add courses" rail, so a course with nothing takeable is out of sight
+             in both places. -->
+        <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <Checkbox
+            :model-value="planner.hideUnavailable"
+            label="Hide full &amp; closed sections"
+            size="sm"
+            @update:model-value="planner.setHideUnavailable($event)"
+          />
+          <span
+            v-if="planner.hideUnavailable && hiddenBySearch"
+            class="font-mono text-[11px] text-gray-400 dark:text-gray-500 tabular-nums"
+          >
+            {{ hiddenBySearch }} hidden
+          </span>
+        </div>
         <p
           v-if="currentSchoolMeta && !currentSchoolMeta.enrollmentDataAvailable"
           class="text-xs text-gray-500 dark:text-gray-400 mt-3"
@@ -657,8 +688,28 @@ function confirmApply() {
           <div v-else-if="!planner.selectedSubjectCode" class="py-14 text-center">
             <p class="font-serif italic text-base text-gray-500 dark:text-gray-400">Pick a term + subject to see sections.</p>
           </div>
-          <div v-else-if="filteredSections.length === 0" class="py-14 text-center">
-            <p class="font-serif italic text-base text-gray-500 dark:text-gray-400">No sections match.</p>
+          <div v-else-if="filteredSections.length === 0" class="py-14 text-center px-4">
+            <!-- Several schools publish one subject list for every term, so a
+                 subject can be offered in the catalogue yet run no classes this
+                 term. Say that plainly instead of "no sections match", which
+                 reads as a broken search. -->
+            <p v-if="!planner.sections.length" class="font-serif italic text-base text-gray-500 dark:text-gray-400 leading-relaxed">
+              {{ planner.selectedSubjectCode }} has no classes in {{ planner.selectedTermLabel || 'this term' }}.
+            </p>
+            <template v-else-if="allMatchesUnavailable">
+              <p class="font-serif italic text-base text-gray-500 dark:text-gray-400 leading-relaxed">
+                {{ hiddenBySearch === 1 ? 'The only matching section is' : `All ${hiddenBySearch} matching sections are` }}
+                full or closed.
+              </p>
+              <button
+                type="button"
+                class="mt-3 eyebrow text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 transition-colors"
+                @click="planner.setHideUnavailable(false)"
+              >
+                Show them anyway
+              </button>
+            </template>
+            <p v-else class="font-serif italic text-base text-gray-500 dark:text-gray-400">No sections match.</p>
           </div>
 
           <!-- List -->

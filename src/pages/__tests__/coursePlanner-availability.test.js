@@ -35,10 +35,15 @@ function section(over = {}) {
 
 const opts = { global: { mocks: { $router: { push: vi.fn() } } } }
 
-/** Mount the page, then seed the results list as if a search had returned it. */
-async function mountWithSections(sections) {
+/**
+ * Mount the page, then seed the results list as if a search had returned it.
+ * `hideUnavailable` defaults to ON in the store, so tests that want to see
+ * full/closed rows have to opt out the way a user would.
+ */
+async function mountWithSections(sections, { hideUnavailable = true } = {}) {
   useProfileStore().updateProfile({ school: 'rice' })
   const planner = useCoursePlannerStore()
+  planner.setHideUnavailable(hideUnavailable)
   const w = mount(CoursePlannerPage, opts)
   await flushPromises(); await nextTick()
   // Drive the results panel out of its "pick a subject" empty state.
@@ -64,35 +69,91 @@ describe('CoursePlanner section availability rendering', () => {
   })
 
   it('marks a full section (available 0) as Full and offers no Add button', async () => {
-    const { w } = await mountWithSections([
-      section({ crn: 'FULL', enrollment: { max: 30, current: 30, available: 0 } }),
-    ])
+    const { w } = await mountWithSections(
+      [section({ crn: 'FULL', enrollment: { max: 30, current: 30, available: 0 } })],
+      { hideUnavailable: false }
+    )
     expect(w.text()).toContain('Full')
     const addBtn = w.findAll('button').find((b) => b.text().trim() === 'Add')
     expect(addBtn).toBeFalsy()
   })
 
   it('marks a closed section as Closed', async () => {
-    const { w } = await mountWithSections([
-      section({ crn: 'CLOSED', status: 'closed' }),
-    ])
+    const { w } = await mountWithSections(
+      [section({ crn: 'CLOSED', status: 'closed' })],
+      { hideUnavailable: false }
+    )
     expect(w.text()).toContain('Closed')
     const addBtn = w.findAll('button').find((b) => b.text().trim() === 'Add')
     expect(addBtn).toBeFalsy()
   })
 
-  it('renders a mixed list: open is addable, full/closed are not', async () => {
-    const { w } = await mountWithSections([
-      section({ crn: 'A', courseNumber: '101' }),
-      section({ crn: 'B', courseNumber: '202', enrollment: { max: 20, current: 20, available: 0 } }),
-      section({ crn: 'C', courseNumber: '303', status: 'closed' }),
-    ])
+  it('renders a mixed list unfiltered: open is addable, full/closed are not', async () => {
+    const { w } = await mountWithSections(
+      [
+        section({ crn: 'A', courseNumber: '101' }),
+        section({ crn: 'B', courseNumber: '202', enrollment: { max: 20, current: 20, available: 0 } }),
+        section({ crn: 'C', courseNumber: '303', status: 'closed' }),
+      ],
+      { hideUnavailable: false }
+    )
     expect(w.text()).toContain('COMP 101')
     expect(w.text()).toContain('COMP 202')
     expect(w.text()).toContain('COMP 303')
     // Exactly one Add button — only the open section.
     const addButtons = w.findAll('button').filter((b) => b.text().trim() === 'Add')
     expect(addButtons).toHaveLength(1)
+  })
+
+  it('hides full/closed sections by default, dropping dead courses entirely', async () => {
+    const { w } = await mountWithSections([
+      section({ crn: 'A', courseNumber: '101' }),
+      // COMP 202's only section is closed — the whole course is unregisterable.
+      section({ crn: 'B', courseNumber: '202', status: 'closed' }),
+      // COMP 303 keeps one open seat, so the course survives minus its full row.
+      section({ crn: 'C1', courseNumber: '303', sectionNumber: '001', enrollment: { max: 20, current: 20, available: 0 } }),
+      section({ crn: 'C2', courseNumber: '303', sectionNumber: '002' }),
+    ])
+    expect(w.text()).toContain('COMP 101')
+    expect(w.text()).not.toContain('COMP 202')
+    expect(w.text()).toContain('COMP 303')
+    // Only the two registerable sections remain.
+    const addButtons = w.findAll('button').filter((b) => b.text().trim() === 'Add')
+    expect(addButtons).toHaveLength(2)
+    expect(w.text()).toContain('2 hidden')
+  })
+
+  it('never hides sections whose availability the school does not publish', async () => {
+    const { w } = await mountWithSections([
+      section({ crn: 'U', status: 'unknown', enrollment: { max: null, current: null, available: null } }),
+    ])
+    expect(w.text()).toContain('COMP 140')
+    const addBtn = w.findAll('button').find((b) => b.text().trim() === 'Add')
+    expect(addBtn, 'an unknown-availability section stays addable').toBeTruthy()
+  })
+
+  it('explains an all-unavailable subject and can reveal it on request', async () => {
+    const { w } = await mountWithSections([
+      section({ crn: 'A', courseNumber: '101', status: 'closed' }),
+      section({ crn: 'B', courseNumber: '202', enrollment: { max: 20, current: 20, available: 0 } }),
+    ])
+    expect(w.text()).toContain('full or closed')
+    expect(w.text()).not.toContain('COMP 101')
+
+    const reveal = w.findAll('button').find((b) => b.text().trim() === 'Show them anyway')
+    expect(reveal).toBeTruthy()
+    await reveal.trigger('click')
+    await nextTick()
+    expect(w.text()).toContain('COMP 101')
+    expect(w.text()).toContain('COMP 202')
+  })
+
+  it('says a subject runs no classes this term rather than "no sections match"', async () => {
+    const { w, planner } = await mountWithSections([])
+    planner.selectedTermLabel = 'Fall 2026'
+    await nextTick()
+    expect(w.text()).toContain('COMP has no classes in Fall 2026')
+    expect(w.text()).not.toContain('No sections match')
   })
 
   it('adding an open section swaps its Add button for a Remove action', async () => {

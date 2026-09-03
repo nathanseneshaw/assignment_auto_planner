@@ -109,4 +109,82 @@ describe('cacheMemo', () => {
     await cacheMemo('refetch', async () => { calls++; return 2 }, 5000)
     assert.equal(calls, 2)
   })
+
+  it('does not cache a rejection, so the next call retries', async () => {
+    cacheFlush()
+    let calls = 0
+    const loader = async () => { calls++; throw new Error('upstream down') }
+    await assert.rejects(() => cacheMemo('boom', loader, 5000), /upstream down/)
+    await assert.rejects(() => cacheMemo('boom', loader, 5000), /upstream down/)
+    assert.equal(calls, 2, 'a failed scrape must not be memoized')
+    assert.equal(cacheGet('boom'), null)
+  })
+
+  it('rejects every concurrent caller from a single failed load', async () => {
+    cacheFlush()
+    let calls = 0
+    const loader = async () => {
+      calls++
+      await new Promise((r) => setTimeout(r, 5))
+      throw new Error('nope')
+    }
+    const results = await Promise.allSettled([
+      cacheMemo('shared-boom', loader, 5000),
+      cacheMemo('shared-boom', loader, 5000),
+    ])
+    assert.deepEqual(results.map((r) => r.status), ['rejected', 'rejected'])
+    assert.equal(calls, 1)
+    // The pending entry must be cleared, so a later success is not blocked.
+    assert.equal(await cacheMemo('shared-boom', async () => 'ok', 5000), 'ok')
+  })
+
+  it('caches falsy-but-not-null values', async () => {
+    for (const value of [0, '', false, [], NaN]) {
+      cacheFlush()
+      let calls = 0
+      const loader = async () => { calls++; return value }
+      await cacheMemo('falsy', loader, 5000)
+      const second = await cacheMemo('falsy', loader, 5000)
+      assert.equal(calls, 1, `${String(value)} should have been cached`)
+      assert.deepEqual(second, value)
+    }
+  })
+
+  it('never caches a null result, so the loader re-runs every time', async () => {
+    // cacheGet returns null both for "missing" and for a stored null, so a
+    // loader that legitimately resolves null is re-run on every call. Scrapers
+    // therefore must return [] rather than null for "nothing found".
+    cacheFlush()
+    let calls = 0
+    const loader = async () => { calls++; return null }
+    await cacheMemo('nullish', loader, 5000)
+    await cacheMemo('nullish', loader, 5000)
+    await cacheMemo('nullish', loader, 5000)
+    assert.equal(calls, 3)
+  })
+
+  it('flushing a key mid-flight starts a fresh load for the next caller', async () => {
+    cacheFlush()
+    let calls = 0
+    const loader = async () => {
+      calls++
+      await new Promise((r) => setTimeout(r, 10))
+      return 'value'
+    }
+    const first = cacheMemo('inflight', loader, 5000)
+    cacheFlush('inflight')
+    const second = cacheMemo('inflight', loader, 5000)
+    assert.equal(await first, 'value')
+    assert.equal(await second, 'value')
+    assert.equal(calls, 2, 'the flush should have dropped the pending promise')
+  })
+
+  it('uses the caller-supplied TTL rather than the default', async () => {
+    cacheFlush()
+    let calls = 0
+    const loader = async () => { calls++; return 'x' }
+    await cacheMemo('short', loader, -1) // already expired on write
+    await cacheMemo('short', loader, -1)
+    assert.equal(calls, 2)
+  })
 })

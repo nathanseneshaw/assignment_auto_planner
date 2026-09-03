@@ -550,3 +550,31 @@ router.post('/api/ics/sync', requireUser, syncLimiter, async (req, res) => {
 })
 
 export default router
+
+/**
+ * Exported for tests only — mirrors the `_internal` convention in ics-fetcher.js.
+ * Gives the test suite a handle on the module-private helpers and on the two
+ * pieces of module-level state (the auth cache and the `content_hash` capability
+ * flag) so tests can stay hermetic. Not used by production code.
+ */
+export const _internal = {
+  getEnv,
+  clientFor,
+  getServiceClient,
+  authCache,
+  authCacheGet,
+  authCacheSet,
+  jwtExpMs,
+  bearerToken,
+  makeIcsLimiter,
+  normalizeUrlInput,
+  feedContentHash,
+  isUndefinedColumnErr,
+  selectSyncFeeds,
+  updateFeedStatus,
+  syncOneFeed,
+  AUTH_CACHE_TTL_MS,
+  AUTH_CACHE_MAX,
+  getFeedHashColumn: () => feedHashColumn,
+  setFeedHashColumn: (v) => { feedHashColumn = v },
+}

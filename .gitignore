@@ -29,5 +29,16 @@ release
 .env*
 .env*.local
 
+# Playwright end-to-end env: no secrets (blanks Supabase creds, pins a local
+# API URL) - tracked so CI can run test:e2e without recreating it.
+!.env.e2e
+
 # Local dev notes / docs (not for version control)
 *.md
+
+# Playwright end-to-end artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/dist-e2e/

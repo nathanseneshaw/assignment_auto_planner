@@ -17,6 +17,19 @@ async function bootstrap() {
 
   app.use(router)
   app.mount('#app')
+
+  // Test hook for the Playwright suite, exposed in dev and in the dedicated
+  // `e2e` build mode only. Both operands are compile-time literals, so the
+  // whole block is dead-code-eliminated from every shipping bundle: `vite
+  // build`, electron:build and ios:build all run in the default `production`
+  // mode, where DEV is false and MODE is not 'e2e'.
+  //
+  // Playwright uses it to seed Pinia stores directly (see e2e/fixtures/test.js),
+  // which keeps a tasks test from having to click through course creation just
+  // to reach its actual subject.
+  if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+    window.__APP_TEST_HOOK__ = { app, pinia, router }
+  }
 }
 
 bootstrap()

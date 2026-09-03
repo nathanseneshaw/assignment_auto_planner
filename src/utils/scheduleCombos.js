@@ -10,6 +10,11 @@
  * conflict with anything.
  */
 import { toMinutes, overlaps } from './scheduleTime.js'
+import { sectionUnavailable } from './sectionAvailability.js'
+
+// Re-exported so the engine's callers keep a single import site for the
+// availability rule they filter combos with.
+export { sectionUnavailable }
 
 /** @typedef {{ day: string, startMin: number, endMin: number }} Interval */
 
@@ -48,15 +53,6 @@ export function intervalsConflict(a, b) {
     }
   }
   return false
-}
-
-/** 'closed' | 'full' | null - mirrors the page's unavailableReason (null-safe). */
-export function sectionUnavailable(section) {
-  if (section.status === 'closed') return 'closed'
-  const enr = section.enrollment || {}
-  if (enr.available != null && enr.available <= 0) return 'full'
-  if (enr.max != null && enr.current != null && enr.current >= enr.max) return 'full'
-  return null
 }
 
 // Leading alpha component token of a sectionNumber: 'LEC 001' -> 'LEC',

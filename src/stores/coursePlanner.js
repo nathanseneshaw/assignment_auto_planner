@@ -17,10 +17,12 @@
 import { defineStore } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 import * as coursePlannerApi from '../services/coursePlannerApi.js'
+import { isSectionAvailable } from '../utils/sectionAvailability.js'
 import { useProfileStore } from './profile.js'
 
 const STORAGE_KEY = 'coursePlanner:saved'
 const WORK_STORAGE_KEY = 'coursePlanner:work'
+const HIDE_UNAVAILABLE_KEY = 'coursePlanner:hideUnavailable'
 
 export const useCoursePlannerStore = defineStore('coursePlanner', () => {
   const profileStore = useProfileStore()
@@ -37,6 +39,22 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
 
   const loading = reactive({ terms: false, subjects: false, sections: false })
   const errors = reactive({ terms: '', subjects: '', sections: '' })
+
+  // Persisted browse preference. Catalogues carry a lot of dead weight — at
+  // UMD, 20 of CMSC's 88 courses have every section closed — and a row you
+  // cannot add is noise, so this defaults ON. The UI keeps a one-click escape
+  // hatch (a student watching for a seat to free up still wants to find it).
+  const hideUnavailable = ref(loadHideUnavailable())
+
+  /** Sections the results list actually renders. */
+  const visibleSections = computed(() =>
+    hideUnavailable.value ? sections.value.filter(isSectionAvailable) : sections.value
+  )
+
+  /** How many full/closed sections the preference is currently hiding. */
+  const hiddenSectionCount = computed(
+    () => sections.value.length - visibleSections.value.length
+  )
 
   // In-flight request controllers, one per resource. Starting a new load aborts
   // the previous one so a burst of school/term/subject changes can't pile up
@@ -256,6 +274,28 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     }
   }
 
+  // --- Browse preferences ---
+
+  function setHideUnavailable(value) {
+    hideUnavailable.value = !!value
+    try {
+      localStorage.setItem(HIDE_UNAVAILABLE_KEY, JSON.stringify(hideUnavailable.value))
+    } catch (e) {
+      console.warn('[coursePlanner] persist hideUnavailable failed:', e)
+    }
+  }
+
+  function loadHideUnavailable() {
+    try {
+      const raw = localStorage.getItem(HIDE_UNAVAILABLE_KEY)
+      // Unset (first visit) means "on" — the filter is the default experience.
+      return raw === null ? true : JSON.parse(raw) === true
+    } catch (e) {
+      console.warn('[coursePlanner] load hideUnavailable failed:', e)
+      return true
+    }
+  }
+
   // --- Work shifts ---
 
   /** Replace the whole weekly work schedule (the modal edits a draft, then commits it here). */
@@ -289,6 +329,10 @@ export const useCoursePlannerStore = defineStore('coursePlanner', () => {
     terms,
     subjects,
     sections,
+    visibleSections,
+    hiddenSectionCount,
+    hideUnavailable,
+    setHideUnavailable,
     selectedTermCode,
     selectedTermLabel,
     selectedSubjectCode,

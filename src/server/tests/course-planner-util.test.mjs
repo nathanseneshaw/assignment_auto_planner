@@ -157,6 +157,47 @@ describe('dedupeMeetings', () => {
     assert.deepEqual(dedupeMeetings(null), [])
     assert.deepEqual(dedupeMeetings(undefined), [])
   })
+  it('returns [] for every other non-array type', () => {
+    for (const input of ['MWF', 0, 42, true, {}, { days: ['M'] }]) {
+      assert.deepEqual(dedupeMeetings(input), [], `input: ${JSON.stringify(input)}`)
+    }
+  })
+  it('skips undefined and falsy entries', () => {
+    const keep = { days: ['M'], startTime: '09:00', endTime: '09:50', location: 'A' }
+    assert.deepEqual(dedupeMeetings([undefined, keep, null, 0, '']), [keep])
+  })
+  it('returns a new array and leaves the input untouched', () => {
+    const input = [{ days: ['M'] }, { days: ['M'] }]
+    const out = dedupeMeetings(input)
+    assert.notEqual(out, input)
+    assert.equal(input.length, 2, 'input array was mutated')
+    assert.equal(out.length, 1)
+  })
+  it('returns the original objects, not copies', () => {
+    const first = { days: ['M'], startTime: '09:00', endTime: '09:50', location: 'A' }
+    assert.equal(dedupeMeetings([first])[0], first)
+  })
+  it('is idempotent (safe to run twice over the same array)', () => {
+    const m = { days: ['M'], startTime: '09:00', endTime: '09:50', location: 'A' }
+    const once = dedupeMeetings([m, { ...m }, { ...m }])
+    assert.deepEqual(dedupeMeetings(once), once)
+  })
+  it('treats a non-array days field as blank, so same-time rows collapse', () => {
+    const meetings = [
+      { days: 'MW', startTime: '09:00', endTime: '09:50', location: 'A' },
+      { days: 'WM', startTime: '09:00', endTime: '09:50', location: 'A' },
+    ]
+    assert.equal(dedupeMeetings(meetings).length, 1)
+  })
+  it('collapses rows that differ only in a missing vs blank location', () => {
+    const meetings = [
+      { days: ['M'], startTime: '09:00', endTime: '09:50' },
+      { days: ['M'], startTime: '09:00', endTime: '09:50', location: '' },
+      { days: ['M'], startTime: '09:00', endTime: '09:50', location: null },
+    ]
+    assert.equal(dedupeMeetings(meetings).length, 1)
+  })
+  it('returns [] for an empty array', () => assert.deepEqual(dedupeMeetings([]), []))
 })
 
 // ── parseCsv ──────────────────────────────────────────────────────────────────

@@ -4,19 +4,22 @@ import { useCoursePlannerStore } from '../../../stores/coursePlanner'
 import { useScheduleBuilderStore } from '../../../stores/scheduleBuilder'
 import { Button, Checkbox, TimePicker } from '../../ui'
 import { DAYS } from '../../../utils/scheduleTime.js'
+import { groupSectionsByCourse } from '../../../utils/sectionAvailability.js'
 
 const planner = useCoursePlannerStore()
 const builder = useScheduleBuilderStore()
 
 // One row per course in the currently loaded subject; the "Add" button hands
 // the group's first section to the store, which derives the candidate from it.
-const courseGroups = computed(() => {
-  const map = new Map()
-  for (const s of planner.sections) {
-    if (!map.has(s.courseNumber)) map.set(s.courseNumber, { first: s, count: 0 })
-    map.get(s.courseNumber).count++
-  }
-  return [...map.values()]
+// Built from visibleSections so a course whose every section is full or closed
+// never becomes a candidate — the generator would only report it back as an
+// empty slot and produce zero schedules.
+const courseGroups = computed(() => groupSectionsByCourse(planner.visibleSections))
+
+// Courses the availability preference is holding back from this subject.
+const hiddenCourseCount = computed(() => {
+  if (!planner.hideUnavailable) return 0
+  return groupSectionsByCourse(planner.sections).filter((g) => g.available === 0).length
 })
 
 function toggleDayOff(code) {
@@ -101,14 +104,19 @@ const showNoCombosMessage = computed(
       <p v-else-if="!planner.selectedSubjectCode" class="font-serif italic text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
         Pick a term + subject above, then add courses from the list here.
       </p>
-      <p v-else-if="!courseGroups.length" class="font-serif italic text-[14px] text-gray-500 dark:text-gray-400">
-        No courses in this subject.
-      </p>
+      <template v-else-if="!courseGroups.length">
+        <p v-if="hiddenCourseCount" class="font-serif italic text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
+          Every course in this subject is full or closed.
+        </p>
+        <p v-else class="font-serif italic text-[14px] text-gray-500 dark:text-gray-400">
+          No courses in this subject.
+        </p>
+      </template>
 
       <ul v-else class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
         <li
           v-for="g in courseGroups"
-          :key="g.first.courseNumber"
+          :key="g.courseNumber"
           class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface dark:hover:bg-gray-800/60 transition-colors"
         >
           <div class="min-w-0">
@@ -117,7 +125,7 @@ const showNoCombosMessage = computed(
               <span class="text-gray-500 dark:text-gray-400"> - {{ g.first.title }}</span>
             </p>
             <p class="font-mono text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
-              {{ g.count }} {{ g.count === 1 ? 'section' : 'sections' }}
+              {{ g.sections.length }} {{ g.sections.length === 1 ? 'section' : 'sections' }}
             </p>
           </div>
           <Button
@@ -133,6 +141,9 @@ const showNoCombosMessage = computed(
           <span v-else class="shrink-0 font-mono text-[11px] text-primary-600 dark:text-primary-400">Added</span>
         </li>
       </ul>
+      <p v-if="hiddenCourseCount" class="mt-2 font-mono text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
+        {{ hiddenCourseCount }} {{ hiddenCourseCount === 1 ? 'course' : 'courses' }} with no open sections hidden
+      </p>
       <p v-if="!builder.canAddMore" class="mt-2 font-mono text-[11px] text-gray-400 dark:text-gray-500">
         Course limit reached (8).
       </p>

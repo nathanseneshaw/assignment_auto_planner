@@ -241,3 +241,6 @@ router.post('/api/syllabus/save', requireUser, syllabusSaveRateLimit, async (req
 })
 
 export default router
+
+/** Exported for tests. */
+export const _internal = { nowIso, parseDueAt, clip }
