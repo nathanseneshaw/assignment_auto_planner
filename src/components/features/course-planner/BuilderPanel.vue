@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useCoursePlannerStore } from '../../../stores/coursePlanner'
 import { useScheduleBuilderStore } from '../../../stores/scheduleBuilder'
-import { Button, Checkbox, TimePicker } from '../../ui'
+import { Button, Checkbox, Spinner, TimePicker } from '../../ui'
 import { DAYS } from '../../../utils/scheduleTime.js'
 import { groupSectionsByCourse } from '../../../utils/sectionAvailability.js'
 
@@ -95,8 +95,13 @@ const showNoCombosMessage = computed(
     <div class="rounded-2xl border border-primary-200/50 dark:border-primary-800/30 bg-surface/40 dark:bg-gray-800/30 p-4">
       <p class="eyebrow text-gray-400 dark:text-gray-500 mb-2.5">Add courses</p>
 
-      <p v-if="planner.loading.sections" class="py-4 text-center font-mono text-[12px] text-gray-400 dark:text-gray-500">
-        Loading sections…
+      <p
+        v-if="planner.loading.sections"
+        role="status"
+        class="py-4 flex items-center justify-center gap-2 font-mono text-[12px] text-gray-400 dark:text-gray-500"
+      >
+        <Spinner size="sm" label="" />
+        <span>Loading sections…</span>
       </p>
       <p v-else-if="planner.errors.sections" class="py-4 text-center text-sm text-rust-600 dark:text-rust-500">
         {{ planner.errors.sections }}

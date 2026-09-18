@@ -140,7 +140,12 @@ export const useAssignmentsStore = defineStore('assignments', () => {
   function updateAssignment(id, updates) {
     const index = assignments.value.findIndex((a) => a.id === id)
     if (index === -1) return
-    assignments.value[index] = { ...assignments.value[index], ...updates }
+    // `dueAt` is the exact instant hydration carried over from Supabase; `dueDate`
+    // is the day key the UI edits. Moving the day has to drop the stale instant,
+    // or the persist below would prefer it and quietly undo the move.
+    const patch =
+      'dueDate' in updates && !('dueAt' in updates) ? { ...updates, dueAt: null } : updates
+    assignments.value[index] = { ...assignments.value[index], ...patch }
     const merged = assignments.value[index]
     const hasExt =
       (merged.canvasAssignmentId != null && String(merged.canvasAssignmentId).trim() !== '') ||

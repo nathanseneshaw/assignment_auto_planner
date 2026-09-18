@@ -77,7 +77,13 @@ const notifications = computed(() => {
   }
 
   const urgentAssignments = assignmentsStore.upcomingAssignments.filter(a => {
-    const days = Math.ceil((new Date(a.dueDate) - new Date()) / (1000 * 60 * 60 * 24))
+    // Whole days between two local midnights. `new Date('2026-09-18')` parses as
+    // midnight UTC, so measuring that against the current instant drifted the
+    // count by a day for anyone west of UTC.
+    const [y, m, d] = String(a.dueDate).slice(0, 10).split('-').map(Number)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const days = Math.round((new Date(y, m - 1, d) - today) / 86_400_000)
     return days <= 2
   })
 

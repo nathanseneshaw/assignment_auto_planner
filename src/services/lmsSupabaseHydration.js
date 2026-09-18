@@ -13,6 +13,7 @@ import { useAssignmentsStore } from '../stores/assignments'
 import { useTasksStore } from '../stores/tasks'
 import { useSubtasksStore } from '../stores/subtasks'
 import { mapDbTaskRow, mergeTaskLists } from './taskSyncCore'
+import { dueDateKeyFromInstant } from '../utils/dueDate'
 
 /** Color palette assigned round-robin so hydration is deterministic per-position. */
 const courseColors = [
@@ -27,15 +28,14 @@ const courseColors = [
 ]
 
 /**
- * Convert a Supabase `due_at` timestamp into the `YYYY-MM-DD` string the UI
- * uses everywhere. Bad/missing input falls back to today so the calendar
- * grid doesn't crash on a malformed row.
+ * Convert a Supabase `due_at` timestamp into the `YYYY-MM-DD` string the UI uses
+ * everywhere. Delegates to the shared helper so this reads the instant in the
+ * viewer's **local** timezone, matching the date keys every calendar builds.
+ * Reading it as UTC (the old `toISOString().split('T')[0]`) filed anything due
+ * late in the day (11:59 PM being the LMS default) one day late.
  */
 function dueDateFromDb(dueAt) {
-  if (!dueAt) return new Date().toISOString().split('T')[0]
-  const d = new Date(dueAt)
-  if (Number.isNaN(d.getTime())) return new Date().toISOString().split('T')[0]
-  return d.toISOString().split('T')[0]
+  return dueDateKeyFromInstant(dueAt)
 }
 
 /**
@@ -103,6 +103,11 @@ function mapAssignmentRow(row, course) {
     courseName: course?.name || 'Unknown course',
     title: row.assignment_name || 'Untitled',
     dueDate: dueDateFromDb(row.due_at),
+    // The exact instant, kept alongside the day key so an edit that doesn't
+    // touch the date (marking it done, say) writes the feed's real due time back
+    // instead of flattening it to midnight. Cleared by the store whenever the
+    // user actually moves the assignment.
+    dueAt: row.due_at || null,
     description: row.description != null ? String(row.description) : '',
     importSource: src || null,
   }

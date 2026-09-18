@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, nextTick, ref } from 'vue'
-import { Button, Input, ConfirmDialog } from '../ui'
+import { Button, Input, ConfirmDialog, Spinner } from '../ui'
 import IntegrationRow from './IntegrationRow.vue'
 import { useIcsFeedsStore } from '../../stores/icsFeeds'
 import { useAuthStore } from '../../stores/auth'
@@ -270,10 +270,7 @@ async function confirmRemoveFeed() {
           : 'bg-primary-100/70 text-primary-800 hover:bg-primary-200/80 dark:bg-primary-900/40 dark:text-primary-300 dark:hover:bg-primary-900/60 focus-visible:ring-primary-500/30'"
         @click="handleResync(feed)"
       >
-        <svg v-if="feedsStore.isSyncing(feed.id)" class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
+        <Spinner v-if="feedsStore.isSyncing(feed.id)" size="xs" label="" />
         <svg v-else class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5" />
         </svg>

@@ -69,7 +69,7 @@ const progressColor = computed(() => {
         class="h-full rounded-full transition-all duration-500 ease-out"
         :class="[
           variant === 'gradient' ? variantClasses.gradient : variantClasses[variant],
-          animated ? 'animate-pulse' : ''
+          animated ? 'shimmer' : ''
         ]"
         :style="{ width: `${value}%` }"
       ></div>

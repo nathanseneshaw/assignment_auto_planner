@@ -454,6 +454,85 @@ describe('parseAndExpand — occurrence field shaping', () => {
   })
 })
 
+// ── all-day (VALUE=DATE) events ───────────────────────────────────────
+// An all-day entry names a calendar day, and RFC 5545 makes its DTEND exclusive
+// (node-ical synthesizes start+1day when DTEND is absent at all). Preferring the
+// end here filed every all-day item one day late on the calendar. The parser now
+// pins these to midnight UTC of the DTSTART day, which is also the marker the
+// client reads with UTC getters so the day cannot drift with the viewer's
+// timezone. The asserted instants are absolute, so these hold under any TZ.
+
+describe('parseAndExpand — all-day (VALUE=DATE) events', () => {
+  function allDay(fields) {
+    return ['BEGIN:VEVENT', ...Object.entries(fields).map(([k, v]) => `${k}:${v}`), 'END:VEVENT'].join(CRLF)
+  }
+
+  it('files an all-day event on its DTSTART day, not the exclusive DTEND day', () => {
+    const { occurrences } = parseAndExpand(ics(allDay({
+      UID: 'allday-end@test',
+      SUMMARY: 'Do Weekly Reading [CGS 1234]',
+      'DTSTART;VALUE=DATE': '20260917',
+      'DTEND;VALUE=DATE': '20260918',
+    })))
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].dueAt, '2026-09-17T00:00:00.000Z')
+  })
+
+  it('files an all-day event with no DTEND on its own day', () => {
+    const { occurrences } = parseAndExpand(ics(allDay({
+      UID: 'allday-noend@test',
+      SUMMARY: 'Reading day',
+      'DTSTART;VALUE=DATE': '20260920',
+    })))
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].dueAt, '2026-09-20T00:00:00.000Z')
+  })
+
+  it('files a date-only VTODO on the day its DUE names', () => {
+    const feed = ics(['BEGIN:VTODO', 'UID:allday-todo@test', 'SUMMARY:Essay', 'DUE;VALUE=DATE:20260905', 'END:VTODO'].join(CRLF))
+    const { occurrences } = parseAndExpand(feed)
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].dueAt, '2026-09-05T00:00:00.000Z')
+  })
+
+  it('keeps a real timed DUE on a VTODO whose DTSTART is date-only', () => {
+    const feed = ics(['BEGIN:VTODO', 'UID:mixed-todo@test', 'SUMMARY:Problem Set 3',
+      'DTSTART;VALUE=DATE:20260901', 'DUE:20260908T235900Z', 'END:VTODO'].join(CRLF))
+    const { occurrences } = parseAndExpand(feed)
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].dueAt, '2026-09-08T23:59:00.000Z')
+  })
+
+  it('still prefers DTEND for a timed event', () => {
+    const { occurrences } = parseAndExpand(ics(vevent({
+      UID: 'timed@test', SUMMARY: 'Lab', DTSTART: '20260901T120000Z', DTEND: '20260901T140000Z',
+    })))
+    assert.equal(occurrences[0].dueAt, '2026-09-01T14:00:00.000Z')
+  })
+
+  it('gives every occurrence of an all-day series its own midnight-UTC day', () => {
+    // Anchor the series inside the [now-30d, now+365d] expansion window.
+    const start = new Date(Date.now() + 7 * 86_400_000)
+    const y = start.getUTCFullYear()
+    const m = String(start.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(start.getUTCDate()).padStart(2, '0')
+    const { occurrences } = parseAndExpand(ics(allDay({
+      UID: 'allday-series@test',
+      SUMMARY: 'Weekly reading',
+      'DTSTART;VALUE=DATE': `${y}${m}${d}`,
+      'DTEND;VALUE=DATE': `${y}${m}${d}`,
+      RRULE: 'FREQ=WEEKLY;COUNT=3',
+    })))
+    assert.equal(occurrences.length, 3)
+    for (const occ of occurrences) assert.ok(occ.dueAt.endsWith('T00:00:00.000Z'), occ.dueAt)
+    assert.equal(occurrences[0].dueAt.slice(0, 10), `${y}-${m}-${d}`)
+    // Consecutive weeks, exactly 7 days apart.
+    const days = occurrences.map((o) => Date.parse(o.dueAt))
+    assert.equal(days[1] - days[0], 7 * 86_400_000)
+    assert.equal(days[2] - days[1], 7 * 86_400_000)
+  })
+})
+
 // ── RRULE expansion — identity of the expanded occurrences ───────────────────
 // The writer relies on both of these: unique UIDs keep the occurrences off each
 // other's unique index, and isRecurring excludes them from the content-based

@@ -11,6 +11,7 @@
  *     duplicates when the user lacks a stable external id.
  */
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { dueAtFromDueDate } from '../utils/dueDate'
 
 /**
  * Map local Pinia course → LMS source for public.courses.source.
@@ -64,12 +65,14 @@ export function resolveImportSource(assignment) {
  * Coerce any accepted date input (ISO string, Date, epoch ms) into an ISO
  * string. Falls back to "now" on garbage input so Supabase NOT NULL still
  * succeeds  the user can fix the date later.
+ *
+ * A bare `YYYY-MM-DD` (what the date pickers produce) becomes midnight UTC, the
+ * date-only marker hydration reads back with UTC getters. Keeping both ends on
+ * the same convention is what lets a hand-picked date survive the round trip
+ * instead of sliding a day west of UTC.
  */
 function normalizeDueAt(due) {
-  if (!due) return new Date().toISOString()
-  const d = new Date(due)
-  if (Number.isNaN(d.getTime())) return new Date().toISOString()
-  return d.toISOString()
+  return dueAtFromDueDate(due)
 }
 
 /** ISO string for a completion timestamp, or null when not completed / unparseable. */

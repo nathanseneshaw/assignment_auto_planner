@@ -7,6 +7,7 @@
  * why. These tests assert that real branch, not the signed-out marketing one.
  */
 import { test, expect } from '../../fixtures/test.js'
+import { schoolsResponse } from '../../mocks/auth.js'
 
 test.describe('landing page', () => {
   test('renders every marketing section', async ({ app, page }) => {
@@ -27,6 +28,32 @@ test.describe('landing page', () => {
 
     await expect(page).toHaveURL('/login?redirect=/dashboard')
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  })
+
+  test('the Course Planner call to action opens the planner without signing in', async ({
+    app,
+    api,
+    page,
+  }) => {
+    // The planner loads the supported-school list as it mounts.
+    api.json('/api/course-planner/schools', schoolsResponse)
+    await app.goto('/')
+
+    // Offered in both the signed-out and the unconfigured hero, so it needs no
+    // `isSupabaseConfigured` branch of its own.
+    await page.getByRole('link', { name: 'Try the Course Planner' }).click()
+
+    await expect(page).toHaveURL('/course-planner')
+    await expect(page.getByRole('heading', { name: 'Course Planner' })).toBeVisible()
+  })
+
+  test('the header links straight to the Course Planner', async ({ app, api, page }) => {
+    api.json('/api/course-planner/schools', schoolsResponse)
+    await app.goto('/')
+
+    await page.locator('header').getByRole('link', { name: 'Course Planner' }).click()
+
+    await expect(page).toHaveURL('/course-planner')
   })
 
   test('explains that auth is unavailable and offers a local way into the app', async ({ app, page }) => {

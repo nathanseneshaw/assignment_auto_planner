@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Card, Input, Button } from '../components/ui'
+import { Card, Input, Button, Spinner } from '../components/ui'
 import { useAuthStore } from '../stores/auth'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { isElectron } from '../lib/platform'
@@ -190,7 +190,7 @@ async function onSubmit() {
             v-if="awaitingConfirmation"
             class="flex items-center justify-center gap-2 text-xs text-gray-400"
           >
-            <span class="w-3 h-3 rounded-full border-2 border-gray-200 border-t-emerald-500 animate-spin" />
+            <Spinner size="xs" label="" class="text-emerald-500" />
             Waiting for confirmation. You can keep this tab open.
           </p>
 

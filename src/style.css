@@ -309,6 +309,38 @@ html.is-electron .app-topbar {
   .badge-danger {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-100 text-danger-800;
   }
+
+  /* Skeleton placeholders. .skeleton is the resting tint, .shimmer the light
+     sweep that travels across it. The pair replaced a whole-block opacity
+     pulse, which made loading list rows look like they were flashing on and
+     off rather than filling in. .shimmer works on any element that clips its
+     own corners, so a progress fill can borrow it too. */
+  .skeleton {
+    background-color: var(--color-gray-200);
+  }
+
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    animation: shimmer-sweep 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after { animation: none; opacity: 0; }
 }
 
 /* ── Custom scrollbar ── */
@@ -380,4 +412,12 @@ html.is-electron .app-topbar {
 .dark .btn-ghost:hover {
   color: var(--color-gray-100);
   background-color: rgba(63, 63, 70, 0.8);
+}
+
+.dark .skeleton {
+  background-color: var(--color-gray-700);
+}
+
+.dark .shimmer::after {
+  background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.055), transparent);
 }

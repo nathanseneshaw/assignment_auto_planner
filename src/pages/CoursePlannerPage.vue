@@ -3,27 +3,51 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useCoursePlannerStore } from '../stores/coursePlanner'
 import { useScheduleBuilderStore } from '../stores/scheduleBuilder'
 import { useProfileStore } from '../stores/profile'
-import { Button, Checkbox, ConfirmDialog, Dropdown, Modal, TimePicker } from '../components/ui'
+import { useAuthStore } from '../stores/auth'
+import { Button, Checkbox, ConfirmDialog, Dropdown, Modal, Spinner, TimePicker } from '../components/ui'
 import BuilderPanel from '../components/features/course-planner/BuilderPanel.vue'
 import ComboNavigator from '../components/features/course-planner/ComboNavigator.vue'
+import UniversityPicker from '../components/features/UniversityPicker.vue'
 import { listSchools } from '../services/coursePlannerApi.js'
 import { schoolLogo } from '../lib/schoolLogos'
+import { isSupabaseConfigured } from '../lib/supabase'
 import { DAYS, toMinutes, formatClock, formatHour, meetingSummary } from '../utils/scheduleTime.js'
 import { sectionUnavailable } from '../utils/sectionAvailability.js'
 
 const planner = useCoursePlannerStore()
 const builder = useScheduleBuilderStore()
 const profileStore = useProfileStore()
+const authStore = useAuthStore()
+
+// Signed-out visitors get to try the planner: an inline school picker instead
+// of the (auth-walled) profile link, plus a sign-up nudge.
+const isGuest = computed(() => !authStore.isAuthenticated)
+
+const guestBannerDismissed = ref(false)
+
+// Local/demo builds have no Supabase, so `isAuthenticated` is always false
+// there. Only nudge sign-up where an account can actually be created, which
+// also keeps the banner out of the demo-screenshot pipeline.
+const showGuestBanner = computed(
+  () => isSupabaseConfigured && isGuest.value && !guestBannerDismissed.value
+)
 
 // Friendly label for the user's current school (fetched once from the API).
 const schoolName = ref('')
 const supportedSchools = ref([])
+// Only consumed by the guest picker; the header falls back to the bare code.
+const schoolsLoading = ref(false)
+const schoolsError = ref('')
 
 onMounted(async () => {
+  schoolsLoading.value = true
   try {
     supportedSchools.value = await listSchools()
-  } catch {
+  } catch (e) {
     // Falls back to the bare school code in the header — non-fatal.
+    schoolsError.value = e?.message || 'Failed to load supported schools.'
+  } finally {
+    schoolsLoading.value = false
   }
   if (planner.schoolCode) {
     planner.loadTerms()
@@ -48,6 +72,27 @@ const currentSchoolMeta = computed(() =>
 
 // Bundled logo for the current school, '' when none (drives the hero badge).
 const schoolLogoUrl = computed(() => schoolLogo(planner.schoolCode))
+
+// --- Guest school picker ---
+// Same contract ProfilePage gives UniversityPicker, so picking a school here
+// behaves exactly like picking one in the profile.
+const schoolOptions = computed(() =>
+  supportedSchools.value.map((s) => ({ value: s.code, label: s.name }))
+)
+
+const selectedSchool = computed({
+  get: () => profileStore.profile.school || '',
+  set(v) {
+    // No-op if the school didn't actually change (avoids wiping the planner
+    // when the picker re-emits the same value).
+    if (v === (profileStore.profile.school || '')) return
+    profileStore.updateProfile({ school: v })
+    // Switching schools clears the Course Planner (search state + saved weekly
+    // plan) so courses from the previous school don't linger.
+    planner.resetForSchoolChange()
+    builder.resetForSchoolChange()
+  },
+})
 
 // --- Dropdown option arrays ---
 const termOptions = computed(() => [
@@ -463,6 +508,32 @@ function confirmApply() {
 
 <template>
   <div class="pb-12">
+    <!-- ══ Guest sign-up nudge ═════════════════════════════════════════════ -->
+    <div
+      v-if="showGuestBanner"
+      class="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-primary-200/60 dark:border-primary-800/40 bg-primary-50/60 dark:bg-primary-900/20 px-4 py-3"
+    >
+      <p class="min-w-0 flex-1 font-serif text-[15px] leading-relaxed text-gray-700 dark:text-gray-300">
+        You're browsing as a guest. Sign up to save your plan across devices.
+      </p>
+      <router-link
+        to="/register?redirect=/course-planner"
+        class="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-900 hover:bg-primary-800 text-white text-[13px] font-semibold transition-colors duration-200 active:scale-[0.98] shadow-sm shadow-primary-900/15"
+      >
+        Sign up free
+      </router-link>
+      <button
+        type="button"
+        aria-label="Dismiss"
+        class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-primary-100/70 dark:hover:bg-primary-800/30 transition-colors duration-200"
+        @click="guestBannerDismissed = true"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
     <!-- ══ Hero ════════════════════════════════════════════════════════════ -->
     <header class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
       <div class="min-w-0">
@@ -501,10 +572,29 @@ function confirmApply() {
         </svg>
       </div>
       <h3 class="display text-xl text-gray-900 dark:text-gray-100">Pick your university first</h3>
-      <p class="mt-2 font-serif text-[15px] text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
+      <p
+        v-if="isGuest"
+        class="mt-2 font-serif text-[15px] text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed"
+      >
+        Choose which school's catalog to search. Pick one below to start browsing.
+      </p>
+      <p
+        v-else
+        class="mt-2 font-serif text-[15px] text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed"
+      >
         Choose which school's catalog to search from your profile.
       </p>
+      <!-- Guests have no profile page to send them to, so the picker lives here. -->
+      <div v-if="isGuest" class="mt-6 max-w-md mx-auto text-left">
+        <UniversityPicker
+          v-model="selectedSchool"
+          :options="schoolOptions"
+          :loading="schoolsLoading"
+          :error="schoolsError"
+        />
+      </div>
       <button
+        v-else
         type="button"
         @click="$router.push('/profile#university')"
         class="mt-6 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-900 hover:bg-primary-800 text-white text-[13px] font-semibold transition-colors duration-200 active:scale-[0.98] shadow-sm shadow-primary-900/15"
@@ -533,8 +623,9 @@ function confirmApply() {
             >{{ planner.errors.terms }}</p>
             <p
               v-else-if="planner.loading.terms"
-              class="mt-1.5 font-mono text-[11px] text-gray-400 dark:text-gray-500"
-            >Loading terms…</p>
+              role="status"
+              class="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-gray-400 dark:text-gray-500"
+            ><Spinner size="xs" label="" />Loading terms…</p>
           </div>
 
           <!-- Subject -->
@@ -553,8 +644,9 @@ function confirmApply() {
             >{{ planner.errors.subjects }}</p>
             <p
               v-else-if="planner.loading.subjects"
-              class="mt-1.5 font-mono text-[11px] text-gray-400 dark:text-gray-500"
-            >Loading subjects…</p>
+              role="status"
+              class="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-gray-400 dark:text-gray-500"
+            ><Spinner size="xs" label="" />Loading subjects…</p>
             <p
               v-else-if="!planner.selectedTermCode"
               class="mt-1.5 font-mono text-[11px] text-gray-400 dark:text-gray-500"
@@ -679,8 +771,13 @@ function confirmApply() {
           <BuilderPanel v-if="mode === 'builder'" />
 
           <!-- States -->
-          <div v-else-if="planner.loading.sections" class="py-14 text-center font-mono text-[12px] text-gray-400 dark:text-gray-500">
-            Loading sections…
+          <div
+            v-else-if="planner.loading.sections"
+            role="status"
+            class="py-14 flex flex-col items-center gap-3 font-mono text-[12px] text-gray-400 dark:text-gray-500"
+          >
+            <Spinner size="lg" label="" />
+            <span>Loading sections…</span>
           </div>
           <div v-else-if="planner.errors.sections" class="py-14 text-center text-sm text-rust-600 dark:text-rust-500">
             {{ planner.errors.sections }}

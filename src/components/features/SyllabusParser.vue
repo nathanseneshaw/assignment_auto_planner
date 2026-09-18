@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Button, Input, Modal, DatePicker } from '../ui'
+import { Button, Input, Modal, DatePicker, Spinner } from '../ui'
 import IntegrationRow from './IntegrationRow.vue'
 import * as syllabusService from '../../services/syllabusService'
 import { hydrateLmsStoresFromSupabase } from '../../services/lmsSupabaseHydration'
@@ -251,10 +251,7 @@ function handleModalClose() {
           class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors border-primary-300 text-primary-700 hover:bg-primary-50 hover:border-primary-400 dark:border-primary-700/70 dark:text-primary-300 dark:hover:bg-primary-900/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
           @click="handleParse"
         >
-          <svg v-if="parsing" class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
+          <Spinner v-if="parsing" size="xs" label="" />
           {{ parsing ? 'Parsing…' : 'Parse' }}
           <span v-if="!parsing" aria-hidden="true">→</span>
         </button>

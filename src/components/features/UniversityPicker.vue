@@ -125,13 +125,13 @@ function select(value) {
     <!-- List -->
     <div
       class="rounded-xl border border-gray-200/80 dark:border-gray-700/60 overflow-hidden"
-      :class="loading ? 'opacity-60 pointer-events-none' : ''"
+      :class="loading ? 'pointer-events-none' : ''"
     >
       <!-- Loading skeletons -->
       <template v-if="loading">
         <div v-for="i in 6" :key="i" class="flex items-center gap-3 px-4 py-3 border-b border-gray-200/60 dark:border-gray-700/40 last:border-b-0">
-          <div class="w-8 h-8 rounded-lg bg-gray-200/70 dark:bg-gray-700/60 animate-pulse shrink-0" />
-          <div class="h-3.5 rounded-full bg-gray-200/70 dark:bg-gray-700/60 animate-pulse" :style="{ width: (50 + i * 17) % 120 + 80 + 'px' }" />
+          <div class="w-8 h-8 rounded-lg skeleton shimmer shrink-0" />
+          <div class="h-3.5 rounded-full skeleton shimmer" :style="{ width: (50 + i * 17) % 120 + 80 + 'px' }" />
         </div>
       </template>
 

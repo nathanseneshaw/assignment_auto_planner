@@ -25,7 +25,12 @@ test.describe('course planner catalogue', () => {
     await app.goto('/course-planner')
 
     await expect(page.getByRole('heading', { name: 'Pick your university first' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Open Profile' })).toBeVisible()
+    // The app runs signed out under test (blank Supabase credentials), and the
+    // Course Planner is open to guests, so the empty state offers the picker
+    // inline. The old "Open Profile" button is the signed-in variant only -
+    // /profile is auth-walled, which makes it a dead end for a guest.
+    await expect(page.getByPlaceholder('Search universities…')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open Profile' })).toHaveCount(0)
     // Nothing to browse yet, so the page must not go looking for a catalogue.
     expect(api.callsTo(ENDPOINTS.terms)).toHaveLength(0)
     expect(api.unmatched).toHaveLength(0)
@@ -36,7 +41,8 @@ test.describe('course planner catalogue', () => {
     await app.goto('/course-planner')
     await expect(page.getByRole('heading', { name: 'Pick your university first' })).toBeVisible()
 
-    // What the university picker on the profile page ultimately does.
+    // What both university pickers (profile page, and the inline guest one)
+    // ultimately do. The inline picker is driven through the UI in guest.spec.js.
     await app.store('profile').invoke('updateProfile', { school: SCHOOL_CODE })
 
     await api.waitForCall(ENDPOINTS.terms)
