@@ -34,7 +34,12 @@ function sampleSection(over = {}) {
   }
 }
 
-const opts = { global: { mocks: { $router: { push: vi.fn() } } } }
+// vue-router is mocked away above, so the guest banner's <router-link> has
+// nothing to resolve against. Vue hoists that lookup out of its `v-if`, so the
+// stub is needed even on renders where the banner is hidden.
+const opts = {
+  global: { mocks: { $router: { push: vi.fn() } }, stubs: { RouterLink: true } },
+}
 
 describe('CoursePlanner school change', () => {
   beforeEach(() => { setActivePinia(createPinia()) })

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Button, Input, Modal, DatePicker } from '../ui'
+import { Button, Input, Modal, DatePicker, Spinner } from '../ui'
 import IntegrationRow from './IntegrationRow.vue'
 import * as syllabusService from '../../services/syllabusService'
 import { hydrateLmsStoresFromSupabase } from '../../services/lmsSupabaseHydration'
@@ -251,10 +251,7 @@ function handleModalClose() {
           class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors border-primary-300 text-primary-700 hover:bg-primary-50 hover:border-primary-400 dark:border-primary-700/70 dark:text-primary-300 dark:hover:bg-primary-900/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
           @click="handleParse"
         >
-          <svg v-if="parsing" class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
+          <Spinner v-if="parsing" size="xs" label="" />
           {{ parsing ? 'Parsing…' : 'Parse' }}
           <span v-if="!parsing" aria-hidden="true">→</span>
         </button>
@@ -307,8 +304,8 @@ function handleModalClose() {
           Rows without a due date won't be saved. Fill one in or remove the row.
         </p>
 
-        <!-- Column headers -->
-        <div v-if="draft.assignments.length > 0" class="grid grid-cols-[1fr_148px_32px] gap-x-2 px-1 mb-1">
+        <!-- Column headers (hidden once rows stack on narrow screens) -->
+        <div v-if="draft.assignments.length > 0" class="hidden sm:grid grid-cols-[minmax(0,1fr)_168px_32px] gap-x-2 px-1 mb-1">
           <span class="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Name</span>
           <span class="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Due date</span>
           <span></span>
@@ -318,23 +315,30 @@ function handleModalClose() {
           No assignments detected. Click "Add row" to enter them manually.
         </div>
 
-        <ul v-else class="space-y-1.5">
+        <!--
+          Rows are name / due date / remove side by side once there's room, and
+          stack to name-on-top with the date and remove button beneath below
+          `sm`. The name track is minmax(0,1fr) rather than 1fr because a bare
+          `1fr` can't shrink under a text input's intrinsic width, which pushed
+          the whole row wider than the dialog on narrow windows.
+        -->
+        <ul v-else class="space-y-3 sm:space-y-1.5">
           <li
             v-for="(a, idx) in draft.assignments"
             :key="idx"
-            class="grid grid-cols-[1fr_148px_32px] gap-x-2 items-center"
+            class="grid grid-cols-[minmax(0,1fr)_32px] sm:grid-cols-[minmax(0,1fr)_168px_32px] gap-x-2 gap-y-1.5 items-center"
           >
             <!-- Name -->
             <input
               v-model="a.name"
               type="text"
               placeholder="Assignment name"
-              class="w-full px-3 py-2 rounded-lg border bg-surface dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 border-gray-200 dark:border-gray-700 transition-colors"
+              class="col-span-2 sm:col-span-1 w-full min-w-0 px-3 py-2 rounded-lg border bg-surface dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/25 border-gray-200 dark:border-gray-700 transition-colors"
             />
             <!-- Due date -->
             <DatePicker
               :model-value="isoToDateInput(a.dueAt)"
-              placeholder="Pick a due date"
+              placeholder="Pick a date"
               size="sm"
               @update:model-value="(v) => { a.dueAt = dateInputToIso(v) }"
             />

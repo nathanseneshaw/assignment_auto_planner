@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Button } from '../components/ui'
 import AppWalkthrough from '../components/features/AppWalkthrough.vue'
+import { COURSE_PLANNER } from '../config/featureFlags.js'
 import { isSupabaseConfigured } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 
@@ -321,6 +322,13 @@ function scrollToSection(id) {
             :aria-current="activeSection === link.href.slice(1) ? 'true' : undefined"
             @click.prevent="scrollToSection(link.href.slice(1))"
           >{{ link.label }}</a>
+          <!-- A real route, not an in-page anchor, so it stays out of the
+               navLinks loop (which feeds scroll-spy) and renders as a sibling. -->
+          <RouterLink
+            v-if="COURSE_PLANNER"
+            to="/course-planner"
+            class="px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-100/80"
+          >Course Planner</RouterLink>
         </nav>
 
         <nav class="flex items-center flex-wrap justify-end gap-2">
@@ -377,6 +385,12 @@ function scrollToSection(id) {
             :aria-current="activeSection === link.href.slice(1) ? 'true' : undefined"
             @click.prevent="mobileNavOpen = false; scrollToSection(link.href.slice(1))"
           >{{ link.label }}</a>
+          <RouterLink
+            v-if="COURSE_PLANNER"
+            to="/course-planner"
+            class="px-3 py-2.5 rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-100/80"
+            @click="mobileNavOpen = false"
+          >Course Planner</RouterLink>
         </nav>
       </div>
     </header>
@@ -446,6 +460,20 @@ function scrollToSection(id) {
                 </Button>
               </RouterLink>
             </template>
+
+            <!-- Guest entry point. Valid in both branches above, so it sits
+                 outside them and leaves the auth CTA logic untouched. -->
+            <RouterLink v-if="COURSE_PLANNER" to="/course-planner" custom v-slot="{ href, navigate }">
+              <Button
+                variant="secondary"
+                size="lg"
+                :href="href"
+                class="w-full sm:w-auto min-w-[9rem]"
+                @click="navigate"
+              >
+                Try the Course Planner
+              </Button>
+            </RouterLink>
           </div>
 
           <p v-if="showSkipSignIn" class="mt-6 text-sm text-gray-600">
@@ -453,7 +481,7 @@ function scrollToSection(id) {
             planner locally.
           </p>
           <p v-else class="hero-enter hero-enter-5 mt-5 text-sm text-gray-600">
-            Free during beta · No credit card
+            Free during beta · No credit card<template v-if="COURSE_PLANNER"> · Course Planner needs no signup</template>
           </p>
         </div>
 

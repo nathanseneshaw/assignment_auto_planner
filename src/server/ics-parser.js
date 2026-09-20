@@ -336,6 +336,35 @@ function toDate(v) {
 }
 
 /**
+ * The calendar date an all-day (VALUE=DATE) entry is anchored to, or null when the
+ * entry carries a real time. node-ical flags every Date it builds from a date-only
+ * value with `dateOnly`, including the DTEND it synthesizes when one is absent.
+ *
+ * `picked` is the value the due time would otherwise come from (DUE, then DTEND,
+ * then DTSTART). Only when *that* value is date-only is the entry all-day, so a
+ * VTODO with a date-only DTSTART and a real timed DUE still keeps its deadline.
+ */
+function allDayAnchorOf(start, picked) {
+  if (!picked || picked.dateOnly !== true) return null
+  // An all-day VEVENT's DTEND is exclusive, so DTSTART names the real day; a
+  // date-only VTODO DUE with no DTSTART names its day itself.
+  return start && start.dateOnly === true ? start : picked
+}
+
+/**
+ * Re-anchor an all-day date to midnight UTC.
+ *
+ * node-ical builds VALUE=DATE values at *local* midnight of whatever timezone the
+ * process happens to run in, so the calendar components come back out through the
+ * local getters. Midnight UTC is this app's marker for "a day, not an instant":
+ * the client reads such timestamps with UTC getters, so an all-day item lands on
+ * the same day for every viewer no matter where they are.
+ */
+function utcMidnightOf(d) {
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+}
+
+/**
  * Expand a single ICS event into 1..N normalized assignment occurrences.
  * Handles RRULE-recurring events by expanding within the [now-30d, now+365d] window
  * and giving each occurrence a unique external id (so they don't collide on the
@@ -350,7 +379,14 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
   // Prefer the real DUE field for VTODO; fall back to .end only for VEVENT.
   const baseDue = toDate(event.due)
   const baseEnd = event.type === 'VTODO' ? null : toDate(event.end)
-  const effectiveEnd = baseDue || baseEnd || baseStart
+
+  // An all-day entry names a calendar day rather than a moment. Its DTEND is
+  // *exclusive* per RFC 5545, and node-ical synthesizes start+1day when DTEND is
+  // missing entirely, so preferring the end here filed every all-day item one day
+  // late. Use the start date, pinned to midnight UTC.
+  const picked = baseDue || baseEnd || baseStart
+  const allDayAnchor = allDayAnchorOf(baseStart, picked)
+  const effectiveEnd = allDayAnchor ? utcMidnightOf(allDayAnchor) : picked
 
   // Skip expanding sub-daily recurrences (the DoS payload); such an event falls
   // through to the single-occurrence path below instead.
@@ -372,8 +408,10 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
       occurrences = []
     }
 
+    // An all-day series carries no duration onto its occurrences; each occurrence
+    // *is* one calendar day.
     const durationMs =
-      baseStart && effectiveEnd ? effectiveEnd.getTime() - baseStart.getTime() : 0
+      allDayAnchor || !baseStart || !effectiveEnd ? 0 : effectiveEnd.getTime() - baseStart.getTime()
 
     const overrides = event.recurrences || {}
     const seriesUid = stringOf(event.uid) || 'evt'
@@ -386,7 +424,9 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
         const ovStart = toDate(override.start)
         const ovDue = toDate(override.due)
         const ovEnd = override.type === 'VTODO' ? null : toDate(override.end)
-        const overrideEnd = ovDue || ovEnd || ovStart
+        const ovPicked = ovDue || ovEnd || ovStart
+        const ovAllDay = allDayAnchorOf(ovStart, ovPicked)
+        const overrideEnd = ovAllDay ? utcMidnightOf(ovAllDay) : ovPicked
         const overrideCourse = extractCourse(override, calendarName, bracketToCanvasId, opts)
         const overrideUid = occurrenceUid(seriesUid, occStart)
         out.push(
@@ -403,7 +443,11 @@ export function expandEvent(event, calendarName, bracketToCanvasId, opts) {
         continue
       }
 
-      const occEnd = durationMs > 0 ? new Date(occStart.getTime() + durationMs) : occStart
+      const occEnd = allDayAnchor
+        ? utcMidnightOf(occStart)
+        : durationMs > 0
+          ? new Date(occStart.getTime() + durationMs)
+          : occStart
       const uid = occurrenceUid(seriesUid, occStart)
       out.push(
         normalizeOccurrence(event, occStart, occEnd, course, stringOf(event.url), uid, true)

@@ -1,5 +1,12 @@
 // Live verification: run each modified scraper end-to-end and report seat coverage.
+//
+// The term is chosen with the SAME term window the /terms route applies, so this
+// verifies what the app actually binds. Taking the school's first listed term
+// instead (what this did originally) silently checked the wrong catalogue for
+// any school that lists terms oldest-first or alphabetically: WashU and Arkansas
+// verified against Fall 2025, and Louisville against Spring 2022.
 import { selectCurrentAndNextTerms } from '../src/server/course-planner/term-window.js'
+
 const TARGETS = [
   { school: 'utsa', mod: '../src/server/course-planner/utsa-scraper.js', prefer: ['CS', 'ACC'] },
   { school: 'utep', mod: '../src/server/course-planner/utep-scraper.js', prefer: ['CS', 'ACCT'] },
@@ -71,6 +78,21 @@ const TARGETS = [
     mod: '../src/server/course-planner/dallascollege-scraper.js',
     prefer: ['RNSG', 'ITSC'],
   },
+  { school: 'uwyo', mod: '../src/server/course-planner/uwyo-scraper.js', prefer: ['CS', 'ECON'] },
+  { school: 'umontana', mod: '../src/server/course-planner/umontana-scraper.js', prefer: ['CSCI', 'ECNS'] },
+  { school: 'uaf', mod: '../src/server/course-planner/uaf-scraper.js', prefer: ['CS', 'ECON'] },
+  { school: 'uaa', mod: '../src/server/course-planner/uaa-scraper.js', prefer: ['CSE', 'ECON'] },
+  { school: 'sdstate', mod: '../src/server/course-planner/sdstate-scraper.js', prefer: ['CSC', 'ECON'] },
+  { school: 'usd', mod: '../src/server/course-planner/usd-scraper.js', prefer: ['CSC', 'ECON'] },
+  { school: 'hawaii', mod: '../src/server/course-planner/hawaii-scraper.js', prefer: ['ICS', 'ECON'] },
+  { school: 'uvm', mod: '../src/server/course-planner/uvm-scraper.js', prefer: ['CS', 'EC'] },
+  // WashU and LSU pick by DEPARTMENT, not subject code - that is the only facet
+  // their search accepts (see the scrapers' headers).
+  { school: 'washu', mod: '../src/server/course-planner/washu-scraper.js', prefer: ['Computer Science & Engineering', 'Economics'] },
+  { school: 'lsu', mod: '../src/server/course-planner/lsu-scraper.js', prefer: ['CSC', 'ECON'] },
+  { school: 'uark', mod: '../src/server/course-planner/uark-scraper.js', prefer: ['CSCE', 'ECON'] },
+  { school: 'louisville', mod: '../src/server/course-planner/louisville-scraper.js', prefer: ['CSE', 'ECON'] },
+  { school: 'unr', mod: '../src/server/course-planner/unr-scraper.js', prefer: ['CS', 'ECON'] },
 ]
 
 const which = process.argv[2] // optional filter
@@ -78,7 +100,6 @@ for (const t of TARGETS) {
   if (which && t.school !== which) continue
   const started = Date.now()
   try {
-    const scraper = await import(t.mod)
     const allTerms = await scraper.getTerms()
     // Skip "(View only)" shells — but Texas Southern marks even its live terms
     // that way, so never let the filter empty the list.
@@ -88,6 +109,7 @@ for (const t of TARGETS) {
     // whatever the school happens to list first — several schools lead with a
     // Continuing-Ed or summer term that has nothing in the subject we probe.
     const term = selectCurrentAndNextTerms(terms)[0] || terms[0]
+    if (!term) throw new Error('term window resolved to nothing')
     const subjects = await scraper.getSubjects(term.code)
     const subject =
       subjects.find((s) => t.prefer.includes(s.code)) || subjects[Math.min(4, subjects.length - 1)]

@@ -1,19 +1,176 @@
-name: Release (Windows + Mac)
+name: Release
 
-# Manual only: bump the version in package.json, commit/push it, then trigger
-# this from the Actions tab. Each platform builds independently (electron-
-# builder can't cross-compile a mac target from Windows or vice versa) and
-# both upload to the SAME draft GitHub release, matched by the version in
-# package.json. Once both succeed, the last job flips that release live -
-# same effect as the old local `gh release edit --draft=false --latest` step.
+# Every push to main: smoke-test a Windows build, an iOS Simulator launch, the
+# full unit test suite, and the Playwright e2e suite - all four must pass. If
+# that push ALSO bumped the "version" field in package.json (checked by
+# looking for a GitHub release matching v<version> - if it doesn't exist yet,
+# this is a new version), the pipeline continues on to build signed-off
+# Windows + Mac installers and publish them to GitHub Releases. Push commits
+# without a version bump just run the checks and stop - no release noise.
+#
+# workflow_dispatch lets you force a re-run (e.g. retry a failed release
+# build) without needing a new commit.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-windows:
+  smoke-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Same script used for local releases, minus publishing - unsigned build
+      # is fine here, this job only proves the Windows installer still builds.
+      - run: npm run electron:build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: release/*.exe
+          retention-days: 7
+
+  smoke-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Builds dist/ and syncs it into the Xcode project (same as npm run
+      # ios:build), then compiles for the simulator SDK with signing off -
+      # no Apple Developer account needed for this.
+      - run: npm run ios:build
+
+      - name: Compile for iOS Simulator (unsigned)
+        working-directory: ios/App
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project App.xcodeproj \
+            -target App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Boot Simulator, install & launch the app
+        run: |
+          set -euo pipefail
+          UDID=$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.name | test("iPhone"))][0].udid')
+          echo "Booting simulator $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+
+          APP_PATH=$(find "$RUNNER_TEMP/build" -maxdepth 6 -name "App.app" -print -quit)
+          echo "Installing $APP_PATH"
+          xcrun simctl install "$UDID" "$APP_PATH"
+
+          xcrun simctl launch "$UDID" com.plannr.app
+          sleep 8
+
+          # If the app crashed on launch it drops out of the running-process
+          # list within a few seconds - this is a best-effort check, not a
+          # full UI test.
+          if xcrun simctl spawn "$UDID" launchctl list | grep -q com.plannr.app; then
+            echo "App launched and is still running."
+          else
+            echo "App is not present in the running process list - it may have crashed on launch."
+            exit 1
+          fi
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run server:test
+      - run: npm run test:client
+      - run: npm run test:utils
+      - run: npm run test:stores
+      - run: npm run test:pages
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  check-release:
+    needs: [smoke-windows, smoke-ios, unit-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run - forcing a release build for $TAG."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          elif gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Release $TAG already exists - this push didn't bump the version. Skipping release build."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release for $TAG yet - version was bumped. Building the release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-windows:
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +188,9 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
 
-  build-mac:
+  release-mac:
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,17 +212,12 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
 
-  publish-release:
-    needs: [build-windows, build-mac]
+  finalize-release:
+    needs: [check-release, release-windows, release-mac]
+    if: needs.check-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Read version from package.json
-        id: version
-        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Publish the draft release
-        run: gh release edit "${{ steps.version.outputs.tag }}" --draft=false --latest
+      - name: Mark the release published and latest
+        run: gh release edit "${{ needs.check-release.outputs.tag }}" --draft=false --latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

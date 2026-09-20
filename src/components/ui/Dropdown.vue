@@ -179,7 +179,7 @@ const chevronSize = computed(() => (props.size === 'sm' ? 'w-4 h-4' : 'w-[18px] 
             ref="panelRef"
             role="listbox"
             :style="panelStyle"
-            class="z-[60] rounded-xl border border-gray-200/80 dark:border-gray-700 bg-surface dark:bg-gray-800 py-1 overflow-y-auto shadow-[0_4px_20px_rgba(28,25,23,0.10),0_1px_4px_rgba(28,25,23,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
+            class="z-[110] rounded-xl border border-gray-200/80 dark:border-gray-700 bg-surface dark:bg-gray-800 py-1 overflow-y-auto shadow-[0_4px_20px_rgba(28,25,23,0.10),0_1px_4px_rgba(28,25,23,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
           >
             <button
               v-for="opt in options"

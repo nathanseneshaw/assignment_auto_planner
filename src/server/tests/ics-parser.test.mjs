@@ -380,3 +380,213 @@ describe('parseAndExpand — RRULE expansion is bounded (DoS guard)', () => {
     assert.ok(occurrences.length > 1 && occurrences.length <= 1000)
   })
 })
+
+// ── normalizeOccurrence — field shaping ──────────────────────────────────────
+// The writer compares these fields verbatim to decide insert / update /
+// unchanged, so their exact shape (null vs '' vs truncated) is load-bearing.
+
+describe('parseAndExpand — occurrence field shaping', () => {
+  const base = { UID: 'shape@test', DTSTART: '20260901T120000Z', DTEND: '20260901T130000Z' }
+
+  it('falls back to "Untitled assignment" when SUMMARY is missing', () => {
+    const { occurrences } = parseAndExpand(ics(vevent(base)))
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].title, 'Untitled assignment')
+  })
+
+  it('trims whitespace off the title', () => {
+    const { occurrences } = parseAndExpand(ics(vevent({ ...base, SUMMARY: '   Quiz 2   ' })))
+    assert.equal(occurrences[0].title, 'Quiz 2')
+  })
+
+  it('emits null (not "") for an absent description and sourceUrl', () => {
+    const { occurrences } = parseAndExpand(ics(vevent(base)))
+    assert.equal(occurrences[0].description, null)
+    assert.equal(occurrences[0].sourceUrl, null)
+  })
+
+  it('does not append the URL twice when the description already contains it', () => {
+    const url = 'https://lms.example.edu/a/1'
+    const { occurrences } = parseAndExpand(ics(vevent({
+      ...base, SUMMARY: 'HW', URL: url, DESCRIPTION: `Read the brief at ${url} first`,
+    })))
+    assert.equal(occurrences[0].description, `Read the brief at ${url} first`)
+    assert.equal(occurrences[0].description.match(/lms\.example\.edu/g).length, 1)
+  })
+
+  it('truncates a huge description to 16KB with an ellipsis', () => {
+    const { occurrences } = parseAndExpand(ics(vevent({
+      ...base, SUMMARY: 'HW', DESCRIPTION: 'y'.repeat(40_000),
+    })))
+    const desc = occurrences[0].description
+    assert.equal(desc.length, 16 * 1024)
+    assert.ok(desc.endsWith('...'))
+  })
+
+  it('marks a single (non-recurring) event isRecurring:false', () => {
+    const { occurrences } = parseAndExpand(ics(vevent({ ...base, SUMMARY: 'HW' })))
+    assert.equal(occurrences[0].isRecurring, false)
+  })
+
+  it('drops an event that carries no usable date at all', () => {
+    const { occurrences } = parseAndExpand(ics(vevent({ UID: 'nodate@test', SUMMARY: 'Someday' })))
+    assert.equal(occurrences.length, 0)
+  })
+
+  it('keeps a date-only (VALUE=DATE) event as a single occurrence with a valid dueAt', () => {
+    const feed = ['BEGIN:VCALENDAR', 'VERSION:2.0',
+      'BEGIN:VEVENT', 'UID:allday@test', 'SUMMARY:Reading day', 'DTSTART;VALUE=DATE:20260901', 'END:VEVENT',
+      'END:VCALENDAR'].join(CRLF) + CRLF
+    const { occurrences } = parseAndExpand(feed)
+    assert.equal(occurrences.length, 1)
+    assert.ok(!Number.isNaN(Date.parse(occurrences[0].dueAt)))
+  })
+
+  it('uses DUE for a VTODO that has no DTSTART', () => {
+    const { occurrences } = parseAndExpand(ics(vtodo({ UID: 'todo@test', SUMMARY: 'Essay', DUE: '20260908T235900Z' })))
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].dueAt, '2026-09-08T23:59:00.000Z')
+  })
+
+  it('unescapes commas and semicolons in X-WR-CALNAME', () => {
+    const feed = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'X-WR-CALNAME:Fall 2026\\, Section 1', 'END:VCALENDAR'].join(CRLF) + CRLF
+    assert.equal(parseIcsBuffer(feed).calendarName, 'Fall 2026, Section 1')
+  })
+})
+
+// ── all-day (VALUE=DATE) events ───────────────────────────────────────
+// An all-day entry names a calendar day, and RFC 5545 makes its DTEND exclusive
+// (node-ical synthesizes start+1day when DTEND is absent at all). Preferring the
+// end here filed every all-day item one day late on the calendar. The parser now
+// pins these to midnight UTC of the DTSTART day, which is also the marker the
+// client reads with UTC getters so the day cannot drift with the viewer's
+// timezone. The asserted instants are absolute, so these hold under any TZ.
+
+describe('parseAndExpand — all-day (VALUE=DATE) events', () => {
+  function allDay(fields) {
+    return ['BEGIN:VEVENT', ...Object.entries(fields).map(([k, v]) => `${k}:${v}`), 'END:VEVENT'].join(CRLF)
+  }
+
+  it('files an all-day event on its DTSTART day, not the exclusive DTEND day', () => {
+    const { occurrences } = parseAndExpand(ics(allDay({
+      UID: 'allday-end@test',
+      SUMMARY: 'Do Weekly Reading [CGS 1234]',
+      'DTSTART;VALUE=DATE': '20260917',
+      'DTEND;VALUE=DATE': '20260918',
+    })))
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].dueAt, '2026-09-17T00:00:00.000Z')
+  })
+
+  it('files an all-day event with no DTEND on its own day', () => {
+    const { occurrences } = parseAndExpand(ics(allDay({
+      UID: 'allday-noend@test',
+      SUMMARY: 'Reading day',
+      'DTSTART;VALUE=DATE': '20260920',
+    })))
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].dueAt, '2026-09-20T00:00:00.000Z')
+  })
+
+  it('files a date-only VTODO on the day its DUE names', () => {
+    const feed = ics(['BEGIN:VTODO', 'UID:allday-todo@test', 'SUMMARY:Essay', 'DUE;VALUE=DATE:20260905', 'END:VTODO'].join(CRLF))
+    const { occurrences } = parseAndExpand(feed)
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].dueAt, '2026-09-05T00:00:00.000Z')
+  })
+
+  it('keeps a real timed DUE on a VTODO whose DTSTART is date-only', () => {
+    const feed = ics(['BEGIN:VTODO', 'UID:mixed-todo@test', 'SUMMARY:Problem Set 3',
+      'DTSTART;VALUE=DATE:20260901', 'DUE:20260908T235900Z', 'END:VTODO'].join(CRLF))
+    const { occurrences } = parseAndExpand(feed)
+    assert.equal(occurrences.length, 1)
+    assert.equal(occurrences[0].dueAt, '2026-09-08T23:59:00.000Z')
+  })
+
+  it('still prefers DTEND for a timed event', () => {
+    const { occurrences } = parseAndExpand(ics(vevent({
+      UID: 'timed@test', SUMMARY: 'Lab', DTSTART: '20260901T120000Z', DTEND: '20260901T140000Z',
+    })))
+    assert.equal(occurrences[0].dueAt, '2026-09-01T14:00:00.000Z')
+  })
+
+  it('gives every occurrence of an all-day series its own midnight-UTC day', () => {
+    // Anchor the series inside the [now-30d, now+365d] expansion window.
+    const start = new Date(Date.now() + 7 * 86_400_000)
+    const y = start.getUTCFullYear()
+    const m = String(start.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(start.getUTCDate()).padStart(2, '0')
+    const { occurrences } = parseAndExpand(ics(allDay({
+      UID: 'allday-series@test',
+      SUMMARY: 'Weekly reading',
+      'DTSTART;VALUE=DATE': `${y}${m}${d}`,
+      'DTEND;VALUE=DATE': `${y}${m}${d}`,
+      RRULE: 'FREQ=WEEKLY;COUNT=3',
+    })))
+    assert.equal(occurrences.length, 3)
+    for (const occ of occurrences) assert.ok(occ.dueAt.endsWith('T00:00:00.000Z'), occ.dueAt)
+    assert.equal(occurrences[0].dueAt.slice(0, 10), `${y}-${m}-${d}`)
+    // Consecutive weeks, exactly 7 days apart.
+    const days = occurrences.map((o) => Date.parse(o.dueAt))
+    assert.equal(days[1] - days[0], 7 * 86_400_000)
+    assert.equal(days[2] - days[1], 7 * 86_400_000)
+  })
+})
+
+// ── RRULE expansion — identity of the expanded occurrences ───────────────────
+// The writer relies on both of these: unique UIDs keep the occurrences off each
+// other's unique index, and isRecurring excludes them from the content-based
+// rotated-UID dedupe (many same-titled rows would be ambiguous).
+
+describe('parseAndExpand — recurring occurrence identity', () => {
+  // Anchor the series inside the [now-30d, now+365d] expansion window.
+  const soon = new Date(Date.now() + 7 * 86_400_000)
+  const stamp = soon.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+  const feed = ics(vevent({
+    UID: 'series@test', SUMMARY: 'Weekly lab', DTSTART: stamp, DTEND: stamp, RRULE: 'FREQ=WEEKLY;COUNT=3',
+  }))
+
+  it('gives every occurrence a distinct uid derived from the base UID + instant', () => {
+    const { occurrences } = parseAndExpand(feed)
+    assert.equal(occurrences.length, 3)
+    for (const occ of occurrences) assert.ok(occ.uid.startsWith('series@test@'))
+    assert.equal(new Set(occurrences.map((o) => o.uid)).size, 3)
+  })
+
+  it('flags every expanded occurrence isRecurring:true', () => {
+    const { occurrences } = parseAndExpand(feed)
+    assert.deepEqual(occurrences.map((o) => o.isRecurring), [true, true, true])
+  })
+
+  it('keeps the whole series under one course', () => {
+    const { occurrences } = parseAndExpand(feed, { feedLabel: 'Physics Lab' })
+    assert.equal(new Set(occurrences.map((o) => o.courseExternalId)).size, 1)
+    assert.equal(occurrences[0].courseExternalId, 'label:physics lab')
+  })
+})
+
+// ── multi-course feeds ───────────────────────────────────────────────────────
+
+describe('parseAndExpand — multiple courses in one feed', () => {
+  it('splits occurrences across the courses their events identify', () => {
+    const feed = ics(
+      vevent({ UID: 'a@t', SUMMARY: 'HW 1 [CS 3340]', DTSTART: '20260901T120000Z', DTEND: '20260901T130000Z' }),
+      vevent({ UID: 'b@t', SUMMARY: 'Quiz [MATH 2418]', DTSTART: '20260902T120000Z', DTEND: '20260902T130000Z' }),
+      vevent({ UID: 'c@t', SUMMARY: 'HW 2 [CS 3340]', DTSTART: '20260903T120000Z', DTEND: '20260903T130000Z' })
+    )
+    const { occurrences } = parseAndExpand(feed)
+    assert.equal(occurrences.length, 3)
+    assert.deepEqual(
+      occurrences.map((o) => o.courseExternalId),
+      ['name:cs 3340', 'name:math 2418', 'name:cs 3340']
+    )
+  })
+
+  it('does not let feedLabel override a course identified by the event itself', () => {
+    const feed = ics(vevent({
+      UID: 'a@t', SUMMARY: 'HW 1 [CS 3340]', DTSTART: '20260901T120000Z', DTEND: '20260901T130000Z',
+    }))
+    const { occurrences } = parseAndExpand(feed, { feedLabel: 'Whatever the user typed' })
+    assert.equal(occurrences[0].courseExternalId, 'name:cs 3340')
+  })
+})

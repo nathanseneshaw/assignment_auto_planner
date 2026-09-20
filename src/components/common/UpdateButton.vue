@@ -13,6 +13,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { isElectron } from '../../lib/platform'
+import Spinner from '../ui/Spinner.vue'
 
 const api = typeof window !== 'undefined' ? window.electronAPI?.updates : null
 
@@ -106,10 +107,7 @@ onBeforeUnmount(() => {
       v-else-if="status === 'downloading'"
       class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-primary-700 dark:text-primary-300 bg-primary-100 dark:bg-primary-900/30"
     >
-      <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
+      <Spinner size="sm" label="" />
       <span class="hidden sm:inline">Downloading {{ percent }}%</span>
     </div>
 

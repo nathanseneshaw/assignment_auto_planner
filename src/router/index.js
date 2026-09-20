@@ -104,7 +104,7 @@ const routes = [
     path: '/course-planner',
     name: 'CoursePlanner',
     component: () => import('../pages/CoursePlannerPage.vue'),
-    meta: { title: 'Course Planner', requiresAuth: true },
+    meta: { title: 'Course Planner' },
   },
   {
     path: '/profile',

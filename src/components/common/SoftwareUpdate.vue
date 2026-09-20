@@ -11,7 +11,7 @@
  * Web build / browser: window.electronAPI is undefined, so this renders nothing.
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { isElectron } from '../../lib/platform'
+import { isElectron, desktopOSName } from '../../lib/platform'
 import { Button } from '../ui'
 
 const api = typeof window !== 'undefined' ? window.electronAPI?.updates : null
@@ -25,6 +25,10 @@ const message = ref('')
 let unsubscribe = null
 
 const show = computed(() => isElectron && !!api)
+
+// "Plannr for Windows" / "macOS" / "Linux" — re-read on mount in case the
+// preload handle wasn't populated when this component was created.
+const osName = ref(desktopOSName())
 
 // Broadcast events (from the main-process auto-checker or an in-progress
 // download) keep this section in sync with the rest of the app.
@@ -121,6 +125,7 @@ const statusText = computed(() => {
 
 onMounted(async () => {
   if (!show.value) return
+  osName.value = desktopOSName()
   unsubscribe = api.onEvent(applyEvent)
   version.value = (await api.getVersion()) || ''
   // If the background checker already found an update, reflect it right away.
@@ -135,7 +140,7 @@ onBeforeUnmount(() => {
 <template>
   <div v-if="show" class="flex items-center justify-between gap-4 py-3.5">
     <div class="min-w-0">
-      <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Plannr for desktop</p>
+      <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Plannr for {{ osName }}</p>
       <p
         class="text-[12px] font-mono truncate mt-0.5"
         :class="status === 'error' ? 'text-danger-600 dark:text-danger-400' : 'text-gray-500 dark:text-gray-400'"

@@ -55,3 +55,31 @@ export const isMacElectron = detectMacElectron()
 export const isCapacitor = IS_CAPACITOR_BUILD || Capacitor.isNativePlatform()
 
 export const isIOS = isCapacitor && Capacitor.getPlatform() === 'ios'
+
+/**
+ * Human-readable OS name for desktop UI labels ("Plannr for Windows").
+ *
+ * A function, not a frozen const, for the same preload-timing reason described
+ * above: called from a component it runs well after `window.electronAPI` is
+ * populated. Falls back to the user agent, then to a generic "desktop" when the
+ * OS can't be determined.
+ */
+export function desktopOSName() {
+  if (typeof window !== 'object') return 'desktop'
+  switch (window.electronAPI?.platform) {
+    case 'darwin':
+      return 'macOS'
+    case 'win32':
+      return 'Windows'
+    case 'linux':
+      return 'Linux'
+    default:
+      break
+  }
+  const nav = window.navigator || {}
+  const ua = `${nav.userAgentData?.platform || nav.platform || ''} ${nav.userAgent || ''}`
+  if (/mac/i.test(ua)) return 'macOS'
+  if (/win/i.test(ua)) return 'Windows'
+  if (/linux/i.test(ua)) return 'Linux'
+  return 'desktop'
+}
