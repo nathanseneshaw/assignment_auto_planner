@@ -57,7 +57,7 @@ test.describe('dashboard', () => {
     await expect(page.getByText('Skim notes')).toBeVisible()
 
     // Right rail: the upcoming deadline, and the course with its open count.
-    await expect(page.getByText('Nothing on the horizon yet.')).not.toBeVisible()
+    await expect(page.getByText('Nothing due this week.')).not.toBeVisible()
     await expect(page.getByRole('button', { name: 'Proof set 4' })).toBeVisible()
     // "My courses" counts both assignments as still open.
     await expect(page.getByText('2 left')).toBeVisible()
@@ -74,7 +74,7 @@ test.describe('dashboard', () => {
     await expect(page.getByText('Nothing scheduled yet')).toBeVisible()
     await expect(page.getByText('Nothing upcoming')).toBeVisible()
     await expect(page.getByText('All clear')).toBeVisible()
-    await expect(page.getByText('Nothing on the horizon yet.')).toBeVisible()
+    await expect(page.getByText('Nothing due this week.')).toBeVisible()
   })
 
   test('the Today\'s Tasks card opens the tasks page', async ({ app, page }) => {

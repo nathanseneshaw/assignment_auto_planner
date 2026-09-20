@@ -251,6 +251,13 @@ class AppDriver {
         timeout: 20000,
         polling: 100,
       })
+      // main.js mounts synchronously and publishes the hook straight after, but
+      // the router's FIRST navigation is async. Until it settles currentRoute is
+      // still vue-router's START_LOCATION, whose path is '/', so a spec reading
+      // app.currentPath() right after goto() races it and intermittently sees
+      // '/' instead of the route it asked for. isReady() resolves once that
+      // initial navigation - guards included - has finished.
+      await this.page.evaluate(() => window.__APP_TEST_HOOK__.router.isReady())
       await expect(this.page.locator('#app')).not.toBeEmpty()
     }
     return this.page

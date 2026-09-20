@@ -49,7 +49,7 @@ test.describe('assignments list', () => {
     await expect(page.getByText('all caught up here')).toBeVisible()
 
     await statusTab(page, 'Upcoming', 0).click()
-    await expect(page.getByText('Nothing due in the next 7 days.')).toBeVisible()
+    await expect(page.getByText('Nothing upcoming.')).toBeVisible()
     await expect(page.getByText('clear for now')).toBeVisible()
 
     await statusTab(page, 'Completed', 0).click()
