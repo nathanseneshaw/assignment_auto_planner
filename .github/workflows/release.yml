@@ -217,6 +217,8 @@ jobs:
     if: needs.check-release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Mark the release published and latest
         run: gh release edit "${{ needs.check-release.outputs.tag }}" --draft=false --latest
         env:
