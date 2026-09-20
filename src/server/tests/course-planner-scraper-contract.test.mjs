@@ -32,7 +32,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const serverDir = path.resolve(here, '..')
 const plannerDir = path.join(serverDir, 'course-planner')
-const routesSrc = fs.readFileSync(path.join(serverDir, 'course-planner-routes.js'), 'utf8')
+// Sources below are parsed with \n-anchored regexes. A Windows checkout
+// under core.autocrlf hands back CRLF, which would silently fail every one of
+// them, so normalise on read and keep this test OS-independent.
+const readSource = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n')
+
+const routesSrc = readSource(path.join(serverDir, 'course-planner-routes.js'))
 
 // ── static parse of the router ────────────────────────────────────────────────
 
@@ -85,7 +90,7 @@ const scraperFiles = fs
   .sort()
 
 const sourceByFile = new Map(
-  scraperFiles.map((f) => [f, fs.readFileSync(path.join(plannerDir, f), 'utf8')])
+  scraperFiles.map((f) => [f, readSource(path.join(plannerDir, f))])
 )
 
 // ── registry shape ────────────────────────────────────────────────────────────
@@ -175,7 +180,7 @@ describe('scraper school tagging', () => {
 
 /** Option names a factory actually destructures, read from its own source. */
 function factoryOptions(file, factoryName) {
-  const src = fs.readFileSync(path.join(plannerDir, file), 'utf8')
+  const src = readSource(path.join(plannerDir, file))
   const m = src.match(new RegExp('export function ' + factoryName + '\\(\\{([\\s\\S]*?)\\}\\)'))
   assert.ok(m, `could not read the option list of ${factoryName} in ${file}`)
   return new Set(
@@ -199,8 +204,12 @@ const ENGINES = {
 const callSites = []
 for (const [file, src] of sourceByFile) {
   for (const m of src.matchAll(/(create\w*Scraper)\(\{([\s\S]*?)\}\)/g)) {
-    const keys = [...m[2].matchAll(/(?:^|[{,])\s*([A-Za-z_]\w*):/g)].map((k) => k[1])
-    callSites.push({ file, factory: m[1], body: m[2], keys })
+    // Options are routinely documented with a `//` line directly above them.
+    // Strip those first: a key sitting after a comment is invisible to the
+    // scan below, and the call site reads as if it never passed the flag.
+    const body = m[2].replace(/^[ \t]*\/\/.*$/gm, '')
+    const keys = [...body.matchAll(/(?:^|[{,])\s*([A-Za-z_]\w*):/g)].map((k) => k[1])
+    callSites.push({ file, factory: m[1], body, keys })
   }
 }
 
@@ -279,20 +288,30 @@ describe('Colleague engine wiring', () => {
   const colleagueSites = callSites.filter((c) => c.factory === 'createColleagueScraper')
 
   it('registers the Colleague schools this build ships', () => {
-    // Project notes list TWU / Dallas College / TCC / McLennan / Southwestern /
-    // Hardin-Simmons as the Colleague cohort, with the last four needing a
-    // `legacyApi: true` flag. Only TWU is present in this tree, and neither
-    // colleague.js nor any call site knows a `legacyApi` option — so there is
-    // no flag to get wrong here. Pin that so re-adding those schools without
-    // re-adding the engine support fails loudly.
+    // TWU and Dallas College run the modern SearchAsync API; Hardin-Simmons,
+    // McLennan, Southwestern and TCC sit on the older Self-Service release and
+    // must pass `legacyApi: true`. Both halves are pinned so adding a Colleague
+    // school without picking the right API flavour fails loudly here.
+    assert.deepEqual(colleagueSites.map((c) => c.file).sort(), [
+      'dallascollege-scraper.js',
+      'hsutx-scraper.js',
+      'mclennan-scraper.js',
+      'southwestern-scraper.js',
+      'tccd-scraper.js',
+      'twu-scraper.js',
+    ])
     assert.deepEqual(
-      colleagueSites.map((c) => c.file).sort(),
-      ['twu-scraper.js']
+      colleagueSites
+        .filter((c) => c.keys.includes('legacyApi'))
+        .map((c) => c.file)
+        .sort(),
+      ['hsutx-scraper.js', 'mclennan-scraper.js', 'southwestern-scraper.js', 'tccd-scraper.js'],
+      'legacy Colleague schools must opt into the unsuffixed endpoints'
     )
   })
 
   it('has no orphaned legacyApi flag anywhere in the engine or its call sites', () => {
-    const colleagueSrc = fs.readFileSync(path.join(plannerDir, 'colleague.js'), 'utf8')
+    const colleagueSrc = readSource(path.join(plannerDir, 'colleague.js'))
     const engineKnowsFlag = /legacyApi/.test(colleagueSrc)
     const callersPassFlag = colleagueSites.filter((c) => c.keys.includes('legacyApi'))
     assert.equal(
@@ -348,6 +367,8 @@ describe('central term window is not duplicated in scrapers', () => {
       'gatech-scraper.js',
       'hawaii-scraper.js',
       'neu-scraper.js',
+      'stc-scraper.js',
+      'tamut-scraper.js',
       'umontana-scraper.js',
       'unm-scraper.js',
       'utrgv-scraper.js',

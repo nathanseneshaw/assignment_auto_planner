@@ -116,8 +116,21 @@ describe('DashboardPage mount + hero', () => {
     await flushPromises(); await nextTick()
     // 2 tasks scheduled today → "You have 2 tasks lined up for today."
     expect(w.text()).toContain('You have 2 tasks lined up for today')
-    // 1 overdue assignment feeds the italic warning clause.
-    expect(w.text()).toContain('1 overdue assignment')
+  })
+
+  it('nudges toward catching up when the slate is clear but work is overdue', async () => {
+    seedAssignments([
+      { id: 'a-od1', title: 'Late Lab', dueDate: '2026-06-10', status: 'pending', feedStatus: 'live' },
+    ])
+    const w = mountDashboard()
+    await flushPromises(); await nextTick()
+    expect(w.text()).toContain('a good moment to catch up')
+  })
+
+  it('nudges toward planning ahead when nothing is outstanding', async () => {
+    const w = mountDashboard()
+    await flushPromises(); await nextTick()
+    expect(w.text()).toContain('a good moment to plan ahead')
   })
 })
 
@@ -127,10 +140,10 @@ describe('DashboardPage stat cards', () => {
   it('renders exactly three stat cards with their labels', async () => {
     const w = mountDashboard()
     await flushPromises(); await nextTick()
-    const cards = w.find('.grid-cols-3').findAll('div')
+    const cards = w.find('.grid-cols-3').findAll('button')
     expect(cards).toHaveLength(3)
     expect(cards[0].text()).toContain("Today's Tasks")
-    expect(cards[1].text()).toContain('Upcoming')
+    expect(cards[1].text()).toContain('Due this week')
     expect(cards[2].text()).toContain('Overdue')
   })
 
@@ -138,7 +151,7 @@ describe('DashboardPage stat cards', () => {
     seedFullDashboard()
     const w = mountDashboard()
     await flushPromises(); await nextTick()
-    const cards = w.find('.grid-cols-3').findAll('div')
+    const cards = w.find('.grid-cols-3').findAll('button')
     // 1 of today's 2 tasks is complete.
     expect(cards[0].find('.display').text()).toBe('1/2')
     expect(cards[0].text()).toContain('1 done so far')
@@ -148,7 +161,7 @@ describe('DashboardPage stat cards', () => {
     seedFullDashboard()
     const w = mountDashboard()
     await flushPromises(); await nextTick()
-    const cards = w.find('.grid-cols-3').findAll('div')
+    const cards = w.find('.grid-cols-3').findAll('button')
     expect(cards[1].find('.display').text()).toBe('3')
     // Sub-label points at the nearest deadline (Jun 16).
     expect(cards[1].text()).toContain('Next')
@@ -159,7 +172,7 @@ describe('DashboardPage stat cards', () => {
     seedFullDashboard()
     const w = mountDashboard()
     await flushPromises(); await nextTick()
-    const cards = w.find('.grid-cols-3').findAll('div')
+    const cards = w.find('.grid-cols-3').findAll('button')
     expect(cards[2].find('.display').text()).toBe('1')
     expect(cards[2].text()).toContain('Needs attention')
   })
@@ -167,7 +180,7 @@ describe('DashboardPage stat cards', () => {
   it('shows all-zero counts and reassuring sub-labels when empty', async () => {
     const w = mountDashboard()
     await flushPromises(); await nextTick()
-    const cards = w.find('.grid-cols-3').findAll('div')
+    const cards = w.find('.grid-cols-3').findAll('button')
     expect(cards[0].find('.display').text()).toBe('0/0')
     expect(cards[0].text()).toContain('Nothing scheduled yet')
     expect(cards[1].find('.display').text()).toBe('0')
@@ -210,7 +223,7 @@ describe('DashboardPage today\'s tasks', () => {
     const w = mountDashboard()
     await flushPromises(); await nextTick()
 
-    const cards = w.find('.grid-cols-3').findAll('div')
+    const cards = w.find('.grid-cols-3').findAll('button')
     expect(cards[0].find('.display').text()).toBe('0/1')
 
     // The task row carries the click handler that toggles completion.
@@ -253,7 +266,9 @@ describe('DashboardPage right rail', () => {
   it('always renders the weekly planner shortcut', async () => {
     const w = mountDashboard()
     await flushPromises(); await nextTick()
-    expect(w.text()).toContain('Weekly planner')
+    const rail = w.get('aside').text()
+    expect(rail).toContain('Plan')
+    expect(rail).toContain('This week')
   })
 
   it('lists this week’s deadlines with title and short date', async () => {
@@ -286,19 +301,15 @@ describe('DashboardPage right rail', () => {
     expect(w.text()).not.toContain('Deadline 5')
   })
 
-  it('shows the overdue alert only when something is overdue', async () => {
-    const empty = mountDashboard()
-    await flushPromises(); await nextTick()
-    expect(empty.text()).not.toContain('Review overdue')
-
-    setActivePinia(createPinia())
-    seedAssignments([
-      { id: 'a-od1', title: 'Late Lab', dueDate: '2026-06-10', status: 'pending', feedStatus: 'live' },
-    ])
+  it('summarises the week ahead on the planner shortcut', async () => {
+    seedFullDashboard()
     const w = mountDashboard()
     await flushPromises(); await nextTick()
-    expect(w.text()).toContain('Review overdue')
-    expect(w.text()).toContain('1 Overdue')
+    const rail = w.get('aside').text()
+    // Mon Jun 15 - Sun Jun 21: 2 tasks today plus 1 on the 20th, and the
+    // 16th/18th/20th deadlines all land inside the same week.
+    expect(rail).toContain('3 tasks')
+    expect(rail).toContain('3 due')
   })
 
   it('shows an empty-rail message when nothing is due this week', async () => {

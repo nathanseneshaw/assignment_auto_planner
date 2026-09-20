@@ -1,14 +1,14 @@
 /**
- * Tests for twu-scraper.js — Texas Woman's University, the one Ellucian
- * Colleague Self-Service school in this build.
+ * Tests for twu-scraper.js — Texas Woman's University, one of the Ellucian
+ * Colleague Self-Service schools in this build.
  *
  * The engine itself is covered by course-planner-colleague.test.mjs, so this
  * file pins the part that is TWU's own: the host it talks to, the antiforgery
  * round-trip against that host, the section shape it hands the planner, and the
- * `legacyApi` question — the project notes describe a Colleague cohort where
- * four schools need `legacyApi: true`, but neither colleague.js nor TWU knows
- * that option in this tree, so a re-added school passing it would be silently
- * ignored. That is asserted here rather than assumed.
+ * `legacyApi` question — four schools in the Colleague cohort sit on the older
+ * Self-Service release and pass `legacyApi: true`, while TWU is on the modern
+ * SearchAsync API and must not. That the engine honours the flag, and that TWU
+ * stays off it, is asserted here rather than assumed.
  */
 import assert from 'node:assert'
 import { describe, it, beforeEach, afterEach } from 'node:test'
@@ -238,22 +238,25 @@ describe('Colleague legacyApi flag', () => {
   const twuSrc = fs.readFileSync(path.join(plannerDir, 'twu-scraper.js'), 'utf8')
 
   it('TWU is the correct Colleague school and does NOT need the flag', () => {
-    // Project notes say TWU / Dallas College / TCC / McLennan / Southwestern /
-    // Hardin-Simmons are Colleague and the last four need `legacyApi: true`.
-    // Only TWU ships here, and TWU is on the modern SearchAsync API, so no flag
-    // is expected — and none exists.
+    // The Colleague cohort is TWU / Dallas College / TCC / McLennan /
+    // Southwestern / Hardin-Simmons; the last four run the older Self-Service
+    // release and pass `legacyApi: true`. TWU is on the modern SearchAsync API,
+    // so it must stay off the flag.
     assert.match(twuSrc, /createColleagueScraper\(\{[\s\S]*base: 'https:\/\/selfservice\.twu\.edu'/)
     assert.ok(!/legacyApi/.test(twuSrc), 'twu-scraper.js should not pass legacyApi')
   })
 
-  it('colleague.js has no legacyApi option, so passing one would be a silent no-op', () => {
+  it('colleague.js understands legacyApi and swaps both endpoints on it', () => {
     const opts = colleagueSrc.match(/export function createColleagueScraper\(\{([^}]*)\}\)/)
     assert.ok(opts, 'could not read createColleagueScraper options')
     const names = opts[1].split(',').map((s) => s.trim().split('=')[0].trim()).filter(Boolean)
-    assert.deepEqual(names, ['school', 'base'])
-    assert.ok(
-      !/legacyApi/.test(colleagueSrc),
-      'if a legacy-Colleague school is re-added, colleague.js must grow the option first'
+    assert.deepEqual(names, ['school', 'base', 'legacyApi'])
+    // The flag has to switch BOTH endpoints. Half-applying it would leave a
+    // legacy school POSTing a modern path and quietly returning no sections.
+    assert.match(
+      colleagueSrc,
+      /legacyApi \? 'GetCatalogAdvancedSearch' : 'GetCatalogAdvancedSearchAsync'/
     )
+    assert.match(colleagueSrc, /legacyApi \? 'PostSearchCriteria' : 'SearchAsync'/)
   })
 })
